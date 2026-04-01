@@ -75,5 +75,18 @@
             <artifactId>commons-jexl3</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Core module (shared transformation engine, PermuteConfig) -->
+        <dependency>
+            <groupId>io.quarkiverse.permuplate</groupId>
+            <artifactId>quarkus-permuplate-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Maven plugin (InlineGenerator, AnnotationReader) -->
+        <dependency>
+            <groupId>io.quarkiverse.permuplate</groupId>
+            <artifactId>quarkus-permuplate-maven-plugin</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
