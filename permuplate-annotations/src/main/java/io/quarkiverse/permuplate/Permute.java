@@ -12,75 +12,43 @@ import java.lang.annotation.Target;
  * <p>
  * <b>Type permutation</b> ({@code @Permute} on a class or interface) — for each
  * combination of the permutation variables, clones the type declaration, applies all
- * transformations, and writes a new top-level source file. Nested types are promoted
- * to top-level. Produces one file per combination.
+ * transformations, and writes a new source file. Nested types are promoted to
+ * top-level unless {@code inline = true} is set.
  *
  * <p>
- * Class example:
+ * <b>Inline generation</b> ({@code inline = true}, nested class only) — instead of
+ * writing separate top-level files, all generated permutations are written as nested
+ * siblings inside the parent class. Requires {@code permuplate-maven-plugin}; the APT
+ * annotation processor reports a compile error if it encounters {@code inline = true}.
  *
  * <pre>{@code
- * &#64;Permute(varName = "i", from = 3, to = 10, className = "Join${i}")
- * public class Join2 { ... }
- * }</pre>
- *
- * Generates Join3 through Join10.
- *
- * <p>
- * Interface example:
- *
- * <pre>{@code
- * @Permute(varName = "i", from = 2, to = 10, className = "Callable${i}")
- * public interface Callable1 {
- *     void call(@PermuteParam(varName = "j", from = "1", to = "${i}", type = "Object", name = "o${j}") Object o1);
+ * public class Handlers {
+ *     &#64;Permute(varName = "i", from = 2, to = 5,
+ *              className = "Handler${i}",
+ *              inline = true,
+ *              keepTemplate = true)
+ *     public static class Handler1 { ... }
  * }
  * }</pre>
  *
- * Generates Callable2 through Callable10.
- *
- * <p>
- * <b>Multiple permutation variables</b> — {@code extraVars} adds additional integer
- * loop variables, generating one class per combination (cross-product). The primary
- * variable ({@code varName}) is the outermost loop; {@code extraVars} are inner loops
- * in declaration order.
- *
- * <pre>{@code
- * &#64;Permute(varName = "i", from = 2, to = 4,
- *          className = "BiCallable${i}x${k}",
- *          extraVars = { @PermuteVar(varName = "k", from = 2, to = 4) })
- * public interface BiCallable1x1 { ... }
- * }</pre>
- *
- * Generates {@code BiCallable2x2} through {@code BiCallable4x4} (9 interfaces).
+ * Generates {@code Handlers.Handler2} through {@code Handlers.Handler5} as nested
+ * classes inside {@code Handlers}. If {@code keepTemplate = true}, {@code Handler1}
+ * is also retained in the output.
  *
  * <p>
  * <b>On a method</b> — generates a single new class containing one overload of the
- * method per combination of all variables. The {@code className} attribute names the
- * generated class (it should not contain the permutation variables since all overloads
- * go into the same class).
- *
- * <pre>
- * {@code
- * public class MyUtils {
- *     &#64;Permute(varName = "i", from = 2, to = 4, className = "MultiJoin")
- *     public static void join(
- *         @PermuteParam(varName = "j", from = "1", to = "${i}", type = "Object", name = "o${j}") Object o1) { ... }
- * }
- * }
- * </pre>
+ * method per combination. {@code inline} is not supported on methods.
  *
  * <p>
  * <b>className prefix rule (type permutation only):</b> the leading literal part of
  * {@code className} (everything before the first {@code ${...}}) must be a prefix of
- * the template class's simple name. {@code className = "Join${i}"} on {@code class Join2}
- * is valid (leading literal {@code "Join"} matches); {@code className = "Bar${i}"} on
- * {@code class Join2} is a compile error. The rule is skipped when {@code className}
- * starts with a {@code ${...}} variable expression, and does not apply when
- * {@code @Permute} is placed on a method.
+ * the template class's simple name. The rule is skipped when {@code className} starts
+ * with a {@code ${...}} variable expression, and does not apply when {@code @Permute}
+ * is placed on a method.
  *
  * <p>
  * <b>String variables:</b> {@code strings} entries are {@code "key=value"} pairs
- * providing fixed named string constants in all {@code ${...}} expressions. Keys must
- * not conflict with {@code varName} or any {@code extraVars} variable name.
+ * providing fixed named string constants in all {@code ${...}} expressions.
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target({ ElementType.TYPE, ElementType.METHOD })
@@ -103,23 +71,43 @@ public @interface Permute {
 
     /**
      * Named string constants available in all {@code ${...}} expressions alongside
-     * {@code varName}. Each entry must be in {@code "key=value"} format; the
-     * separator is the first {@code =} so values may contain further {@code =} signs.
+     * {@code varName}. Each entry must be in {@code "key=value"} format.
      * Keys must not match {@code varName} or any {@code extraVars} variable name.
      */
     String[] strings() default {};
 
     /**
-     * Additional integer loop variables for cross-product generation. Each entry adds
-     * one axis; one output type is generated per combination of all axes. The primary
-     * variable ({@code varName}) is the outermost loop; {@code extraVars} are inner
-     * loops in declaration order.
-     *
-     * <p>
-     * Variable names must not conflict with {@code varName}, each other, or any
-     * {@code strings} key.
+     * Additional integer loop variables for cross-product generation.
      *
      * @see PermuteVar
      */
     PermuteVar[] extraVars() default {};
+
+    /**
+     * When {@code true}, generates permuted classes as nested siblings inside the
+     * parent class rather than as separate top-level files.
+     *
+     * <p>
+     * Only valid on nested static classes. Requires {@code permuplate-maven-plugin};
+     * the APT annotation processor reports a compile error if this is set to
+     * {@code true}.
+     *
+     * <p>
+     * Template files with {@code inline = true} must be placed in
+     * {@code src/main/permuplate/} (the plugin's template directory) so they are
+     * not compiled directly by javac. The augmented parent class is written to
+     * {@code target/generated-sources/permuplate/} instead.
+     */
+    boolean inline() default false;
+
+    /**
+     * When {@code true} and {@code inline = true}, the template class itself is
+     * retained in the generated parent alongside the permuted classes. When
+     * {@code false} (default), the template class is removed — it was only a scaffold
+     * and the generated classes replace it entirely.
+     *
+     * <p>
+     * Has no effect when {@code inline = false}.
+     */
+    boolean keepTemplate() default false;
 }
