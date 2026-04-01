@@ -17,6 +17,7 @@
 
     <modules>
         <module>permuplate-annotations</module>
+        <module>permuplate-core</module>
         <module>permuplate-processor</module>
         <module>permuplate-example</module>
         <module>permuplate-tests</module>
@@ -43,6 +44,11 @@
             <dependency>
                 <groupId>io.quarkiverse.permuplate</groupId>
                 <artifactId>quarkus-permuplate-annotations</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkiverse.permuplate</groupId>
+                <artifactId>quarkus-permuplate-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
