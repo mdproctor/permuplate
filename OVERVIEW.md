@@ -15,6 +15,8 @@ This document covers internal architecture, implementation decisions, and testin
 
 In both paths, the source of the template is read via the compiler `Trees` API, parsed into a JavaParser AST, and all `${...}` expressions are evaluated with Apache Commons JEXL3.
 
+**Inline generation** (`@Permute(inline = true)` on a nested class, Maven plugin only) — instead of writing separate top-level files, all permuted classes are written as nested siblings inside an augmented copy of the parent class. This requires the Maven plugin (`permuplate-maven-plugin`) which runs in `generate-sources` before javac; the APT processor rejects `inline = true` with a clear error directing users to the plugin. Templates for inline generation live in `src/main/permuplate/` rather than `src/main/java/` so javac never compiles them directly.
+
 ---
 
 ## Annotation API Detail
@@ -33,6 +35,10 @@ public @interface Permute {
              default {};
     PermuteVar[] extraVars()   // additional integer axes for cross-product generation
              default {};
+    boolean inline()           // default false — inline into parent class (Maven plugin only)
+             default false;
+    boolean keepTemplate()     // default false — retain template class in inline output
+             default false;
 }
 ```
 
@@ -43,6 +49,8 @@ public @interface Permute {
 **Multiple permutation variables:** `extraVars` adds additional integer axes. `buildAllCombinations(permute)` generates the full cross-product: it starts with the primary variable's range, then for each `@PermuteVar` expands the list. Primary variable is outermost; `extraVars` are inner loops in declaration order. All N×M (×…) combinations are generated; `generatePermutation` receives a `EvaluationContext` with all variables already bound.
 
 **String variables:** `strings` entries are `"key=value"` pairs merged into every combination map. Keys must be non-empty and must not duplicate `varName` or any `extraVars` name.
+
+**Inline generation:** `inline = true` on a nested class instructs the Maven plugin to generate permuted classes as nested siblings in an augmented parent. The APT processor reports a compile error if this is set — use `permuplate-maven-plugin` instead.
 
 **Nested types:** when placed on a nested `static` class or interface, the processor finds the nested declaration inside the compilation unit (using `cu.findFirst()` — the recursive form, not `cu.getClassByName()` which only searches top-level types), clones it, strips the `static` modifier, and generates it as a top-level type. The package is resolved by walking up `getEnclosingElement()` until a `PackageElement` is found — the immediate enclosing element of a nested type is the outer class, not the package.
 
@@ -200,21 +208,29 @@ For method permutation, `parseSource(enclosingClass)` is called with the method'
 ```
 permuplate-parent/
 ├── permuplate-annotations/
-│   ├── Permute.java          — outer loop; type and method targets; strings + extraVars
+│   ├── Permute.java          — outer loop; type and method targets; strings + extraVars; inline + keepTemplate
 │   ├── PermuteVar.java       — nested annotation for one extra integer loop axis
 │   ├── PermuteDeclr.java     — field, constructor parameter, for-each renaming
 │   └── PermuteParam.java     — sentinel parameter expansion + anchor call-site rewriting
-├── permuplate-processor/
-│   ├── PermuteProcessor.java        — AP entry point; type and method permutation paths;
-│   │                                   buildAllCombinations() for cross-product generation;
-│   │                                   validation; error reporting with annotation precision
+├── permuplate-core/
 │   ├── EvaluationContext.java       — JEXL3 wrapper; Map<String,Object> for int + string vars
 │   ├── PermuteDeclrTransformer.java — fields, constructor params, for-each renaming;
 │   │                                   validatePrefixes() for pre-generation validation
-│   └── PermuteParamTransformer.java — parameter expansion + anchor mechanism;
-│                                       validatePrefixes() for name prefix check
-├── permuplate-example/   template examples (Join2, ContextJoin2, JoinLibrary, Callable1, ...)
-└── permuplate-tests/     compile-testing unit tests
+│   ├── PermuteParamTransformer.java — parameter expansion + anchor mechanism;
+│   │                                   validatePrefixes() for name prefix check
+│   └── PermuteConfig.java           — shared configuration model (parsed from annotations)
+├── permuplate-processor/
+│   └── PermuteProcessor.java        — APT entry point (thin shell); type and method permutation paths;
+│                                       buildAllCombinations() for cross-product generation;
+│                                       validation; error reporting with annotation precision;
+│                                       rejects inline=true with migration message
+├── permuplate-maven-plugin/
+│   └── PermuteMojo.java             — Maven Mojo; generate-sources phase; reads src/main/permuplate/
+│                                       for inline templates; writes augmented parent CU to
+│                                       target/generated-sources/permuplate/
+├── permuplate-apt-examples/  APT examples (Join2, ContextJoin2, JoinLibrary, Callable1, ...)
+├── permuplate-mvn-examples/  Maven plugin examples (Handlers inline demo)
+└── permuplate-tests/         compile-testing unit tests
 ```
 
 **Key build concern:** `permuplate-processor` uses `-proc:none` to prevent self-invocation during compilation. The example and test modules must list the processor **and its transitive dependencies** (`javaparser-core`, `commons-jexl3`) explicitly under `annotationProcessorPaths` — `maven-compiler-plugin` 3.x isolates the processor classloader and does not auto-discover transitive deps.
@@ -229,13 +245,14 @@ Tests are organised into focused test classes:
 
 | Class | Coverage area |
 |---|---|
-| `PermuteTest` | Type permutation range, nested class/interface promotion to top-level, double-digit arities, string variable in `className`, cross-product via `extraVars` |
+| `PermuteTest` | Type permutation range, nested class/interface promotion to top-level, double-digit arities, string variable in `className`, cross-product via `extraVars`, (inline generation tested via InlineGenerationTest) |
 | `PermuteDeclrTest` | Field rename across all methods, constructor parameter rename, for-each variable rename, two annotated fields, dual for-each loops |
 | `PermuteParamTest` | Fixed params before/after sentinel, multiple methods in same class, anchor expansion |
 | `ExampleTest` | Real-world domain templates: `ProductFilter2`, `AuditRecord2`, `ValidationSuite.FieldValidator2` |
 | `DogFoodingTest` | `Callable1` generates `Callable2`–`Callable10` — Permuplate describes its own foundational types |
 | `ExampleTest` | Real-world templates including `BiCallable1x1` cross-product (9 interfaces via `extraVars`) |
 | `DegenerateInputTest` | All error paths with message content and source-position assertions |
+| `InlineGenerationTest` | InlineGenerator (augmented parent CU), AnnotationReader (JavaParser to PermuteConfig), keepTemplate behavior |
 
 `ProcessorTestSupport` provides shared infrastructure: `templateSource()` reads real template `.java` files from `src/test/java/`; `compileTemplate()` adds generated `Callable{n}` support sources; `classLoaderFor()` loads generated `.class` bytes; `capturingProxy()` creates reflective proxies for behavioural assertions; `assertJoinN()` is a structural + behavioural assertion helper for the Join pattern.
 

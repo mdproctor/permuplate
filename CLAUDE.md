@@ -22,13 +22,16 @@ This is genuinely novel. Every comparable tool (Vavr generators, Freemarker temp
 
 ```
 permuplate-parent/
-├── permuplate-annotations/     @Permute, @PermuteDeclr, @PermuteParam  (no deps)
-├── permuplate-processor/       Annotation processor + transformers
-├── permuplate-example/         Living template examples (Join2, ContextJoin2, JoinLibrary)
+├── permuplate-annotations/     @Permute, @PermuteDeclr, @PermuteParam, @PermuteVar  (no runtime deps)
+├── permuplate-core/            shared transformation engine: EvaluationContext, transformers, PermuteConfig
+├── permuplate-processor/       APT entry point only (thin shell depending on permuplate-core)
+├── permuplate-maven-plugin/    Maven Mojo for pre-compilation generation including inline mode
+├── permuplate-apt-examples/    APT examples (renamed from permuplate-example)
+├── permuplate-mvn-examples/    Maven plugin examples with Handlers inline demo
 └── permuplate-tests/           Unit tests via Google compile-testing
 ```
 
-The processor module uses `-proc:none` to prevent self-invocation during its own compilation. The example and test modules must list the processor **and its transitive deps** (javaparser-core, commons-jexl3) explicitly under `annotationProcessorPaths` — `maven-compiler-plugin` 3.x does not auto-discover them.
+The processor module uses `-proc:none` to prevent self-invocation during its own compilation. The apt-examples and test modules must list the processor **and its transitive deps** (javaparser-core, commons-jexl3) explicitly under `annotationProcessorPaths` — `maven-compiler-plugin` 3.x does not auto-discover them.
 
 Maven is at `/opt/homebrew/bin/mvn`. The standard build command is:
 
@@ -84,7 +87,7 @@ The sentinel's original name is registered as an **anchor**. Every method call i
 
 ### Entry point: `PermuteProcessor`
 
-`AbstractProcessor` subclass. Dispatches to `processTypePermutation` (TypeElement) or `processMethodPermutation` (ExecutableElement). For type permutation:
+`AbstractProcessor` subclass. Dispatches to `processTypePermutation` (TypeElement) or `processMethodPermutation` (ExecutableElement). `processTypePermutation` also validates `inline = true` (error — only the Maven plugin supports inline generation) and `keepTemplate = true` without `inline` (warning). For type permutation:
 
 1. Reads source via `Trees` API using `getCharContent(true)` — works for file-based and in-memory sources
 2. Parses with `StaticJavaParser`
@@ -143,6 +146,10 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | Constructor name after class rename | After `classDecl.setName(newClassName)`, all constructor declarations must also be renamed (`classDecl.getConstructors().forEach(ctor -> ctor.setName(newClassName))`). JavaParser does not propagate class renames to constructors automatically. |
 | Processor self-compilation | `-proc:none` in permuplate-processor/pom.xml |
 | `annotationProcessorPaths` | Must list processor + javaparser-core + commons-jexl3 explicitly — maven-compiler-plugin 3.x isolates the processor classloader |
+| Inline generation uses Maven plugin, not APT | APT can only CREATE new files; it cannot modify existing parent class files. `inline = true` therefore requires `permuplate-maven-plugin` (runs in `generate-sources`, reads source files directly with JavaParser). The APT errors on `inline = true` with a migration message. |
+| Template directory not on compile path | `src/main/permuplate/` (inline templates) is never added as a Maven compile source root. The Maven plugin reads it at `generate-sources` time and writes augmented parent classes to `target/generated-sources/permuplate/`. Javac compiles only the output dir. IDE users mark `src/main/permuplate` as a source root manually. |
+| InlineGenerator strips all permuplate annotations | When `keepTemplate = true`, the retained template class must have `@Permute`, `@PermuteDeclr`, and `@PermuteParam` all stripped — not just `@Permute` — otherwise javac cannot compile the annotations that reference types from `permuplate-annotations`. |
+| permuplate-core null-checks Messager | `PermuteDeclrTransformer` and `PermuteParamTransformer` take `Messager` as a parameter. The Maven plugin passes `null` (no Messager in Maven). All `messager.printMessage(...)` calls are guarded with `if (messager != null)`. |
 
 ---
 

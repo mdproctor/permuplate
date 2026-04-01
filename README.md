@@ -127,6 +127,122 @@ public class Join2 {
 
 ---
 
+## APT vs Maven Plugin
+
+Permuplate offers two generation modes. Choose based on what your project needs.
+
+### Annotation Processor (APT) — for top-level generation
+
+The simplest setup. Add `permuplate-processor` to `annotationProcessorPaths` and `javac` invokes it automatically. Every permuted class becomes a separate top-level `.java` file.
+
+**Use the APT when:**
+- All your generated classes can be top-level files
+- You want minimal build configuration
+- You don't need `@Permute(inline = true)`
+
+**Complete `pom.xml` configuration:**
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>io.quarkiverse.permuplate</groupId>
+        <artifactId>quarkus-permuplate-annotations</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </dependency>
+</dependencies>
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>io.quarkiverse.permuplate</groupId>
+                        <artifactId>quarkus-permuplate-processor</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                    </path>
+                    <path>
+                        <groupId>com.github.javaparser</groupId>
+                        <artifactId>javaparser-core</artifactId>
+                        <version>3.25.9</version>
+                    </path>
+                    <path>
+                        <groupId>org.apache.commons</groupId>
+                        <artifactId>commons-jexl3</artifactId>
+                        <version>3.3</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+Template files live in `src/main/java/` as usual.
+
+### Maven Plugin — for inline generation (and everything the APT does)
+
+The Maven plugin runs in the `generate-sources` phase — before `javac` touches anything. It supports all APT functionality **plus** `@Permute(inline = true)`: permuted classes can be generated as nested siblings inside the parent class.
+
+**Use the Maven plugin when:**
+- You want generated classes nested inside a parent (`inline = true`)
+- You prefer a pre-compilation approach (plugin runs before javac)
+- You are switching from APT and want to keep all existing templates working
+
+> **Important:** Do not configure both the APT processor and the Maven plugin in the same project. They would process the same annotations twice, producing duplicate generated classes and compile errors. When switching from APT to the plugin, remove `permuplate-processor` from `annotationProcessorPaths`.
+
+**Complete `pom.xml` configuration:**
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>io.quarkiverse.permuplate</groupId>
+        <artifactId>quarkus-permuplate-annotations</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </dependency>
+</dependencies>
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>io.quarkiverse.permuplate</groupId>
+            <artifactId>quarkus-permuplate-maven-plugin</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <executions>
+                <execution>
+                    <goals><goal>generate</goal></goals>
+                </execution>
+            </executions>
+        </plugin>
+        <!-- Disable APT — the Maven plugin handles all @Permute processing -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+                <compilerArgs>
+                    <arg>-proc:none</arg>
+                </compilerArgs>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+**Template directories with the Maven plugin:**
+- Non-inline templates (`inline = false`, the default): place in `src/main/java/` as normal
+- Inline templates (`inline = true`): place in `src/main/permuplate/` — the plugin's dedicated template directory. These files are read by the plugin before javac runs; javac never compiles them directly.
+
+**IDE setup for `src/main/permuplate/`:**
+
+The template directory is intentionally not a Maven compile source root (to avoid duplicate class errors with the generated augmented version). Mark it as a source root in your IDE manually so refactoring and navigation work on your templates:
+
+- **IntelliJ IDEA:** Right-click `src/main/permuplate` → *Mark Directory As → Sources Root*
+- **VS Code:** Add the path to your Java project source directories in settings
+
+---
+
 ## The killer example
 
 The best way to see why this is different is to look at what the template *is* versus what it *produces*.
@@ -308,8 +424,31 @@ Drives the outer loop. Supported in two positions:
 | `className` | `String` | Output type/class name. For type permutation: a template evaluated per-i (e.g. `"Join${i}"`). For method permutation: a fixed class name (e.g. `"MultiJoin"`) containing all overloads. |
 | `strings` | `String[]` | Named string constants available in all `${...}` expressions alongside `varName`. Each entry is `"key=value"`. Example: `strings = {"prefix=Buffered"}` makes `${prefix}` expand to `"Buffered"` in `className`, `@PermuteDeclr`, and `@PermuteParam`. See [Expression syntax — String variables](#string-variables). |
 | `extraVars` | `@PermuteVar[]` | Additional integer loop variables for cross-product generation. Each `@PermuteVar(varName="k", from=2, to=4)` adds one axis; one output type is generated per combination. Primary variable is the outermost loop; `extraVars` are inner loops in declaration order. Variable names must not conflict with `varName` or `strings` keys. See [Expression syntax — Multiple permutation variables](#multiple-permutation-variables). |
+| `inline` | `boolean` | Default `false`. When `true`, generates permuted classes as nested siblings inside the parent class rather than separate top-level files. Only valid on nested static classes. Requires `permuplate-maven-plugin`; the APT annotation processor reports a compile error if set. Template must be in `src/main/permuplate/`. |
+| `keepTemplate` | `boolean` | Default `false`. When `true` and `inline = true`, retains the template class itself in the output alongside the permuted classes. When `false`, the template class is removed. Has no effect when `inline = false`. |
 
 **`className` prefix rule (type permutation only):** the static (non-`${...}`) part of `className` must be a prefix of the template class's simple name. `className = "Join${i}"` on `class Join2` is valid; `className = "Bar${i}"` on `class Join2` is a compile error. This rule does not apply when `className` starts with a variable expression or to method-level `@Permute`.
+
+**Inline generation example:**
+
+```java
+public class Handlers {
+    @Permute(varName = "i", from = 2, to = 5,
+             className = "Handler${i}",
+             inline = true,
+             keepTemplate = true)
+    public static class Handler1 {
+        private @PermuteDeclr(type = "Callable${i}", name = "delegate${i}") Callable1 delegate1;
+
+        public void handle(
+                @PermuteParam(varName = "j", from = "1", to = "${i}", type = "Object", name = "arg${j}") Object arg1) {
+            delegate1.call(arg1);
+        }
+    }
+}
+```
+
+With `keepTemplate = true`, the output `Handlers.java` contains `Handler1` through `Handler5` all nested inside `Handlers`. Users write `Handlers.Handler3 h = (a1, a2, a3) -> ...` with no top-level file clutter.
 
 ### `@PermuteDeclr`
 
