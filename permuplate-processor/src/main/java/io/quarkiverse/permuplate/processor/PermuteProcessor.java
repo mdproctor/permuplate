@@ -35,6 +35,8 @@ import io.quarkiverse.permuplate.PermuteVar;
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
+import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
+import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 
 /**
  * Annotation processor for {@link Permute}.
@@ -182,22 +184,20 @@ public class PermuteProcessor extends AbstractProcessor {
             return;
         }
 
-        // className prefix rule: the LEADING literal (before the first ${...}) must be
-        // a prefix of the template class name. Using only the leading literal (rather
-        // than all literal segments combined) correctly handles multi-variable classNames
-        // like "Combo${i}x${k}" whose leading literal is "Combo", not "Combox".
-        String leadingLiteral = permute.className().contains("${")
-                ? permute.className().substring(0, permute.className().indexOf("${"))
-                : permute.className();
+        // R2 for className: all static literals must appear as substrings of the template class name
         String templateSimpleName = typeElement.getSimpleName().toString();
-        if (!leadingLiteral.isEmpty() && !templateSimpleName.startsWith(leadingLiteral)) {
-            error(String.format(
-                    "@Permute className leading literal \"%s\" is not a prefix of the template" +
-                            " class name \"%s\" — the className expression must share the same" +
-                            " base name as the template",
-                    leadingLiteral, templateSimpleName),
-                    typeElement, permuteMirror, findAnnotationValue(permuteMirror, "className"));
-            return;
+        {
+            AnnotationStringTemplate parsedClassNameTemplate = AnnotationStringAlgorithm.parse(permute.className());
+            if (!parsedClassNameTemplate.hasNoLiteral()
+                    && !AnnotationStringAlgorithm.matches(parsedClassNameTemplate, templateSimpleName)) {
+                error(String.format(
+                        "@Permute className \"%s\" has a literal that does not appear as a" +
+                                " substring of the template class name \"%s\" —" +
+                                " the className expression must reference the template class name",
+                        permute.className(), templateSimpleName),
+                        typeElement, permuteMirror, findAnnotationValue(permuteMirror, "className"));
+                return;
+            }
         }
 
         CompilationUnit templateCu = parseSource(typeElement);

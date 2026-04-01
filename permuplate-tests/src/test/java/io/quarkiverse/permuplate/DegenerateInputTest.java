@@ -505,14 +505,14 @@ public class DegenerateInputTest {
      */
     @Test
     public void testExtraVarsPresentInClassNameDoesNotTriggerR1b() {
-        var compilation = compile(Callable2.class, "Foo2",
+        var compilation = compile(Callable2.class, "Foo2x",
                 """
                         package %s;
                         import %s;
                         import %s;
                         @Permute(varName = "i", from = 2, to = 3, className = "Foo${i}x${k}",
                                  extraVars = { @PermuteVar(varName = "k", from = 2, to = 3) })
-                        public class Foo2 {}
+                        public class Foo2x {}
                         """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
 
         assertThat(compilation).succeeded();
