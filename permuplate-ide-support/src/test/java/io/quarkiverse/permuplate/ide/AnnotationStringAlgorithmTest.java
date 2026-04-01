@@ -244,4 +244,124 @@ class AnnotationStringAlgorithmTest {
     private static AnnotationStringTemplate parse(String s) {
         return AnnotationStringAlgorithm.parse(s);
     }
+
+    // =========================================================
+    // validate()
+    // =========================================================
+
+    private static java.util.List<ValidationError> validate(String template, String targetName) {
+        var t = AnnotationStringAlgorithm.expandStringConstants(
+                AnnotationStringAlgorithm.parse(template), java.util.Map.of());
+        return AnnotationStringAlgorithm.validate(t, targetName, java.util.Map.of());
+    }
+
+    private static java.util.List<ValidationError> validate(String template, String targetName,
+            java.util.Map<String, String> constants) {
+        var t = AnnotationStringAlgorithm.expandStringConstants(
+                AnnotationStringAlgorithm.parse(template), constants);
+        return AnnotationStringAlgorithm.validate(t, targetName, constants);
+    }
+
+    @Test
+    void validate_r2_unmatchedSingleLiteral() {
+        var errors = validate("Foo${i}", "Callable2");
+        assertEquals(1, errors.size());
+        assertEquals(ValidationError.ErrorKind.UNMATCHED_LITERAL, errors.get(0).kind());
+    }
+
+    @Test
+    void validate_r2_unmatchedSecondLiteral() {
+        var errors = validate("Async${i}Cache", "AsyncDiskHandler2");
+        assertEquals(1, errors.size());
+        assertEquals(ValidationError.ErrorKind.UNMATCHED_LITERAL, errors.get(0).kind());
+    }
+
+    @Test
+    void validate_r2_shortCircuitsR3() {
+        // "${v1}Foo${v2}" on "Callable2": "Foo" not in "Callable2" → only R2, no orphan error for v1
+        var errors = validate("${v1}Foo${v2}", "Callable2");
+        assertEquals(1, errors.size());
+        assertEquals(ValidationError.ErrorKind.UNMATCHED_LITERAL, errors.get(0).kind());
+    }
+
+    @Test
+    void validate_r3_orphanSingleAtStart() {
+        // "${v1}Callable${v2}" on "Callable2": prefix before "Callable" = "" → v1 orphan
+        var errors = validate("${v1}Callable${v2}", "Callable2");
+        assertEquals(1, errors.size());
+        assertEquals(ValidationError.ErrorKind.ORPHAN_VARIABLE, errors.get(0).kind());
+        assertEquals("v1", errors.get(0).varName());
+    }
+
+    @Test
+    void validate_r3_orphanMultipleAdjacent() {
+        // "${v1}${v2}Callable${v3}" on "Callable2": prefix="" → v1 and v2 both orphan
+        var errors = validate("${v1}${v2}Callable${v3}", "Callable2");
+        assertEquals(2, errors.size());
+        assertTrue(errors.stream().allMatch(e -> e.kind() == ValidationError.ErrorKind.ORPHAN_VARIABLE));
+        var varNames = errors.stream().map(ValidationError::varName).toList();
+        assertTrue(varNames.contains("v1") && varNames.contains("v2"));
+    }
+
+    @Test
+    void validate_r3_notOrphan_nonEmptyPrefix() {
+        // "${v1}Callable${v2}" on "MyCallable2": prefix "My" non-empty → no errors
+        var errors = validate("${v1}Callable${v2}", "MyCallable2");
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void validate_r3_adjacentVariables_nonEmptyCollective_notOrphan() {
+        // "${v1}${v2}Callable${v3}" on "MyCallable2": collective prefix "My" non-empty → neither orphan
+        var errors = validate("${v1}${v2}Callable${v3}", "MyCallable2");
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void validate_r3_suffixNotOrphan() {
+        // "Callable${v1}" on "Callable2": suffix "2" non-empty → v1 not orphan
+        var errors = validate("Callable${v1}", "Callable2");
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void validate_r4_pureVariables() {
+        var errors = validate("${v1}${v2}", "Callable2");
+        assertEquals(1, errors.size());
+        assertEquals(ValidationError.ErrorKind.NO_ANCHOR, errors.get(0).kind());
+    }
+
+    @Test
+    void validate_r4_noExpansion() {
+        // "${prefix}${i}" with no constants for prefix → no anchor after expansion attempt
+        var errors = validate("${prefix}${i}", "Callable2");
+        assertEquals(1, errors.size());
+        assertEquals(ValidationError.ErrorKind.NO_ANCHOR, errors.get(0).kind());
+    }
+
+    @Test
+    void validate_valid_substrMatch() {
+        var errors = validate("${v1}Callable${v2}", "ThisIsMyPrefixCallable3");
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void validate_valid_multipleLiteralsInOrder() {
+        var errors = validate("Async${i}Handler", "AsyncDiskHandler2");
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void validate_valid_stringConstantComposesLiteral() {
+        var errors = validate("${prefix}${i}", "Callable2", java.util.Map.of("prefix", "Callable"));
+        assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void validate_r1_notChecked_noVariables_allowed() {
+        // validate() does NOT enforce R1 (no-variables). The processor does that.
+        // "Object" on "Object": literal found, no variables to be orphan → valid.
+        var errors = validate("Object", "Object");
+        assertTrue(errors.isEmpty());
+    }
 }

@@ -268,4 +268,103 @@ public class AnnotationStringAlgorithm {
         }
         return s.substring(0, j + 1);
     }
+
+    // =========================================================
+    // validate()
+    // =========================================================
+
+    /**
+     * Validates an annotation string template against a target name (class name,
+     * field name, parameter name, etc.) after expanding string constants.
+     *
+     * <p>
+     * Rules checked (in order, R2 short-circuits R3):
+     * <ul>
+     * <li><b>R4:</b> no static literal after expansion → NO_ANCHOR error</li>
+     * <li><b>R2:</b> each literal must appear as a substring in targetName in order;
+     * first mismatch short-circuits and skips R3</li>
+     * <li><b>R3:</b> adjacent variable groups covering an empty region are orphan</li>
+     * </ul>
+     *
+     * <p>
+     * <b>R1 (no variables in className) is NOT checked here.</b>
+     * It is enforced by the processor for {@code @Permute.className} only.
+     *
+     * @param t the already-expanded annotation string template
+     * @param targetName the actual class/field/param name to validate against
+     * @param constants the string constants (already expanded into {@code t})
+     * @return empty list if valid; otherwise one or more errors
+     */
+    public static List<ValidationError> validate(AnnotationStringTemplate t,
+            String targetName, Map<String, String> constants) {
+        List<String> literals = t.staticLiterals();
+
+        // R4: no anchor
+        if (literals.isEmpty()) {
+            return List.of(ValidationError.noAnchor(
+                    "add a literal portion or define the variable in @Permute strings"));
+        }
+
+        // R2: find each literal in order — first failure short-circuits R3
+        List<int[]> positions = new ArrayList<>();
+        int searchFrom = 0;
+        for (String literal : literals) {
+            int pos = targetName.indexOf(literal, searchFrom);
+            if (pos < 0) {
+                return List.of(ValidationError.unmatchedLiteral(literal, targetName));
+            }
+            positions.add(new int[] { pos, pos + literal.length() });
+            searchFrom = pos + literal.length();
+        }
+
+        // R3: check orphan variables
+        List<ValidationError> errors = new ArrayList<>();
+        checkOrphans(t, targetName, literals, positions, errors);
+        return errors;
+    }
+
+    private static void checkOrphans(AnnotationStringTemplate t, String targetName,
+            List<String> literals, List<int[]> positions, List<ValidationError> errors) {
+        // Walk the parts list, collecting variable groups between literals.
+        // Each group collectively covers one text region in the target name.
+        List<AnnotationStringPart> parts = t.parts();
+        int literalIdx = 0;
+        List<String> currentGroup = new ArrayList<>();
+
+        for (AnnotationStringPart part : parts) {
+            if (part.isVariable()) {
+                currentGroup.add(part.text());
+            } else {
+                String literal = part.text();
+                if (literal.isEmpty())
+                    continue; // empty filler from parse()
+
+                // Flush current group — they cover the region BEFORE this literal
+                if (!currentGroup.isEmpty()) {
+                    int litStart = positions.get(literalIdx)[0];
+                    int prevEnd = (literalIdx == 0) ? 0 : positions.get(literalIdx - 1)[1];
+                    String region = targetName.substring(prevEnd, litStart);
+                    if (region.isEmpty()) {
+                        for (String varName : currentGroup) {
+                            errors.add(ValidationError.orphanVariable(varName, literal, false));
+                        }
+                    }
+                    currentGroup.clear();
+                }
+                literalIdx++;
+            }
+        }
+
+        // Final group: variables AFTER the last literal
+        if (!currentGroup.isEmpty() && !literals.isEmpty()) {
+            int lastEnd = positions.get(positions.size() - 1)[1];
+            String region = targetName.substring(lastEnd);
+            if (region.isEmpty()) {
+                String lastLiteral = literals.get(literals.size() - 1);
+                for (String varName : currentGroup) {
+                    errors.add(ValidationError.orphanVariable(varName, lastLiteral, true));
+                }
+            }
+        }
+    }
 }
