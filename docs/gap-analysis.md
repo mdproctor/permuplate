@@ -182,6 +182,23 @@ Wait — `@Permute` on a method uses `className` for the generated **class**, no
 
 ---
 
+### N4 — Expression language functions (`alpha`, `lower`)
+
+**What it is:** Built-in functions registered in the JEXL engine and available in all string attributes. `alpha(n)` converts an integer to an uppercase letter (1-indexed: A=1, B=2, ..., Z=26); `lower(n)` converts to lowercase.
+
+**Example:**
+```java
+// Single-letter type parameters — Drools-style
+@PermuteReturn(typeArgVarName="j", typeArgFrom="1", typeArgTo="${i+1}", typeArgName="${alpha(j)}")
+// → A, B, C, D, E instead of T1, T2, T3, T4, T5
+```
+
+**Status:** Designed (see `docs/superpowers/specs/2026-04-02-expression-language-functions-n4-design.md`). This is the prerequisite that enables the Drools `A, B, C, D, E` naming pattern with G2's explicit `@PermuteReturn`. Without N4, users are constrained to the `T${j}` naming convention for implicit inference to work.
+
+**Why this matters:** N4 is the direct motivator for why `@PermuteReturn` exists as an explicit mechanism rather than relying solely on implicit inference. The Drools use case requires `alpha(j)` naming; explicit `@PermuteReturn` with N4 functions reproduces the hand-written Drools pattern exactly.
+
+---
+
 ### N3 — `@PermuteParam` on interface abstract methods (not just class methods)
 
 **What it is:** Using `@PermuteParam` to expand parameters on an interface method (abstract, no body). This is implicit in the RuleInterfaces example but hasn't been explicitly demonstrated.
@@ -209,6 +226,7 @@ public interface Condition1 {
 | 3 | N1+S1+S2 — Test inline=true on interfaces + two templates | New pattern + soft gaps | Medium (needs RuleInterfaces example) | Validates real use case |
 | 4 | N3 — Verify @PermuteParam on abstract interface method | New pattern | Low | Needed for N1 |
 | 5 | S4 — Degenerate test for empty @PermuteParam range | Soft gap | Low | Edge case safety |
-| 6 | N2 — Method name templating (`path${i}()`) | New pattern → requires new feature | High | New capability |
-| 7 | G1 — Generic type parameter arity | Hard gap | Very high | New capability |
-| 8 | G2 — Return type narrowing by arity | Hard gap | Very high | New capability |
+| 6 | N4 — Expression language functions (`alpha`, `lower`) | New pattern | Low | Enables Drools naming; prerequisite for G2 Drools example |
+| 7 | N2 — Method name templating (`path${i}()`) | New pattern → requires new feature | High | New capability |
+| 8 | G1 — Generic type parameter arity | Hard gap | Very high | New capability |
+| 9 | G2 — Return type narrowing by arity | Hard gap | Very high | New capability |

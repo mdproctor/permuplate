@@ -155,6 +155,7 @@ Use `@PermuteReturn` in these situations — each one should be documented clear
 | Situation | Why explicit is needed |
 |---|---|
 | **APT mode** | Template must be compilable Java; `Step2` as return type doesn't compile before `Step2` is generated. Use `Object` as the sentinel return type. |
+| **Custom type variable naming (e.g., `alpha(j)`)** | Inference Condition 2 requires the `T${j}` convention. Using `alpha(j)` (→ `A, B, C`) or any other naming requires explicit `@PermuteReturn`. This is the canonical Drools use case — see example below. |
 | **Type args don't follow `T${j}` convention** | Inference Condition 2 fails; processor cannot determine the growing series. |
 | **Return type is a non-linear offset** | E.g., `Step${i+2}` (skipping one) — inference always assumes `i+1`. |
 | **Leaf class must reference an external class** | `when="true"` overrides boundary omission to force generation. |
@@ -277,6 +278,39 @@ public class Step1<T1> {
 }
 ```
 
+### Drools-style single-letter type parameters (explicit `@PermuteReturn` + `alpha(j)`)
+
+This is the canonical example for why `@PermuteReturn` exists. The Drools RuleBuilder DSL uses `A, B, C, D, E` as fact type parameter names rather than `T1, T2, T3`. The `alpha(j)` built-in expression function (N4) converts an integer to an uppercase letter.
+
+Implicit inference does **not** apply here — Condition 2 requires the `T${j}` naming convention, and `alpha(j)` produces `A, B, C` which the processor cannot reverse-engineer into a range. Explicit `@PermuteReturn` is required.
+
+```java
+// src/main/permuplate/.../JoinChain.java
+@Permute(varName="i", from=1, to=5, className="Join${i}First", inline=true, keepTemplate=true)
+public class Join1First<@PermuteTypeParam(varName="j", from="1", to="${i}", name="${alpha(j)}") A> {
+
+    // @PermuteReturn required: alpha(j) naming does not trigger implicit inference
+    @PermuteReturn(className="Join${i+1}First",
+                   typeArgVarName="j", typeArgFrom="1", typeArgTo="${i+1}", typeArgName="${alpha(j)}")
+    public Join2First<A, B> join(
+            @PermuteDeclr(type="Source<${alpha(i+1)}>") Source<B> source) { ... }
+
+    public void execute(Action1<A> action) { ... }
+}
+```
+
+Generated output:
+
+```java
+public class Join1First<A>             { public Join2First<A, B>          join(Source<B> source) { ... } ... }
+public class Join2First<A, B>          { public Join3First<A, B, C>       join(Source<C> source) { ... } ... }
+public class Join3First<A, B, C>       { public Join4First<A, B, C, D>    join(Source<D> source) { ... } ... }
+public class Join4First<A, B, C, D>    { public Join5First<A, B, C, D, E> join(Source<E> source) { ... } ... }
+public class Join5First<A, B, C, D, E> { /* join() omitted — Join6First not in generated set */              ... }
+```
+
+Boundary omission still applies — `Join5First` has no `join()`, exactly matching the hand-written Drools pattern.
+
 ### Overriding boundary omission (`when`)
 
 ```java
@@ -325,7 +359,8 @@ New test class `PermuteReturnTest`:
 - **Implicit / with `@PermuteDeclr` on parameter:** `Source<T2>` → `Source<T${i+1}>` in each generated class
 - **Explicit `@PermuteReturn` / APT mode:** `Object` sentinel → correct typed return in each generated class
 - **Explicit `@PermuteReturn` / `when` override:** boundary omission suppressed; last class has method pointing to external type
-- **Drools-style full chain:** `Join1First`–`Join5First` with `join()`, `execute()`, `filter()`; `Join5First` has no `join()`
+- **Drools-style `T${j}` chain:** `Join1First<T1>`–`Join5First<T1..T5>` with implicit inference; `Join5First` has no `join()`
+- **Drools-style `alpha(j)` chain:** `Join1First<A>`–`Join5First<A..E>` with explicit `@PermuteReturn`; `Join5First` has no `join()` — requires N4 expression functions
 - **Degenerate V1:** `@PermuteReturn` outside `@Permute` type → error
 - **Degenerate V2:** `typeArgVarName` without `typeArgTo` → error
 - **Degenerate V3:** `typeArgFrom > typeArgTo` → error
