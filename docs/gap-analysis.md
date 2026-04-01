@@ -43,6 +43,27 @@ interface Condition2 { boolean test(Object fact1, Object fact2); }
 
 ---
 
+### G3 — Multi-join permutation (multiple overloads per class, two-variable boundary)
+
+**What the Drools DSL needs:**
+```java
+// From1First has join() overloads for +1, +2, +3 facts at once:
+public <C>     Join2First<END,DS,B,C>     join(From1First<?,DS,C> fromC)
+public <C,D>   Join3First<END,DS,B,C,D>   join(Join2Second<Void,DS,C,D> fromCD)
+public <C,D,E> Join4First<END,DS,B,C,D,E> join(Join3First<Void,DS,C,D,E> fromCDE)
+```
+
+**The gap:** Permuplate can generate one method per class (G2). For each `Join${i}Second`, the Drools pattern requires *N* overloads of `join()` — one per valid step size j (1 ≤ j ≤ max−i). The parameter type, its type arguments, and the return type all vary with both `i` and `j`. Additionally, `Join${i}First extends Join${i}Second<T1..T${i}>` — the extends clause also carries type references that must grow per permutation.
+
+**Three new capabilities required:**
+1. `@PermuteMethod` — generates multiple method overloads per class using an inner loop variable `j`
+2. `typeArgList(from, to, style)` — JEXL function for comma-separated type argument lists in `@PermuteDeclr.type`
+3. Extends/implements clause expansion — same implicit inference as G2 return type inference applied to `extends`/`implements`
+
+**Depends on:** G1, G2, N4
+
+---
+
 ### G2 — Return type narrowing by arity (stateful builder types)
 
 **What the Drools DSL needs:**
@@ -230,3 +251,4 @@ public interface Condition1 {
 | 7 | N2 — Method name templating (`path${i}()`) | New pattern → requires new feature | High | New capability |
 | 8 | G1 — Generic type parameter arity | Hard gap | Very high | New capability |
 | 9 | G2 — Return type narrowing by arity | Hard gap | Very high | New capability |
+| 10 | G3 — Multi-join permutation (multiple overloads + two-variable boundary) | Hard gap | Very high | New capability; depends on G1+G2+N4 |

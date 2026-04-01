@@ -20,6 +20,10 @@ The problem has two coupled parts:
 
 ## Design Overview
 
+G2 introduces two mechanisms and extends one existing annotation.
+
+> **Note:** G2 as specified covers method return types. Extends/implements clause expansion (e.g., `Join1First<T1> extends Join1Second<T1>` → `Join2First<T1,T2> extends Join2Second<T1,T2>`) uses the same implicit inference rules but is fully specified and implemented in **G3**, which depends on G2.
+
 G2 introduces two mechanisms and extends one existing annotation:
 
 | Mechanism | Mode | Annotation required |
