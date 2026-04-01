@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.quarkiverse</groupId>
+        <artifactId>quarkiverse-parent</artifactId>
+        <version>21</version>
+    </parent>
+
+    <groupId>io.quarkiverse.permuplate</groupId>
+    <artifactId>quarkus-permuplate-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>permuplate-annotations</module>
+        <module>permuplate-processor</module>
+        <module>permuplate-example</module>
+        <module>permuplate-tests</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Dependency versions -->
+        <javaparser.version>3.25.9</javaparser.version>
+        <commons-jexl3.version>3.3</commons-jexl3.version>
+        <compile-testing.version>0.21.0</compile-testing.version>
+        <guava.version>32.1.3-jre</guava.version>
+        <junit.version>4.13.2</junit.version>
+
+        <!-- Plugin versions -->
+        <compiler-plugin.version>3.15.0</compiler-plugin.version>
+        <surefire-plugin.version>3.2.5</surefire-plugin.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.quarkiverse.permuplate</groupId>
+                <artifactId>quarkus-permuplate-annotations</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkiverse.permuplate</groupId>
+                <artifactId>quarkus-permuplate-processor</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.javaparser</groupId>
+                <artifactId>javaparser-core</artifactId>
+                <version>${javaparser.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-jexl3</artifactId>
+                <version>${commons-jexl3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.testing.compile</groupId>
+                <artifactId>compile-testing</artifactId>
+                <version>${compile-testing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>${junit.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${compiler-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${surefire-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

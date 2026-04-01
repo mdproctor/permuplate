@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.quarkiverse.permuplate</groupId>
+        <artifactId>quarkus-permuplate-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>quarkus-permuplate-tests</artifactId>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- Tests invoke the processor programmatically — no auto-processing here -->
+                    <compilerArgs>
+                        <arg>-proc:none</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.quarkiverse.permuplate</groupId>
+            <artifactId>quarkus-permuplate-processor</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.permuplate</groupId>
+            <artifactId>quarkus-permuplate-annotations</artifactId>
+        </dependency>
+
+        <!-- Annotation processor testing framework -->
+        <dependency>
+            <groupId>com.google.testing.compile</groupId>
+            <artifactId>compile-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- compile-testing depends on guava -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JUnit 4 (compile-testing uses JUnit 4 Truth assertions) -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JavaParser needed at test runtime (transitive from processor) -->
+        <dependency>
+            <groupId>com.github.javaparser</groupId>
+            <artifactId>javaparser-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JEXL3 needed at test runtime (transitive from processor) -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-jexl3</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
