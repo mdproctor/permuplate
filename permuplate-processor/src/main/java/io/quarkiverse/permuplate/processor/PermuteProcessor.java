@@ -119,6 +119,30 @@ public class PermuteProcessor extends AbstractProcessor {
             return;
         }
 
+        // Check for inline — APT cannot generate inline (requires Maven plugin)
+        if (permute.inline()) {
+            boolean isNested = typeElement.getEnclosingElement() instanceof TypeElement;
+            if (!isNested) {
+                error("@Permute inline = true is only valid on nested static classes — " +
+                        "there is no parent class to inline into",
+                        typeElement, permuteMirror, findAnnotationValue(permuteMirror, "inline"));
+            } else {
+                error("@Permute inline = true requires permuplate-maven-plugin — " +
+                        "the annotation processor cannot modify existing source files. " +
+                        "See README §'APT vs Maven Plugin' for migration instructions.",
+                        typeElement, permuteMirror, findAnnotationValue(permuteMirror, "inline"));
+            }
+            return;
+        }
+
+        // Warn if keepTemplate is set but inline is false
+        if (permute.keepTemplate()) {
+            processingEnv.getMessager().printMessage(
+                    Diagnostic.Kind.WARNING,
+                    "@Permute keepTemplate = true has no effect when inline = false",
+                    typeElement, permuteMirror, findAnnotationValue(permuteMirror, "keepTemplate"));
+        }
+
         if (!validateStrings(permute, typeElement, permuteMirror))
             return;
 

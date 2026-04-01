@@ -575,4 +575,69 @@ public class DegenerateInputTest {
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("conflicts");
     }
+
+    // -------------------------------------------------------------------------
+    // inline = true on APT is an error
+    // -------------------------------------------------------------------------
+
+    /**
+     * The APT processor cannot modify existing source files, so inline generation
+     * is not supported. Using inline = true with the APT must produce a clear,
+     * actionable error directing the user to the Maven plugin.
+     */
+    @Test
+    public void testInlineTrueOnAptIsError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        public class Foo2 {
+                            @Permute(varName = "i", from = 3, to = 5,
+                                     className = "Foo${i}", inline = true)
+                            public static class FooNested {}
+                        }
+                        """.formatted(PKG, PERMUTE_FQN));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("inline");
+        assertThat(compilation).hadErrorContaining("permuplate-maven-plugin");
+    }
+
+    /**
+     * inline = true on a top-level class has no parent to inline into.
+     */
+    @Test
+    public void testInlineTrueOnTopLevelClassIsError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 5,
+                                 className = "Foo${i}", inline = true)
+                        public class Foo2 {}
+                        """.formatted(PKG, PERMUTE_FQN));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("inline");
+        assertThat(compilation).hadErrorContaining("nested");
+    }
+
+    /**
+     * keepTemplate = true with inline = false is meaningless — warn but don't fail.
+     */
+    @Test
+    public void testKeepTemplateTrueWithInlineFalseIsWarning() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 5,
+                                 className = "Foo${i}", keepTemplate = true)
+                        public class Foo2 {}
+                        """.formatted(PKG, PERMUTE_FQN));
+
+        // keepTemplate without inline should still succeed (just a warning)
+        assertThat(compilation).succeeded();
+        assertThat(compilation).hadWarningContaining("keepTemplate");
+    }
 }
