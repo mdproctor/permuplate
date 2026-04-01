@@ -229,7 +229,7 @@ public class PermuteDeclrTransformer {
         return null;
     }
 
-    static String stripQuotes(String s) {
+    public static String stripQuotes(String s) {
         if (s.startsWith("\"") && s.endsWith("\"")) {
             return s.substring(1, s.length() - 1);
         }

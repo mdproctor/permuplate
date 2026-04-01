@@ -1,0 +1,134 @@
+package io.quarkiverse.permuplate.maven;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.ArrayInitializerExpr;
+import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.MemberValuePair;
+import com.github.javaparser.ast.expr.NormalAnnotationExpr;
+
+import io.quarkiverse.permuplate.core.PermuteConfig;
+import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
+import io.quarkiverse.permuplate.core.PermuteVarConfig;
+
+/**
+ * Reads {@code @Permute} and {@code @PermuteVar} annotation attribute values
+ * from a JavaParser {@link AnnotationExpr} AST node, producing a {@link PermuteConfig}.
+ *
+ * <p>
+ * This is the Maven plugin's equivalent of {@code typeElement.getAnnotation(Permute.class)}
+ * in the APT path — both produce a {@link PermuteConfig} that the shared core engine consumes.
+ */
+public class AnnotationReader {
+
+    private AnnotationReader() {
+    }
+
+    /**
+     * Converts a {@code @Permute} annotation expression to a {@link PermuteConfig}.
+     *
+     * @throws MojoAnnotationException if a required attribute is missing or malformed
+     */
+    public static PermuteConfig readPermute(AnnotationExpr ann) throws MojoAnnotationException {
+        if (!(ann instanceof NormalAnnotationExpr)) {
+            throw new MojoAnnotationException(
+                    "@Permute must use named parameters (e.g. varName=\"i\", from=2, to=4, ...)");
+        }
+        NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
+
+        String varName = requireString(normal, "varName");
+        int from = requireInt(normal, "from");
+        int to = requireInt(normal, "to");
+        String className = requireString(normal, "className");
+        String[] strings = readStringArray(normal, "strings");
+        PermuteVarConfig[] extraVars = readExtraVars(normal);
+        boolean inline = readBoolean(normal, "inline", false);
+        boolean keepTemplate = readBoolean(normal, "keepTemplate", false);
+
+        return new PermuteConfig(varName, from, to, className, strings, extraVars, inline, keepTemplate);
+    }
+
+    private static String requireString(NormalAnnotationExpr ann, String name)
+            throws MojoAnnotationException {
+        for (MemberValuePair pair : ann.getPairs()) {
+            if (pair.getNameAsString().equals(name)) {
+                return PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+            }
+        }
+        throw new MojoAnnotationException("@Permute is missing required attribute: " + name);
+    }
+
+    private static int requireInt(NormalAnnotationExpr ann, String name)
+            throws MojoAnnotationException {
+        for (MemberValuePair pair : ann.getPairs()) {
+            if (pair.getNameAsString().equals(name)) {
+                try {
+                    return Integer.parseInt(pair.getValue().toString().trim());
+                } catch (NumberFormatException e) {
+                    throw new MojoAnnotationException(
+                            "@Permute attribute '" + name + "' is not an integer: " + pair.getValue());
+                }
+            }
+        }
+        throw new MojoAnnotationException("@Permute is missing required attribute: " + name);
+    }
+
+    private static boolean readBoolean(NormalAnnotationExpr ann, String name, boolean defaultValue) {
+        for (MemberValuePair pair : ann.getPairs()) {
+            if (pair.getNameAsString().equals(name)) {
+                return Boolean.parseBoolean(pair.getValue().toString().trim());
+            }
+        }
+        return defaultValue;
+    }
+
+    private static String[] readStringArray(NormalAnnotationExpr ann, String name) {
+        for (MemberValuePair pair : ann.getPairs()) {
+            if (pair.getNameAsString().equals(name)) {
+                Expression val = pair.getValue();
+                if (val instanceof ArrayInitializerExpr) {
+                    List<String> result = new ArrayList<>();
+                    for (Expression e : ((ArrayInitializerExpr) val).getValues()) {
+                        result.add(PermuteDeclrTransformer.stripQuotes(e.toString()));
+                    }
+                    return result.toArray(new String[0]);
+                }
+                return new String[] { PermuteDeclrTransformer.stripQuotes(val.toString()) };
+            }
+        }
+        return new String[0];
+    }
+
+    private static PermuteVarConfig[] readExtraVars(NormalAnnotationExpr ann)
+            throws MojoAnnotationException {
+        for (MemberValuePair pair : ann.getPairs()) {
+            if (pair.getNameAsString().equals("extraVars")) {
+                Expression val = pair.getValue();
+                List<PermuteVarConfig> result = new ArrayList<>();
+                List<Expression> exprs = val instanceof ArrayInitializerExpr
+                        ? ((ArrayInitializerExpr) val).getValues()
+                        : List.of(val);
+                for (Expression e : exprs) {
+                    if (e instanceof NormalAnnotationExpr) {
+                        NormalAnnotationExpr varAnn = (NormalAnnotationExpr) e;
+                        String varName = requireString(varAnn, "varName");
+                        int from = requireInt(varAnn, "from");
+                        int to = requireInt(varAnn, "to");
+                        result.add(new PermuteVarConfig(varName, from, to));
+                    }
+                }
+                return result.toArray(new PermuteVarConfig[0]);
+            }
+        }
+        return new PermuteVarConfig[0];
+    }
+
+    /** Signals a malformed or missing annotation attribute found during source scanning. */
+    public static class MojoAnnotationException extends Exception {
+        public MojoAnnotationException(String message) {
+            super(message);
+        }
+    }
+}
