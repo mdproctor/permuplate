@@ -73,16 +73,31 @@ For each static literal in the string, apply the strip-prefix/strip-suffix opera
 - Literal 2: `"Handler"`, old_prefix=`"AsyncDisk"`, old_suffix=`"2"` → new starts with `"AsyncDisk"` ✓, strip `"2"` from remainder `"Processor2"` → new literal = `"Processor"`
 - Result: `"Async${i}Processor"` ✓
 
-**Multiple literals, both change** (`"AsyncDiskHandler2"` → `"SyncSSDProcessor2"`, string `"Async${i}Handler"`):
-- Literal 1 `"Async"`: `"SyncSSDProcessor2"` does not start with `""` → trivially strips; does not start with `"Async"` in position — wait, `"Async"` was at position 0, new name at position 0 has `"Sync"` → literal changed; old_prefix=`""` strips, old_suffix=`"DiskHandler2"` doesn't match rest → **flag for manual review**
-- IDE shows: *"annotation string may need manual update — rename affected multiple anchors"*
+**When strip algorithm returns `NoMatch` — disambiguation dialog:**
 
-**Prefix/suffix also changed** (`"MyCallable2"` → `"YourHook3"`, string `"${v1}Callable${v2}"`):
-- `${v1}` and `${v2}` explicitly declare their slots are wildcards; prefix `"My"`→`"Your"` and suffix `"2"`→`"3"` are captured by those variables and are ignored
-- `"YourHook3"` does not start with `"My"` → strip by length of `"My"` as fallback? No — spec says: since the prefix is covered by a variable, the algorithm cannot determine the new literal automatically → **flag for manual review**
-- The Rule 2 error (unmatched literal) will fire on the stale string, directing the user to fix it
+When any literal cannot be extracted from the new class name (prefix/suffix also changed, or multiple literals both changed), the plugin does **not** fall back to a compile error. Because the IDE rename provides both old and new class names simultaneously — before anything is written — the plugin shows a disambiguation dialog as part of the same rename transaction:
 
-**Rule ordering:** Rule 2 (unmatched literal) is checked first and **short-circuits** Rules 3 and 4. If the literal is not found in the class name at all, checking for orphan variables is undefined and is skipped.
+```
+Permuplate: annotation string needs updating
+
+Renaming "MyCallable2" → "YourHook3"
+
+The string "${v1}Callable${v2}" references this class, but the
+prefix "My" also changed so the update can't be computed automatically.
+
+What should "Callable" become?  [ Hook        ]
+
+                                [ Skip ]  [ Update ]
+```
+
+The user types `"Hook"`, clicks Update, and `"${v1}Hook${v2}"` is applied atomically as part of the same rename operation — no stale string, no compile error.
+
+- **IntelliJ:** shown via `RefactoringDialog` inside `RenamePsiElementProcessor.prepareRenaming()` — appears before the rename commits, integrated into the standard refactoring flow
+- **VS Code:** shown via `window.showInputBox()` inside `RenameProvider.provideRenameEdits()` before returning the `WorkspaceEdit`
+- **Multiple affected literals:** if more than one literal in the string needs disambiguation (e.g. both `"Async"` and `"Handler"` both changed), the dialog shows one field per affected literal, in declaration order
+- **Skip:** if the user clicks Skip, the string is left unchanged and R2 fires immediately as a compile error — the safety net for users who prefer to handle it manually
+
+**Rule ordering:** Rule 2 (unmatched literal) is checked first and **short-circuits** Rules 3 and 4. If a literal is not found in the class name at all, checking for orphan variables is undefined and skipped.
 
 ### Validation errors (all are compile errors)
 
@@ -208,8 +223,8 @@ public class AnnotationStringAlgorithm {
   - Long prefix+suffix preserved: `"ThisIsMyPrefixCallableThisIsMySuffix3"` → `"ThisIsMyPrefixHookThisIsMySuffix3"` → `"${v1}Hook${v2}"` ✓
   - Numeric suffix changes (variable captures it): `"Callable2"` → `"Handler3"`, `"Callable${i}"` → `"Handler${i}"` ✓
   - Multiple literals, second changes: `"AsyncDiskHandler2"` → `"AsyncDiskProcessor2"`, `"Async${i}Handler"` → `"Async${i}Processor"` ✓
-  - Multiple literals, both change: `"AsyncDiskHandler2"` → `"SyncSSDProcessor2"`, `"Async${i}Handler"` → `NoMatch` (manual review)
-  - Prefix also changed: `"MyCallable2"` → `"YourHook3"` → `NoMatch` (manual review)
+  - Multiple literals, both change: `"AsyncDiskHandler2"` → `"SyncSSDProcessor2"`, `"Async${i}Handler"` → `NoMatch` (triggers disambiguation dialog in IDE)
+  - Prefix also changed: `"MyCallable2"` → `"YourHook3"` → `NoMatch` (triggers disambiguation dialog in IDE)
   - String has no match in old class: → `NoMatch`
 - `validate()`:
   - **R2 — Unmatched single literal:** `"Foo${i}"` vs `"Callable2"` → `UNMATCHED_LITERAL`
