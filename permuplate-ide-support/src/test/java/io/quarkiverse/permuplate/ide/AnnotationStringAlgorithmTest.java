@@ -252,14 +252,14 @@ class AnnotationStringAlgorithmTest {
     private static java.util.List<ValidationError> validate(String template, String targetName) {
         var t = AnnotationStringAlgorithm.expandStringConstants(
                 AnnotationStringAlgorithm.parse(template), java.util.Map.of());
-        return AnnotationStringAlgorithm.validate(t, targetName, java.util.Map.of());
+        return AnnotationStringAlgorithm.validate(t, targetName);
     }
 
     private static java.util.List<ValidationError> validate(String template, String targetName,
             java.util.Map<String, String> constants) {
         var t = AnnotationStringAlgorithm.expandStringConstants(
                 AnnotationStringAlgorithm.parse(template), constants);
-        return AnnotationStringAlgorithm.validate(t, targetName, constants);
+        return AnnotationStringAlgorithm.validate(t, targetName);
     }
 
     @Test

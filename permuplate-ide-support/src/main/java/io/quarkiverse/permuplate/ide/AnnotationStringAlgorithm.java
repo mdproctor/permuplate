@@ -292,11 +292,10 @@ public class AnnotationStringAlgorithm {
      *
      * @param t the already-expanded annotation string template
      * @param targetName the actual class/field/param name to validate against
-     * @param constants the string constants (already expanded into {@code t})
      * @return empty list if valid; otherwise one or more errors
      */
     public static List<ValidationError> validate(AnnotationStringTemplate t,
-            String targetName, Map<String, String> constants) {
+            String targetName) {
         List<String> literals = t.staticLiterals();
 
         // R4: no anchor
