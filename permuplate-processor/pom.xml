@@ -33,6 +33,11 @@
             <artifactId>quarkus-permuplate-annotations</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.quarkiverse.permuplate</groupId>
+            <artifactId>quarkus-permuplate-core</artifactId>
+        </dependency>
+
         <!-- AST parsing and rewriting -->
         <dependency>
             <groupId>com.github.javaparser</groupId>

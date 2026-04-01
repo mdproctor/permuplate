@@ -32,6 +32,9 @@ import com.sun.source.util.Trees;
 
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteVar;
+import io.quarkiverse.permuplate.core.EvaluationContext;
+import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
+import io.quarkiverse.permuplate.core.PermuteParamTransformer;
 
 /**
  * Annotation processor for {@link Permute}.
