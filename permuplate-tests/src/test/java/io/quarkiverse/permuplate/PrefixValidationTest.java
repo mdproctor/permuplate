@@ -95,13 +95,13 @@ public class PrefixValidationTest {
      * This is intentional and accepted behaviour. No error must be reported.
      *
      * <p>
-     * <strong>Ignored until Sub-project 1:</strong> this test requires the full
-     * substring-based matching algorithm ({@code "Element"} must be found as a
-     * substring of {@code "myElement2"}, not just a prefix). The current validator
-     * uses prefix-only matching so it incorrectly rejects this as an error. Un-ignore
-     * after implementing {@code permuplate-ide-support} and wiring it into the processor.
+     * <strong>Ignored:</strong> validation correctly passes (non-empty prefix region,
+     * no orphans), but the test template uses undeclared variable names ({@code v1},
+     * {@code v2}, {@code v3}) that cause a JEXL undefined-variable exception during
+     * generation. The test needs to be redesigned to either define these variables or
+     * test the validation layer in isolation.
      */
-    @Ignore("Requires Sub-project 1 substring algorithm — current validator uses prefix-only matching")
+    @Ignore("Validation passes but undeclared variables v1/v2/v3 cause JEXL error during generation")
     @Test
     public void testAdjacentVariablesOnNonEmptyPrefixAreNotOrphan() {
         var compilation = compile(Callable2.class, "Foo2",
@@ -135,16 +135,7 @@ public class PrefixValidationTest {
      * {@code "${v1}${v2}c${v3}"} on field {@code c2}: literal {@code "c"} is at position
      * 0, so the prefix region before it is empty. Both {@code ${v1}} and {@code ${v2}}
      * collectively cover nothing — both are orphan.
-     *
-     * <p>
-     * <strong>Ignored until Sub-project 1:</strong> the orphan variable rule is not yet
-     * implemented in the processor. Currently {@code "${v1}${v2}c${v3}"} passes prefix
-     * validation (static prefix {@code "c"} is a prefix of {@code "c2"}) but then fails
-     * at generation time with a JEXL undefined-variable exception because {@code v1},
-     * {@code v2}, and {@code v3} are not declared as loop or string variables.
-     * Un-ignore after implementing the orphan-variable rule in Sub-project 1.
      */
-    @Ignore("Requires Sub-project 1 orphan-variable rule — not yet implemented in processor")
     @Test
     public void testAdjacentVariablesOnEmptyPrefixAreBothOrphan() {
         var compilation = compile(Callable2.class, "Foo2",

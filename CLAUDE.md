@@ -42,7 +42,7 @@ Maven is at `/opt/homebrew/bin/mvn`. The standard build command is:
 
 ---
 
-## The three annotations
+## The four annotations
 
 ### `@Permute` — on a class or interface (top-level or nested static), or on a method
 
@@ -81,6 +81,16 @@ public void join(
 The sentinel (`o1`) is replaced by a generated sequence (`Object o1, Object o2` for `i=3`). Parameters before and after the sentinel are preserved in position.
 
 The sentinel's original name is registered as an **anchor**. Every method call in the body where the anchor appears as an argument has it replaced by the full generated sequence. This is how `c2.call(o1, o2)` becomes `c3.call(o1, o2, o3)` — there is no annotation on the call site because Java's syntax does not allow it.
+
+### `@PermuteVar` — nested annotation for extra integer loop axes
+
+```java
+@Permute(varName = "i", from = 2, to = 4,
+         className = "BiCallable${i}x${k}",
+         extraVars = { @PermuteVar(varName = "k", from = 2, to = 4) })
+```
+
+Defines an additional integer loop variable for cross-product generation. Each `@PermuteVar` adds one axis; one output type is generated per combination of the primary variable and all extra variables. The primary variable (`varName` on `@Permute`) is the outermost loop; `extraVars` are inner loops in declaration order. Variable names must not conflict with `varName` or `strings` keys.
 
 ---
 
@@ -198,18 +208,22 @@ String src = sourceOf(compilation.generatedSourceFile("io.permuplate.example.Joi
 assertThat(src).contains("c3.call(o1, o2, o3)");
 ```
 
-The four test cases:
-
-| Test | What it specifically covers |
+| Class | Coverage area |
 |---|---|
-| `testBasicJoinPermutation` | Field rename, param expansion, call-site anchor, logic preservation |
-| `testFixedParamsBeforeAndAfterPermuteParam` | Fixed params before/after sentinel preserved in correct position; `results.add(o2)` → `results.add(o3)` |
-| `testNestedClassGeneratesTopLevelClass` | Nested static class → top-level, no `static` modifier |
-| `testPermuteDeclrRenamesAllUsages` | Complex body: field used in null check + println before loop, call site inside loop, println after loop; for-each var used in null check, `skipped.add()`, call site, string concat |
+| `PermuteTest` | Type permutation range, nested class/interface promotion, string variables, cross-product via `extraVars` |
+| `PermuteDeclrTest` | Field, constructor param, for-each variable renaming; two annotated fields; dual for-each loops |
+| `PermuteParamTest` | Fixed params before/after sentinel, multiple sentinels, anchor expansion |
+| `ExampleTest` | Real-world domain templates: `ProductFilter2`, `AuditRecord2`, `ValidationSuite.FieldValidator2`, `BiCallable1x1` |
+| `DogFoodingTest` | `Callable1` generates `Callable2`–`Callable10` |
+| `DegenerateInputTest` | All `@Permute` attribute error paths with message content and source-position assertions |
+| `PrefixValidationTest` | String-literal prefix rules for `@PermuteDeclr` and `@PermuteParam` across all placements |
+| `AptInlineGuardTest` | APT rejection of `inline=true`; `keepTemplate` warning |
+| `OrphanVariableTest` | R2 (substring matching), R3 (orphan variable), R4 (no anchor), R2 short-circuits R3/R4 |
+| `InlineGenerationTest` | `InlineGenerator` and `AnnotationReader` for Maven plugin inline generation |
 
 ---
 
-## Example templates (in permuplate-example/)
+## Example templates (in permuplate-apt-examples/)
 
 | File | What it demonstrates |
 |---|---|
@@ -224,5 +238,5 @@ The four test cases:
 
 - [README.md](README.md) — user-facing overview with examples and quick start
 - [OVERVIEW.md](OVERVIEW.md) — architecture deep-dive, market comparison, full roadmap
-- `permuplate-processor/src/main/java/com/example/permuplate/processor/` — the four processor source files
-- `permuplate-tests/src/test/java/com/example/permuplate/ProcessorTest.java` — four test cases
+- `permuplate-processor/src/main/java/io/quarkiverse/permuplate/processor/` — the processor source files
+- `permuplate-tests/src/test/java/io/quarkiverse/permuplate/` — test classes

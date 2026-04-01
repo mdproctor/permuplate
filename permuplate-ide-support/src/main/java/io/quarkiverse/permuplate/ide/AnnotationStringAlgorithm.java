@@ -11,10 +11,11 @@ import java.util.regex.Pattern;
  * and validation. No external dependencies.
  *
  * <p>
- * <strong>Java is the source of truth.</strong> The TypeScript port in
- * {@code permuplate-vscode/src/algorithm.ts} must be kept exactly in sync.
- * Any bug fix or behaviour change here must be ported to TypeScript in the
- * same commit with a matching Jest test. See CLAUDE.md.
+ * <strong>Java is the source of truth.</strong>
+ * The planned TypeScript port will live in {@code permuplate-vscode/src/algorithm.ts}
+ * when the VS Code extension is built (Sub-projects 3 and 4).
+ * Any bug fix or behaviour change here must be ported to TypeScript
+ * with a matching Jest test. See CLAUDE.md.
  */
 public class AnnotationStringAlgorithm {
 

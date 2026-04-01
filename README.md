@@ -65,9 +65,9 @@ Three things make the transformations correct rather than just textual:
 ```xml
 <dependencies>
     <dependency>
-        <groupId>io.permuplate</groupId>
-        <artifactId>permuplate-annotations</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <groupId>io.quarkiverse.permuplate</groupId>
+        <artifactId>quarkus-permuplate-annotations</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
     </dependency>
 </dependencies>
 
@@ -80,9 +80,9 @@ Three things make the transformations correct rather than just textual:
             <configuration>
                 <annotationProcessorPaths>
                     <path>
-                        <groupId>io.permuplate</groupId>
-                        <artifactId>permuplate-processor</artifactId>
-                        <version>1.0-SNAPSHOT</version>
+                        <groupId>io.quarkiverse.permuplate</groupId>
+                        <artifactId>quarkus-permuplate-processor</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
                     </path>
                     <path>
                         <groupId>com.github.javaparser</groupId>
@@ -596,8 +596,12 @@ Practical workflow:
 ```
 permuplate-parent/
 ├── permuplate-annotations/    Annotation definitions only (tiny jar, no deps)
-├── permuplate-processor/      The annotation processor (JavaParser + JEXL3)
-├── permuplate-example/        Template examples: Join2, ContextJoin2, JoinLibrary
+├── permuplate-core/           Shared transformation engine (EvaluationContext, transformers)
+├── permuplate-ide-support/    Annotation string algorithm (matching, rename, validation; no IDE deps)
+├── permuplate-processor/      APT annotation processor (thin shell)
+├── permuplate-maven-plugin/   Maven plugin for pre-compilation generation including inline mode
+├── permuplate-apt-examples/   APT examples
+├── permuplate-mvn-examples/   Maven plugin examples (Handlers inline demo)
 └── permuplate-tests/          Unit tests using Google compile-testing
 ```
 
@@ -615,7 +619,7 @@ The test suite uses Google's [compile-testing](https://github.com/google/compile
 
 ## Requirements
 
-- Java 11+
+- Java 17+
 - Maven 3.6+ with `maven-compiler-plugin` 3.x
 
 ---
