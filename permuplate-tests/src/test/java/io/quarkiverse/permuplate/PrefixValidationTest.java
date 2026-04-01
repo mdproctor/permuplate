@@ -29,6 +29,41 @@ import io.quarkiverse.permuplate.processor.PermuteProcessor;
  * parameter type, not the sentinel's placeholder type, so a mismatch is not
  * necessarily a mistake)</li>
  * </ul>
+ *
+ * <p>
+ * Coverage matrix — each placement × {type error, name error, valid pass}:
+ * <table>
+ * <tr>
+ * <th>Placement</th>
+ * <th>type mismatch</th>
+ * <th>name mismatch</th>
+ * <th>valid (no error)</th>
+ * </tr>
+ * <tr>
+ * <td>field</td>
+ * <td>✓</td>
+ * <td>✓</td>
+ * <td>✓</td>
+ * </tr>
+ * <tr>
+ * <td>for-each variable</td>
+ * <td>✓</td>
+ * <td>✓</td>
+ * <td>✓</td>
+ * </tr>
+ * <tr>
+ * <td>constructor param</td>
+ * <td>✓</td>
+ * <td>✓</td>
+ * <td>✓</td>
+ * </tr>
+ * <tr>
+ * <td>@PermuteParam</td>
+ * <td>n/a</td>
+ * <td>✓</td>
+ * <td>✓</td>
+ * </tr>
+ * </table>
  */
 public class PrefixValidationTest {
 
@@ -182,6 +217,204 @@ public class PrefixValidationTest {
         assertThat(compilation).failed();
         assertThat(compilation).hadErrorContaining("x");
         assertThat(compilation).hadErrorContaining("o1");
+    }
+
+    /**
+     * The static part of {@code @PermuteDeclr type} on a for-each variable must be a
+     * prefix of the actual loop variable type. {@code type = "Bar${i}"} on a variable
+     * of type {@code Object} is clearly wrong; the processor must reject it upfront.
+     * (Previously only the {@code name} was tested for for-each variables.)
+     */
+    @Test
+    public void testPermuteDeclrForEachTypePrefixMismatchIsError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        import java.util.List;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            private List<Object> right;
+                            public void go() {
+                                for (@PermuteDeclr(type = "Bar${i}", name = "o${i}") Object o2 : right) {}
+                            }
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("Bar");
+        assertThat(compilation).hadErrorContaining("Object");
+    }
+
+    /**
+     * The static part of {@code @PermuteDeclr type} on a constructor parameter must
+     * be a prefix of the actual parameter type. Previously only the {@code name}
+     * attribute was tested for constructor parameters.
+     */
+    @Test
+    public void testPermuteDeclrConstructorParamTypePrefixMismatchIsError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            public Foo2(@PermuteDeclr(type = "Bar${i}", name = "c${i}") Object c2) {}
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("Bar");
+        assertThat(compilation).hadErrorContaining("Object");
+    }
+
+    // -------------------------------------------------------------------------
+    // Valid strings — must NOT produce errors
+    // -------------------------------------------------------------------------
+
+    /**
+     * A correctly written field {@code @PermuteDeclr} must compile without errors.
+     * Uses {@code Object} as the type so the generated files don't reference
+     * missing external types.
+     */
+    @Test
+    public void testPermuteDeclrFieldWithValidStringsDoesNotError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            private @PermuteDeclr(type = "Object", name = "item${i}") Object item2;
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        assertThat(compilation).succeeded();
+    }
+
+    /**
+     * A correctly written for-each {@code @PermuteDeclr} — the type is the static
+     * {@code "Object"} (unchanged across permutations) and the name prefix matches —
+     * must compile without errors. Verifies that a type string with no variable
+     * ({@code "Object"}) is valid when the type genuinely does not change.
+     */
+    @Test
+    public void testPermuteDeclrForEachWithValidStringsDoesNotError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        import java.util.List;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            private List<Object> right;
+                            public void go() {
+                                for (@PermuteDeclr(type = "Object", name = "o${i}") Object o2 : right) {}
+                            }
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        assertThat(compilation).succeeded();
+    }
+
+    /**
+     * A correctly written constructor parameter {@code @PermuteDeclr} must
+     * compile without errors.
+     */
+    @Test
+    public void testPermuteDeclrConstructorParamWithValidStringsDoesNotError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            public Foo2(@PermuteDeclr(type = "Object", name = "arg${i}") Object arg2) {}
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        assertThat(compilation).succeeded();
+    }
+
+    /**
+     * A correctly written {@code @PermuteParam} — the {@code name} prefix matches
+     * the sentinel parameter name — must compile without errors.
+     */
+    @Test
+    public void testPermuteParamWithValidNameDoesNotError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            public void go(
+                                    @PermuteParam(varName = "j", from = "1", to = "${i-1}",
+                                                  type = "Object", name = "o${j}") Object o1) {}
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_PARAM_FQN));
+
+        assertThat(compilation).succeeded();
+    }
+
+    /**
+     * Two separate {@code @PermuteDeclr} annotations in the same class — one on a
+     * field and one on a for-each variable — must each be validated independently.
+     * Both are valid; no error must be reported for either.
+     */
+    @Test
+    public void testMultiplePermuteDeclrAnnotationsInSameClassAllValidDoesNotError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        import java.util.List;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            private @PermuteDeclr(type = "Object", name = "item${i}") Object item2;
+                            private List<Object> elements;
+                            public void go() {
+                                for (@PermuteDeclr(type = "Object", name = "elem${i}") Object elem2 : elements) {}
+                            }
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        assertThat(compilation).succeeded();
+    }
+
+    /**
+     * When one {@code @PermuteDeclr} is valid and a second one in the same class
+     * is invalid, only the invalid annotation produces an error — the valid one
+     * must not be incorrectly flagged.
+     */
+    @Test
+    public void testOneValidOneInvalidPermuteDeclrReportsErrorOnlyForInvalid() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        import java.util.List;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            private @PermuteDeclr(type = "Object", name = "item${i}") Object item2;
+                            private List<Object> elements;
+                            public void go() {
+                                for (@PermuteDeclr(type = "Wrong${i}", name = "elem${i}") Object elem2 : elements) {}
+                            }
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("Wrong");
+        assertThat(compilation).hadErrorContaining("Object");
     }
 
     // -------------------------------------------------------------------------
