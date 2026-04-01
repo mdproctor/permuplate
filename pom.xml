@@ -20,7 +20,8 @@
         <module>permuplate-core</module>
         <module>permuplate-processor</module>
         <module>permuplate-maven-plugin</module>
-        <module>permuplate-example</module>
+        <module>permuplate-apt-examples</module>
+        <module>permuplate-mvn-examples</module>
         <module>permuplate-tests</module>
     </modules>
 

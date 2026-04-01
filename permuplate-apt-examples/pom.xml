@@ -10,7 +10,9 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>quarkus-permuplate-example</artifactId>
+    <artifactId>quarkus-permuplate-apt-examples</artifactId>
+    <name>Permuplate :: APT Examples</name>
+    <description>Examples demonstrating Permuplate using the APT annotation processor. All generated classes are separate top-level files. For inline generation (nested classes inside a parent), see permuplate-mvn-examples.</description>
 
     <dependencies>
         <dependency>

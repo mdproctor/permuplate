@@ -2,9 +2,12 @@ package io.quarkiverse.permuplate.maven;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
@@ -52,13 +55,10 @@ public class InlineGenerator {
         outputParent.getMembers().removeIf(member -> member instanceof ClassOrInterfaceDeclaration &&
                 ((ClassOrInterfaceDeclaration) member).getNameAsString().equals(templateClassName));
 
-        // Re-add the template class if keepTemplate = true (strip @Permute from it)
+        // Re-add the template class if keepTemplate = true (strip all permuplate annotations)
         if (config.keepTemplate) {
             ClassOrInterfaceDeclaration templateCopy = templateClassDecl.clone();
-            templateCopy.getAnnotations().removeIf(a -> {
-                String n = a.getNameAsString();
-                return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute");
-            });
+            stripPermuteAnnotations(templateCopy);
             outputParent.addMember(templateCopy);
         }
 
@@ -90,5 +90,28 @@ public class InlineGenerator {
         outputCu.getImports().removeIf(imp -> imp.getNameAsString().startsWith("io.quarkiverse.permuplate"));
 
         return outputCu;
+    }
+
+    /**
+     * Strips all Permuplate annotations ({@code @Permute}, {@code @PermuteDeclr},
+     * {@code @PermuteParam}) from a class declaration and all of its members,
+     * including field-level and parameter-level annotations.
+     */
+    private static void stripPermuteAnnotations(ClassOrInterfaceDeclaration classDecl) {
+        Set<String> PERMUPLATE_ANNOTATIONS = Set.of(
+                "Permute", "io.quarkiverse.permuplate.Permute",
+                "PermuteDeclr", "io.quarkiverse.permuplate.PermuteDeclr",
+                "PermuteParam", "io.quarkiverse.permuplate.PermuteParam");
+
+        // Strip from the class itself
+        classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
+
+        // Strip from fields
+        classDecl.findAll(FieldDeclaration.class)
+                .forEach(field -> field.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+
+        // Strip from method parameters
+        classDecl.findAll(MethodDeclaration.class).forEach(method -> method.getParameters()
+                .forEach(param -> param.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()))));
     }
 }
