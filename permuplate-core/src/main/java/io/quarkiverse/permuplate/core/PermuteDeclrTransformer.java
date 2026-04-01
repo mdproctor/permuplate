@@ -2,6 +2,7 @@ package io.quarkiverse.permuplate.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
@@ -21,6 +22,10 @@ import com.github.javaparser.ast.stmt.ForEachStmt;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.visitor.ModifierVisitor;
 import com.github.javaparser.ast.visitor.Visitable;
+
+import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
+import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
+import io.quarkiverse.permuplate.ide.ValidationError;
 
 /**
  * Handles {@code @PermuteDeclr} on field declarations, constructor parameters,
@@ -249,15 +254,18 @@ public class PermuteDeclrTransformer {
     // -------------------------------------------------------------------------
 
     /**
-     * Validates that the static part of each {@code @PermuteDeclr} {@code type} and
-     * {@code name} attribute is a prefix of the actual declaration's type and name.
-     * This catches mismatches like {@code type = "Bar${i}"} on a field of type
-     * {@code Callable2} before any permutation is generated.
+     * Validates that the static literals of each {@code @PermuteDeclr} {@code type} and
+     * {@code name} attribute appear as substrings of the actual declaration's type and
+     * name (R2), that no variable is orphaned (R3), and that at least one literal anchor
+     * exists (R4). This catches mismatches like {@code type = "Bar${i}"} on a field of
+     * type {@code Callable2} before any permutation is generated.
      *
-     * @return {@code true} if all prefix constraints are satisfied
+     * @param stringConstants the string constants from {@code @Permute strings}, used to
+     *        expand any string-constant variables before validation
+     * @return {@code true} if all constraints are satisfied
      */
     public static boolean validatePrefixes(ClassOrInterfaceDeclaration classDecl, Messager messager,
-            Element element) {
+            Element element, Map<String, String> stringConstants) {
         boolean[] valid = { true };
 
         // Fields
@@ -271,11 +279,11 @@ public class PermuteDeclrTransformer {
                 continue;
             }
             VariableDeclarator declarator = field.getVariable(0);
-            if (!checkPrefix("@PermuteDeclr type", params[0], "field type",
-                    declarator.getType().asString(), messager, element))
+            if (!checkAnnotationString("@PermuteDeclr type", params[0], "field type",
+                    declarator.getType().asString(), messager, element, stringConstants))
                 valid[0] = false;
-            if (!checkPrefix("@PermuteDeclr name", params[1], "field name",
-                    declarator.getNameAsString(), messager, element))
+            if (!checkAnnotationString("@PermuteDeclr name", params[1], "field name",
+                    declarator.getNameAsString(), messager, element, stringConstants))
                 valid[0] = false;
         }
 
@@ -290,11 +298,11 @@ public class PermuteDeclrTransformer {
                     valid[0] = false;
                     return;
                 }
-                if (!checkPrefix("@PermuteDeclr type", params[0], "constructor parameter type",
-                        param.getType().asString(), messager, element))
+                if (!checkAnnotationString("@PermuteDeclr type", params[0], "constructor parameter type",
+                        param.getType().asString(), messager, element, stringConstants))
                     valid[0] = false;
-                if (!checkPrefix("@PermuteDeclr name", params[1], "constructor parameter name",
-                        param.getNameAsString(), messager, element))
+                if (!checkAnnotationString("@PermuteDeclr name", params[1], "constructor parameter name",
+                        param.getNameAsString(), messager, element, stringConstants))
                     valid[0] = false;
             });
         });
@@ -311,28 +319,61 @@ public class PermuteDeclrTransformer {
                 return;
             }
             VariableDeclarator v = varDeclExpr.getVariables().get(0);
-            if (!checkPrefix("@PermuteDeclr type", params[0], "for-each variable type",
-                    v.getType().asString(), messager, element))
+            if (!checkAnnotationString("@PermuteDeclr type", params[0], "for-each variable type",
+                    v.getType().asString(), messager, element, stringConstants))
                 valid[0] = false;
-            if (!checkPrefix("@PermuteDeclr name", params[1], "for-each variable name",
-                    v.getNameAsString(), messager, element))
+            if (!checkAnnotationString("@PermuteDeclr name", params[1], "for-each variable name",
+                    v.getNameAsString(), messager, element, stringConstants))
                 valid[0] = false;
         });
 
         return valid[0];
     }
 
-    private static boolean checkPrefix(String annotationAttr, String template,
-            String targetDesc, String actual, Messager messager, Element element) {
-        String prefix = staticPrefix(template);
-        if (prefix.isEmpty() || actual.startsWith(prefix))
+    /**
+     * Validates an annotation string template against the actual target name using
+     * the full algorithm (R2 substring matching, R3 orphan variable, R4 no anchor).
+     * Reports all errors via the messager. Returns false if any error was found.
+     *
+     * <p>
+     * The {@code strings} constants from {@code @Permute} are expanded into the
+     * template before validation so that string-constant-composed literals are
+     * correctly recognised.
+     */
+    public static boolean checkAnnotationString(String annotationAttr, String template,
+            String targetDesc, String actual, Messager messager, Element element,
+            Map<String, String> stringConstants) {
+        AnnotationStringTemplate t = AnnotationStringAlgorithm.expandStringConstants(
+                AnnotationStringAlgorithm.parse(template), stringConstants);
+
+        List<ValidationError> errors = AnnotationStringAlgorithm.validate(t, actual);
+        if (errors.isEmpty())
             return true;
-        if (messager != null) {
-            messager.printMessage(Diagnostic.Kind.ERROR,
-                    String.format("%s literal part \"%s\" is not a prefix of the %s \"%s\"",
-                            annotationAttr, prefix, targetDesc, actual),
-                    element);
+
+        for (ValidationError err : errors) {
+            String msg = buildMessage(annotationAttr, template, targetDesc, actual, err);
+            if (messager != null)
+                messager.printMessage(Diagnostic.Kind.ERROR, msg, element);
         }
         return false;
+    }
+
+    private static String buildMessage(String annotationAttr, String template,
+            String targetDesc, String actual, ValidationError err) {
+        return switch (err.kind()) {
+            case UNMATCHED_LITERAL -> String.format(
+                    "%s literal does not match any substring of %s \"%s\" — %s",
+                    annotationAttr, targetDesc, actual, err.suggestion());
+            case ORPHAN_VARIABLE -> String.format(
+                    "%s: variable ${%s} has no corresponding text in \"%s\" — %s",
+                    annotationAttr, err.varName(), actual, err.suggestion());
+            case NO_ANCHOR -> String.format(
+                    "%s string \"%s\" has no static literal to match against \"%s\" — %s",
+                    annotationAttr, template, actual, err.suggestion());
+            case NO_VARIABLES -> String.format(
+                    "%s \"%s\" contains no variables — it will generate the same %s" +
+                            " for every permutation",
+                    annotationAttr, template, targetDesc);
+        };
     }
 }

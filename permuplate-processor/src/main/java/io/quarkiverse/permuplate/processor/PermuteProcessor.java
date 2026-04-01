@@ -209,10 +209,11 @@ public class PermuteProcessor extends AbstractProcessor {
                 c -> c.getNameAsString().equals(templateSimpleName));
         if (foundForValidation.isPresent()) {
             ClassOrInterfaceDeclaration templateClassDecl = foundForValidation.get();
+            Map<String, String> stringConstants = buildStringConstants(permute);
             boolean declrValid = PermuteDeclrTransformer.validatePrefixes(
-                    templateClassDecl, processingEnv.getMessager(), typeElement);
+                    templateClassDecl, processingEnv.getMessager(), typeElement, stringConstants);
             boolean paramValid = PermuteParamTransformer.validatePrefixes(
-                    templateClassDecl, processingEnv.getMessager(), typeElement);
+                    templateClassDecl, processingEnv.getMessager(), typeElement, stringConstants);
             if (!declrValid || !paramValid)
                 return;
         }
@@ -454,6 +455,23 @@ public class PermuteProcessor extends AbstractProcessor {
     // -------------------------------------------------------------------------
     // Validation helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Parses {@link Permute#strings()} into a {@code Map<String, String>} of
+     * constant bindings, for use in pre-generation annotation string validation.
+     * Entries that are malformed (no {@code =}) are silently skipped — the full
+     * format check is done separately by {@link #validateStrings}.
+     */
+    private static Map<String, String> buildStringConstants(Permute permute) {
+        Map<String, String> constants = new HashMap<>();
+        for (String entry : permute.strings()) {
+            int sep = entry.indexOf('=');
+            if (sep > 0) {
+                constants.put(entry.substring(0, sep).trim(), entry.substring(sep + 1));
+            }
+        }
+        return constants;
+    }
 
     /**
      * Validates that every entry in {@code @Permute strings} has the required

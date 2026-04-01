@@ -2,6 +2,7 @@ package io.quarkiverse.permuplate.core;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
@@ -225,20 +226,21 @@ public class PermuteParamTransformer {
     // -------------------------------------------------------------------------
 
     /**
-     * Validates that the static part of each {@code @PermuteParam} {@code name} attribute
-     * is a prefix of the actual sentinel parameter name. For example,
-     * {@code name = "o${j}"} on parameter {@code Object o1} is valid (prefix {@code "o"}
-     * matches), but {@code name = "x${j}"} on {@code Object o1} is an error.
+     * Validates that the static literals of each {@code @PermuteParam} {@code name}
+     * attribute appear as substrings of the actual sentinel parameter name (R2), that
+     * no variable is orphaned (R3), and that at least one literal anchor exists (R4).
      *
      * <p>
      * The {@code type} attribute is intentionally not checked here: it describes the
      * generated parameter type, not the sentinel's placeholder type, so a mismatch is
      * not necessarily a mistake.
      *
-     * @return {@code true} if all prefix constraints are satisfied
+     * @param stringConstants the string constants from {@code @Permute strings}, used to
+     *        expand any string-constant variables before validation
+     * @return {@code true} if all constraints are satisfied
      */
     public static boolean validatePrefixes(ClassOrInterfaceDeclaration classDecl, Messager messager,
-            Element element) {
+            Element element, Map<String, String> stringConstants) {
         boolean[] valid = { true };
         classDecl.findAll(MethodDeclaration.class).forEach(method -> {
             // Validate all sentinels in the method, not just the first
@@ -251,16 +253,10 @@ public class PermuteParamTransformer {
                             valid[0] = false;
                             return;
                         }
-                        String namePrefix = PermuteDeclrTransformer.staticPrefix(values.name);
                         String actualName = sentinel.getNameAsString();
-                        if (!namePrefix.isEmpty() && !actualName.startsWith(namePrefix)) {
-                            if (messager != null) {
-                                messager.printMessage(Diagnostic.Kind.ERROR,
-                                        String.format(
-                                                "@PermuteParam name literal part \"%s\" is not a prefix of the sentinel parameter name \"%s\"",
-                                                namePrefix, actualName),
-                                        element);
-                            }
+                        if (!PermuteDeclrTransformer.checkAnnotationString(
+                                "@PermuteParam name", values.name, "sentinel parameter name",
+                                actualName, messager, element, stringConstants)) {
                             valid[0] = false;
                         }
                     });

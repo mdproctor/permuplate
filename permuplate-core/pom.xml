@@ -20,6 +20,10 @@
             <artifactId>quarkus-permuplate-annotations</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.quarkiverse.permuplate</groupId>
+            <artifactId>quarkus-permuplate-ide-support</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.github.javaparser</groupId>
             <artifactId>javaparser-core</artifactId>
         </dependency>

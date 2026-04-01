@@ -47,8 +47,8 @@ import java.lang.annotation.Target;
  * <pre>
  * {@code
  * public void merge(
- *         &#64;PermuteParam(varName="j", from="1", to="${i-1}", type="Object", name="left${j}") Object left1,
- *         @PermuteParam(varName="k", from="1", to="${i-1}", type="Object", name="right${k}") Object right1) {
+ *         &#64;PermuteParam(varName = "j", from = "1", to = "${i-1}", type = "Object", name = "left${j}") Object left1,
+ *         @PermuteParam(varName = "k", from = "1", to = "${i-1}", type = "Object", name = "right${k}") Object right1) {
  *     c2.call(left1, right1); // both anchors expanded in sequence
  * }
  * }

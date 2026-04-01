@@ -40,6 +40,16 @@
                         </path>
                         <!-- Transitive deps of the processor must be listed explicitly here -->
                         <path>
+                            <groupId>io.quarkiverse.permuplate</groupId>
+                            <artifactId>quarkus-permuplate-core</artifactId>
+                            <version>${project.version}</version>
+                        </path>
+                        <path>
+                            <groupId>io.quarkiverse.permuplate</groupId>
+                            <artifactId>quarkus-permuplate-ide-support</artifactId>
+                            <version>${project.version}</version>
+                        </path>
+                        <path>
                             <groupId>com.github.javaparser</groupId>
                             <artifactId>javaparser-core</artifactId>
                             <version>${javaparser.version}</version>
