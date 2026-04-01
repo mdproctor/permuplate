@@ -77,4 +77,30 @@ public class AnnotationStringAlgorithm {
         }
         return new AnnotationStringTemplate(merged);
     }
+
+    // =========================================================
+    // matches()
+    // =========================================================
+
+    /**
+     * Returns {@code true} if all static literals in {@code t} appear as substrings
+     * within {@code className}, in declaration order.
+     *
+     * <p>
+     * A template with no static literals (all variables) never matches.
+     */
+    public static boolean matches(AnnotationStringTemplate t, String className) {
+        List<String> literals = t.staticLiterals();
+        if (literals.isEmpty())
+            return false;
+
+        int searchFrom = 0;
+        for (String literal : literals) {
+            int pos = className.indexOf(literal, searchFrom);
+            if (pos < 0)
+                return false;
+            searchFrom = pos + literal.length();
+        }
+        return true;
+    }
 }

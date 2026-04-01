@@ -116,4 +116,65 @@ class AnnotationStringAlgorithmTest {
         var expanded = AnnotationStringAlgorithm.expandStringConstants(t, Map.of("a", ""));
         assertEquals(List.of("Callable"), expanded.staticLiterals());
     }
+
+    // =========================================================
+    // matches()
+    // =========================================================
+
+    @Test
+    void matches_singleLiteralAtStart() {
+        assertTrue(AnnotationStringAlgorithm.matches(parse("Callable${i}"), "Callable2"));
+    }
+
+    @Test
+    void matches_singleLiteralInMiddle() {
+        assertTrue(AnnotationStringAlgorithm.matches(parse("${v1}Callable${v2}"), "MyCallable2"));
+    }
+
+    @Test
+    void matches_singleLiteralAtEnd() {
+        assertTrue(AnnotationStringAlgorithm.matches(parse("${v1}Callable"), "MyCallable"));
+    }
+
+    @Test
+    void matches_longPrefixAndSuffix() {
+        assertTrue(AnnotationStringAlgorithm.matches(
+                parse("${v1}Callable${v2}"), "ThisIsMyPrefixCallableThisIsMySuffix3"));
+    }
+
+    @Test
+    void matches_noMatch() {
+        assertFalse(AnnotationStringAlgorithm.matches(parse("Foo${i}"), "Callable2"));
+    }
+
+    @Test
+    void matches_noMatchNumericOnly() {
+        assertFalse(AnnotationStringAlgorithm.matches(parse("Callable${i}"), "2"));
+    }
+
+    @Test
+    void matches_multipleLiteralsCorrectOrder() {
+        assertTrue(AnnotationStringAlgorithm.matches(parse("Async${i}Handler"), "AsyncDiskHandler2"));
+    }
+
+    @Test
+    void matches_multipleLiteralsWrongOrder() {
+        assertFalse(AnnotationStringAlgorithm.matches(parse("Async${i}Handler"), "HandlerAsyncDisk2"));
+    }
+
+    @Test
+    void matches_firstLiteralPresentSecondAbsent() {
+        assertFalse(AnnotationStringAlgorithm.matches(parse("Async${i}Cache"), "AsyncDiskHandler2"));
+    }
+
+    @Test
+    void matches_allVariablesNoLiteral_neverMatches() {
+        assertFalse(AnnotationStringAlgorithm.matches(parse("${v1}${v2}"), "Callable2"));
+        assertFalse(AnnotationStringAlgorithm.matches(parse("${v1}${v2}"), "anything"));
+    }
+
+    // helper used in this test class
+    private static AnnotationStringTemplate parse(String s) {
+        return AnnotationStringAlgorithm.parse(s);
+    }
 }
