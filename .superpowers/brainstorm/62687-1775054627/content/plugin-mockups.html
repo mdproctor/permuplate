@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Permuplate IDE Plugin Mockups</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; padding: 24px; }
+  h1 { font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 28px; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .panel { background: #0d1117; border-radius: 10px; overflow: hidden; border: 1px solid #30363d; }
+  .panel-header { background: #161b22; padding: 10px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #30363d; }
+  .panel-title { font-size: 12px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .ide-logo { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+  .intellij-logo { background: #ff2d55; color: white; }
+  .vscode-logo { background: #007acc; color: white; }
+
+  /* ── shared code font ── */
+  .code-area { padding: 14px 0; font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace; font-size: 12.5px; line-height: 1.7; }
+  .line { padding: 0 16px; white-space: pre; }
+  .line-num { display: inline-block; width: 28px; color: #484f58; text-align: right; margin-right: 16px; user-select: none; font-size: 11px; }
+  .kw { color: #ff7b72; }
+  .ann { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .str-lit { color: #a5d6ff; }
+  .str-var { color: #79c0ff; font-style: italic; }
+  .typ { color: #ffa657; }
+  .cmt { color: #6e7681; font-style: italic; }
+  .mod { color: #ff7b72; }
+  .field { color: #e6edf3; }
+  .punct { color: #6e7681; }
+
+  /* ── IntelliJ-style annotation reference ── */
+  .ref-link { color: #a5d6ff; border-bottom: 1px solid #3d85c8; cursor: pointer; }
+  .ref-link:hover { background: #1c2d40; }
+
+  /* ── error squiggle ── */
+  .squiggle { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='4' width='6'%3E%3Cpath d='M0 3 Q1.5 0 3 3 Q4.5 6 6 3' fill='none' stroke='%23f85149' stroke-width='1'/%3E%3C/svg%3E"); background-repeat: repeat-x; background-position: bottom; padding-bottom: 2px; }
+  .warning-squiggle { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='4' width='6'%3E%3Cpath d='M0 3 Q1.5 0 3 3 Q4.5 6 6 3' fill='none' stroke='%23d29922' stroke-width='1'/%3E%3C/svg%3E"); background-repeat: repeat-x; background-position: bottom; padding-bottom: 2px; }
+
+  /* ── IntelliJ rename dialog ── */
+  .ij-dialog { background: #2d2d2d; border: 1px solid #555; border-radius: 6px; padding: 0; width: 420px; margin: 8px auto; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+  .ij-dialog-title { background: #3c3f41; padding: 8px 12px; font-size: 12px; color: #bbb; border-bottom: 1px solid #555; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; }
+  .ij-dialog-body { padding: 12px; }
+  .ij-field-label { font-size: 11px; color: #aaa; margin-bottom: 4px; }
+  .ij-field { background: #1e1e1e; border: 1px solid #6e8bb8; padding: 5px 8px; font-family: monospace; font-size: 12px; color: #a9b7c6; width: 100%; border-radius: 3px; }
+  .ij-checkbox-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11px; color: #bbb; }
+  .ij-checkbox { width: 12px; height: 12px; accent-color: #6e8bb8; }
+  .ij-update-preview { background: #1e1e1e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 10px; margin-top: 10px; font-family: monospace; font-size: 11px; color: #6a8759; }
+  .ij-update-preview .old { color: #f85149; text-decoration: line-through; opacity: 0.7; }
+  .ij-update-preview .new { color: #6a8759; }
+  .ij-btn-row { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 12px; background: #3c3f41; border-top: 1px solid #555; border-radius: 0 0 6px 6px; }
+  .ij-btn { padding: 4px 14px; font-size: 11px; border-radius: 3px; border: 1px solid; cursor: pointer; }
+  .ij-btn-primary { background: #4c5c8a; border-color: #6e8bb8; color: #a9b7c6; }
+  .ij-btn-secondary { background: #3c3f41; border-color: #555; color: #aaa; }
+
+  /* ── VS Code quickfix popup ── */
+  .vsc-quickfix { background: #252526; border: 1px solid #454545; border-radius: 3px; padding: 0; width: 360px; margin: 6px 0 6px 60px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); font-size: 12px; }
+  .vsc-quickfix-item { padding: 6px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .vsc-quickfix-item:hover { background: #04395e; }
+  .vsc-quickfix-item:first-child { color: #75beff; }
+  .vsc-quickfix-icon { font-size: 13px; }
+  .vsc-quickfix-sep { border-top: 1px solid #454545; }
+
+  /* ── IntelliJ Find Usages panel ── */
+  .ij-panel { background: #2b2b2b; border-top: 1px solid #3e3e3e; }
+  .ij-panel-tab { background: #3c3f41; padding: 4px 12px; font-size: 11px; color: #9d9d9d; border-right: 1px solid #555; border-bottom: 1px solid #3e3e3e; display: inline-block; }
+  .ij-panel-tab.active { color: #a9b7c6; border-bottom-color: #2b2b2b; }
+  .ij-usages { padding: 6px 0; }
+  .ij-usage-group { padding: 3px 12px; font-size: 11px; color: #8c8c8c; display: flex; align-items: center; gap: 5px; }
+  .ij-usage-item { padding: 2px 12px 2px 28px; font-size: 11px; color: #a9b7c6; font-family: monospace; display: flex; gap: 8px; cursor: pointer; }
+  .ij-usage-item:hover { background: #2d3142; }
+  .ij-usage-file { color: #6a8759; }
+  .ij-usage-match { background: #214283; padding: 0 2px; border-radius: 2px; }
+  .ij-usage-count { color: #8c8c8c; font-size: 10px; margin-left: auto; }
+
+  /* ── VS Code references panel ── */
+  .vsc-panel { background: #1e1e1e; border-top: 1px solid #252526; }
+  .vsc-panel-tab { background: #2d2d2d; padding: 6px 12px; font-size: 11px; color: #969696; border-bottom: 1px solid #454545; }
+  .vsc-ref-header { padding: 6px 12px; font-size: 11px; color: #969696; }
+  .vsc-ref-item { padding: 3px 12px 3px 24px; font-size: 12px; font-family: monospace; color: #cccccc; display: flex; gap: 10px; cursor: pointer; }
+  .vsc-ref-item:hover { background: #2a2d2e; }
+  .vsc-ref-file { color: #4ec9b0; }
+  .vsc-ref-match { color: #9cdcfe; background: rgba(156,220,254,0.15); padding: 0 2px; }
+  .vsc-ref-line { color: #6e7681; }
+
+  /* ── status bar ── */
+  .ij-status { background: #4c5c8a; padding: 2px 12px; font-size: 10px; color: #a9b7c6; display: flex; gap: 16px; }
+  .vsc-status { background: #007acc; padding: 3px 12px; font-size: 11px; color: white; display: flex; gap: 16px; }
+  .status-item { opacity: 0.85; }
+
+  /* ── tooltips / hover docs ── */
+  .ij-tooltip { background: #2d2d2d; border: 1px solid #555; border-radius: 4px; padding: 8px 12px; font-size: 11px; color: #a9b7c6; max-width: 320px; margin: 4px 0 4px 80px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+  .ij-tooltip .tip-title { color: #cc7832; font-weight: bold; margin-bottom: 4px; }
+
+  /* ── annotation markers (gutter) ── */
+  .gutter-mark { display: inline-block; width: 3px; height: 14px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+  .gutter-ref { background: #3d85c8; }
+  .gutter-err { background: #f85149; }
+  .gutter-warn { background: #d29922; }
+
+  /* ── line highlight ── */
+  .line-highlight { background: rgba(61,133,200,0.08); display: block; }
+  .line-error-bg { background: rgba(248,81,73,0.08); display: block; }
+
+  h2 { font-size: 16px; color: #fff; margin: 32px 0 16px; }
+  .scenario-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: #6e7681; margin-bottom: 10px; font-weight: 600; }
+  .caption { font-size: 11px; color: #6e7681; margin-top: 8px; text-align: center; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>Permuplate IDE Plugin Mockups</h1>
+<p class="subtitle">Four scenarios: rename hook, error + quickfix, navigation, find usages — shown side-by-side in IntelliJ and VS Code</p>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2>① Smart Rename — updating annotation strings automatically</h2>
+<p class="scenario-label">User renames <code>Callable2</code> → <code>Handler2</code></p>
+
+<div class="split">
+
+  <!-- IntelliJ rename -->
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ide-logo intellij-logo">IJ</span>
+        <span class="panel-title">IntelliJ IDEA — Rename dialog</span>
+      </div>
+      <div class="code-area">
+        <div class="line"><span class="line-num">11</span><span class="ann">@Permute</span><span class="punct">(</span><span class="field">varName</span> <span class="punct">=</span> <span class="str">"i"</span><span class="punct">,</span> <span class="field">from</span> <span class="punct">=</span> <span class="str">3</span><span class="punct">,</span> <span class="field">to</span> <span class="punct">=</span> <span class="str">10</span><span class="punct">,</span></div>
+        <div class="line"><span class="line-num">12</span>         <span class="field">className</span> <span class="punct">=</span> <span class="str">"Join${i}"</span><span class="punct">)</span></div>
+        <div class="line line-highlight"><span class="line-num">13</span><span class="kw">public class</span> <span class="typ">Join2</span> <span class="punct">{</span></div>
+        <div class="line"><span class="line-num">14</span></div>
+        <div class="line"><span class="line-num">15</span>    <span class="kw">private</span> <span class="ann">@PermuteDeclr</span><span class="punct">(</span><span class="field">type</span> <span class="punct">=</span> <span class="str">"<span class="ref-link">Callable</span>${i}"</span><span class="punct">,</span></div>
+        <div class="line"><span class="line-num">16</span>                         <span class="field">name</span> <span class="punct">=</span> <span class="str">"c${i}"</span><span class="punct">)</span></div>
+        <div class="line"><span class="line-num">17</span>    <span class="typ">Callable2</span> <span class="field">c2</span><span class="punct">;</span></div>
+      </div>
+      <div class="ij-dialog">
+        <div class="ij-dialog-title">
+          <span>Rename class 'Callable2'</span>
+          <span style="cursor:pointer;color:#888">✕</span>
+        </div>
+        <div class="ij-dialog-body">
+          <div class="ij-field-label">New name:</div>
+          <div class="ij-field">Handler2<span style="border-left:1px solid #6e8bb8;margin-left:1px"> </span></div>
+          <div class="ij-checkbox-row">
+            <input type="checkbox" class="ij-checkbox" checked>
+            <span>Search in comments and strings</span>
+          </div>
+          <div class="ij-checkbox-row" style="margin-top:4px">
+            <input type="checkbox" class="ij-checkbox" checked style="accent-color:#6a8759">
+            <span style="color:#6a8759">✦ Update Permuplate annotation strings</span>
+          </div>
+          <div class="ij-update-preview">
+            <div>@PermuteDeclr(type = <span class="old">"Callable${i}"</span> → <span class="new">"Handler${i}"</span>)</div>
+            <div style="color:#484f58;margin-top:3px">Join2.java:15 · 1 occurrence updated</div>
+          </div>
+        </div>
+        <div class="ij-btn-row">
+          <button class="ij-btn ij-btn-secondary">Preview</button>
+          <button class="ij-btn ij-btn-primary">Refactor</button>
+        </div>
+      </div>
+    </div>
+    <p class="caption">The rename dialog shows a live preview of which annotation strings will be updated</p>
+  </div>
+
+  <!-- VS Code rename -->
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ide-logo vscode-logo">VS</span>
+        <span class="panel-title">VS Code — inline rename</span>
+      </div>
+      <div class="code-area">
+        <div class="line"><span class="line-num">11</span><span class="ann">@Permute</span><span class="punct">(</span><span class="field">varName</span> <span class="punct">=</span> <span class="str">"i"</span><span class="punct">,</span> <span class="field">from</span> <span class="punct">=</span> <span class="str">3</span><span class="punct">,</span> <span class="field">to</span> <span class="punct">=</span> <span class="str">10</span><span class="punct">,</span></div>
+        <div class="line"><span class="line-num">12</span>         <span class="field">className</span> <span class="punct">=</span> <span class="str">"Join${i}"</span><span class="punct">)</span></div>
+        <div class="line"><span class="line-num">13</span><span class="kw">public class</span> <span class="typ">Join2</span> <span class="punct">{</span></div>
+        <div class="line"><span class="line-num">14</span></div>
+        <div class="line line-highlight"><span class="line-num">15</span>    <span class="kw">private</span> <span class="ann">@PermuteDeclr</span><span class="punct">(</span><span class="field">type</span> <span class="punct">=</span> <span class="str">"<span class="ref-link">Callable</span>${i}"</span><span class="punct">,</span></div>
+        <div class="line"><span class="line-num">16</span>                             <span class="field">name</span> <span class="punct">=</span> <span class="str">"c${i}"</span><span class="punct">)</span></div>
+        <div class="line"><span class="line-num">17</span>    <span class="typ">Callable2</span> <span class="field">c2</span><span class="punct">;</span></div>
+      </div>
+      <div style="background:#1e1e1e;padding:10px 16px;border-top:1px solid #252526;">
+        <div style="font-size:11px;color:#969696;margin-bottom:6px;">▶ Permuplate: 1 annotation string will be updated</div>
+        <div style="font-family:monospace;font-size:11px;background:#252526;padding:6px 8px;border-radius:3px;color:#cccccc;">
+          <span style="color:#f85149">- type = "Callable${i}"</span><br>
+          <span style="color:#3fb950">+ type = "Handler${i}"</span>
+        </div>
+        <div style="font-size:11px;color:#969696;margin-top:6px;">Press <kbd style="background:#3c3c3c;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:10px">Enter</kbd> to apply · <kbd style="background:#3c3c3c;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:10px">Esc</kbd> to cancel</div>
+      </div>
+    </div>
+    <p class="caption">VS Code shows a diff preview in the rename widget before committing</p>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2>② Error Highlighting + Quickfix — orphan variable</h2>
+<p class="scenario-label">String <code>"${v1}Callable${v2}"</code> on field of type <code>Callable2</code> — <code>${v1}</code> has no corresponding prefix text</p>
+
+<div class="split">
+
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ide-logo intellij-logo">IJ</span>
+        <span class="panel-title">IntelliJ IDEA — error + intention</span>
+      </div>
+      <div class="code-area">
+        <div class="line"><span class="line-num">8</span></div>
+        <div class="line line-error-bg"><span class="line-num">9</span>    <span class="ann">@PermuteDeclr</span><span class="punct">(</span><span class="field">type</span> <span class="punct">=</span> <span class="str">"<span class="squiggle">${v1}Callable</span>${v2}"</span><span class="punct">,</span></div>
+        <div class="line"><span class="line-num">10</span>                   <span class="field">name</span> <span class="punct">=</span> <span class="str">"c${i}"</span><span class="punct">)</span></div>
+        <div class="line"><span class="line-num">11</span>    <span class="typ">Callable2</span> <span class="field">c2</span><span class="punct">;</span></div>
+      </div>
+      <div class="ij-tooltip">
+        <div class="tip-title">Permuplate: Orphan variable in type string</div>
+        <div><code style="color:#a5d6ff">${v1}</code> has no corresponding prefix in <code style="color:#ffa657">Callable2</code>.</div>
+        <div style="margin-top:6px;color:#8c8c8c">The text before <code>"Callable"</code> in the class name is empty — <code>${v1}</code> would always expand to nothing.</div>
+        <div style="margin-top:8px;color:#6a8759">💡 Remove <code>${v1}</code> → <code style="color:#6a8759">"Callable${v2}"</code></div>
+      </div>
+    </div>
+    <p class="caption">Red squiggle on the orphan variable; hover shows explanation and fix preview</p>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ide-logo vscode-logo">VS</span>
+        <span class="panel-title">VS Code — error + quickfix</span>
+      </div>
+      <div class="code-area">
+        <div class="line"><span class="line-num">8</span></div>
+        <div class="line line-error-bg"><span class="line-num">9</span>    <span class="ann">@PermuteDeclr</span><span class="punct">(</span><span class="field">type</span> <span class="punct">=</span> <span class="str">"<span class="squiggle">${v1}</span>Callable${v2}"</span><span class="punct">,</span></div>
+        <div class="line"><span class="line-num">10</span>                   <span class="field">name</span> <span class="punct">=</span> <span class="str">"c${i}"</span><span class="punct">)</span></div>
+        <div class="line"><span class="line-num">11</span>    <span class="typ">Callable2</span> <span class="field">c2</span><span class="punct">;</span></div>
+      </div>
+      <div class="vsc-quickfix">
+        <div class="vsc-quickfix-item">
+          <span class="vsc-quickfix-icon">💡</span>
+          <span style="color:#cccccc">Quick Fix…</span>
+        </div>
+        <div class="vsc-quickfix-sep"></div>
+        <div class="vsc-quickfix-item" style="color:#75beff">
+          <span class="vsc-quickfix-icon">⚡</span>
+          Remove orphan variable <code style="background:#1e1e1e;padding:1px 4px;border-radius:2px">${v1}</code>
+        </div>
+        <div class="vsc-quickfix-item" style="color:#969696;font-size:11px;padding-left:32px">
+          "Callable${v2}"
+        </div>
+        <div class="vsc-quickfix-sep"></div>
+        <div class="vsc-quickfix-item" style="color:#969696">
+          <span class="vsc-quickfix-icon">📖</span>
+          View Permuplate documentation
+        </div>
+      </div>
+    </div>
+    <p class="caption">Squiggle on the orphan <code>${v1}</code>; quickfix replaces the whole string with the corrected value</p>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2>③ Navigation — Ctrl+click jumps to the referenced class</h2>
+<p class="scenario-label">Clicking on the <code>"Callable"</code> literal in <code>"Callable${i}"</code> navigates to <code>Callable2.java</code></p>
+
+<div class="split">
+
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ide-logo intellij-logo">IJ</span>
+        <span class="panel-title">IntelliJ IDEA — reference tooltip</span>
+      </div>
+      <div class="code-area">
+        <div class="line"><span class="line-num">15</span>    <span class="ann">@PermuteDeclr</span><span class="punct">(</span><span class="field">type</span> <span class="punct">=</span> <span class="str">"<span class="ref-link" style="cursor:pointer">Callable</span>${i}"</span><span class="punct">,</span></div>
+        <div class="line"><span class="line-num">16</span>                   <span class="field">name</span> <span class="punct">=</span> <span class="str">"c${i}"</span><span class="punct">)</span></div>
+        <div class="line"><span class="line-num">17</span>    <span class="typ">Callable2</span> <span class="field">c2</span><span class="punct">;</span></div>
+      </div>
+      <div class="ij-tooltip">
+        <div class="tip-title">Permuplate type reference</div>
+        <div>References <code style="color:#ffa657">Callable2</code> (and family <code style="color:#ffa657">Callable3..10</code>)</div>
+        <div style="margin-top:6px;color:#8c8c8c;font-size:10px">⌘+Click to navigate · ⌘+B to Go to Declaration</div>
+        <div style="margin-top:4px;color:#6a8759;font-size:10px">⌥+F7 · Find Usages (3 references)</div>
+      </div>
+    </div>
+    <p class="caption">Hover shows the resolved class; ⌘+Click navigates to <code>Callable2.java</code></p>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ide-logo vscode-logo">VS</span>
+        <span class="panel-title">VS Code — peek definition</span>
+      </div>
+      <div class="code-area">
+        <div class="line"><span class="line-num">15</span>    <span class="ann">@PermuteDeclr</span><span class="punct">(</span><span class="field">type</span> <span class="punct">=</span> <span class="str">"<span class="ref-link" style="cursor:pointer">Callable</span>${i}"</span><span class="punct">,</span></div>
+        <div class="line"><span class="line-num">16</span>                   <span class="field">name</span> <span class="punct">=</span> <span class="str">"c${i}"</span><span class="punct">)</span></div>
+        <div class="line"><span class="line-num">17</span>    <span class="typ">Callable2</span> <span class="field">c2</span><span class="punct">;</span></div>
+      </div>
+      <div style="background:#252526;border:1px solid #454545;margin:4px 16px 12px;border-radius:3px;overflow:hidden;">
+        <div style="background:#2d2d2d;padding:4px 12px;font-size:11px;color:#969696;border-bottom:1px solid #454545;">
+          Callable2.java — Peek Definition
+        </div>
+        <div class="code-area" style="padding:8px 0;">
+          <div class="line"><span class="line-num">1</span><span class="kw">package</span> io.quarkiverse.permuplate.example<span class="punct">;</span></div>
+          <div class="line"><span class="line-num">2</span></div>
+          <div class="line line-highlight"><span class="line-num">3</span><span class="kw">public interface</span> <span class="typ">Callable2</span> <span class="punct">{</span></div>
+          <div class="line"><span class="line-num">4</span>    <span class="kw">void</span> <span class="field">call</span><span class="punct">(</span><span class="typ">Object</span> o1<span class="punct">,</span> <span class="typ">Object</span> o2<span class="punct">);</span></div>
+          <div class="line"><span class="line-num">5</span><span class="punct">}</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">F12 or Ctrl+Click opens a peek definition window inline</p>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2>④ Find Usages — annotation strings listed as references</h2>
+<p class="scenario-label">Right-click <code>Callable2</code> → "Find Usages" shows annotation strings as references</p>
+
+<div class="split">
+
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ide-logo intellij-logo">IJ</span>
+        <span class="panel-title">IntelliJ IDEA — Find Usages panel</span>
+      </div>
+      <div class="code-area" style="padding:6px 0;">
+        <div class="line"><span class="line-num">3</span><span class="kw">public interface</span> <span class="typ" style="background:#214283;padding:0 3px;border-radius:2px">Callable2</span> <span class="punct">{</span></div>
+        <div class="line"><span class="line-num">4</span>    <span class="kw">void</span> <span class="field">call</span><span class="punct">(</span><span class="typ">Object</span> o1<span class="punct">,</span> <span class="typ">Object</span> o2<span class="punct">);</span></div>
+        <div class="line"><span class="line-num">5</span><span class="punct">}</span></div>
+      </div>
+      <div class="ij-panel">
+        <div style="padding:0;">
+          <span class="ij-panel-tab active">Find Usages</span>
+          <span class="ij-panel-tab">Problems</span>
+        </div>
+        <div class="ij-usages">
+          <div class="ij-usage-group">
+            <span>▾</span> Java usages of 'Callable2' (4)
+          </div>
+          <div class="ij-usage-group" style="padding-left:24px;">
+            <span>▾</span> Field declarations <span class="ij-usage-count">2</span>
+          </div>
+          <div class="ij-usage-item">
+            <span class="ij-usage-file">Join2.java:17</span>
+            <span><span class="ij-usage-match">Callable2</span> c2;</span>
+          </div>
+          <div class="ij-usage-item">
+            <span class="ij-usage-file">ContextJoin2.java:12</span>
+            <span><span class="ij-usage-match">Callable2</span> c2;</span>
+          </div>
+          <div class="ij-usage-group" style="padding-left:24px;margin-top:4px;">
+            <span style="color:#d2a8ff">✦</span> Permuplate annotation strings <span class="ij-usage-count">2</span>
+          </div>
+          <div class="ij-usage-item">
+            <span class="ij-usage-file">Join2.java:15</span>
+            <span>@PermuteDeclr(type = "<span class="ij-usage-match">Callable</span>${i}"</span>
+          </div>
+          <div class="ij-usage-item">
+            <span class="ij-usage-file">ContextJoin2.java:9</span>
+            <span>@PermuteDeclr(type = "<span class="ij-usage-match">Callable</span>${i}"</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">Annotation strings appear in a dedicated "Permuplate annotation strings" group under Find Usages</p>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="ide-logo vscode-logo">VS</span>
+        <span class="panel-title">VS Code — References panel</span>
+      </div>
+      <div class="code-area" style="padding:6px 0;">
+        <div class="line"><span class="line-num">3</span><span class="kw">public interface</span> <span class="typ" style="background:#264f78;padding:0 3px;border-radius:2px">Callable2</span> <span class="punct">{</span></div>
+        <div class="line"><span class="line-num">4</span>    <span class="kw">void</span> <span class="field">call</span><span class="punct">(</span><span class="typ">Object</span> o1<span class="punct">,</span> <span class="typ">Object</span> o2<span class="punct">);</span></div>
+        <div class="line"><span class="line-num">5</span><span class="punct">}</span></div>
+      </div>
+      <div class="vsc-panel">
+        <div class="vsc-panel-tab">REFERENCES (4)</div>
+        <div class="vsc-ref-header">Callable2 — 4 references</div>
+        <div class="vsc-ref-item">
+          <span class="vsc-ref-file">Join2.java</span>
+          <span class="vsc-ref-line">:17</span>
+          <span><span class="vsc-ref-match">Callable2</span> c2;</span>
+        </div>
+        <div class="vsc-ref-item">
+          <span class="vsc-ref-file">ContextJoin2.java</span>
+          <span class="vsc-ref-line">:12</span>
+          <span><span class="vsc-ref-match">Callable2</span> c2;</span>
+        </div>
+        <div style="padding:4px 12px;font-size:10px;color:#4ec9b0;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Permuplate strings</div>
+        <div class="vsc-ref-item">
+          <span class="vsc-ref-file">Join2.java</span>
+          <span class="vsc-ref-line">:15</span>
+          <span>type = "<span class="vsc-ref-match">Callable</span>${i}"</span>
+        </div>
+        <div class="vsc-ref-item">
+          <span class="vsc-ref-file">ContextJoin2.java</span>
+          <span class="vsc-ref-line">:9</span>
+          <span>type = "<span class="vsc-ref-match">Callable</span>${i}"</span>
+        </div>
+      </div>
+    </div>
+    <p class="caption">Annotation string references appear under a "Permuplate strings" subgroup in the References panel</p>
+  </div>
+
+</div>
+
+<div style="height:32px"></div>
+
+</body>
+</html>
