@@ -3,6 +3,7 @@ package io.quarkiverse.permuplate;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.testing.compile.Compilation;
@@ -77,6 +78,91 @@ public class PrefixValidationTest {
                 .withProcessors(new PermuteProcessor())
                 .compile(JavaFileObjects.forSourceString(
                         packageAnchor.getPackageName() + "." + simpleClassName, source));
+    }
+
+    // -------------------------------------------------------------------------
+    // Adjacent variables — collective region behaviour
+    // -------------------------------------------------------------------------
+
+    /**
+     * Adjacent variables before a static literal (e.g. {@code "${v1}${v2}Element${v3}"})
+     * are treated as a <em>collective unit</em> covering the prefix region. When the
+     * collective prefix region is <strong>non-empty</strong>, neither variable is an orphan.
+     * The individual split between them is irrelevant and is not validated — at generate
+     * time {@code v1+v2} concatenates to produce whatever text fills the slot.
+     *
+     * <p>
+     * This is intentional and accepted behaviour. No error must be reported.
+     *
+     * <p>
+     * <strong>Ignored until Sub-project 1:</strong> this test requires the full
+     * substring-based matching algorithm ({@code "Element"} must be found as a
+     * substring of {@code "myElement2"}, not just a prefix). The current validator
+     * uses prefix-only matching so it incorrectly rejects this as an error. Un-ignore
+     * after implementing {@code permuplate-ide-support} and wiring it into the processor.
+     */
+    @Ignore("Requires Sub-project 1 substring algorithm — current validator uses prefix-only matching")
+    @Test
+    public void testAdjacentVariablesOnNonEmptyPrefixAreNotOrphan() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        import java.util.List;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            private List<Object> myElements;
+                            public void go() {
+                                for (@PermuteDeclr(type = "Object",
+                                                   name = "${v1}${v2}Element${v3}") Object myElement2 : myElements) {}
+                            }
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        // ${v1} and ${v2} together cover prefix "my" in "myElement2" — non-empty.
+        // Neither is orphan. The individual split between them is not our concern.
+        assertThat(compilation).succeeded();
+    }
+
+    /**
+     * Adjacent variables where the collective prefix region is <strong>empty</strong>:
+     * both are orphan. Contrasts with
+     * {@link #testAdjacentVariablesOnNonEmptyPrefixAreNotOrphan()} — the rule applies
+     * to the region as a whole, not per-variable.
+     *
+     * <p>
+     * {@code "${v1}${v2}c${v3}"} on field {@code c2}: literal {@code "c"} is at position
+     * 0, so the prefix region before it is empty. Both {@code ${v1}} and {@code ${v2}}
+     * collectively cover nothing — both are orphan.
+     *
+     * <p>
+     * <strong>Ignored until Sub-project 1:</strong> the orphan variable rule is not yet
+     * implemented in the processor. Currently {@code "${v1}${v2}c${v3}"} passes prefix
+     * validation (static prefix {@code "c"} is a prefix of {@code "c2"}) but then fails
+     * at generation time with a JEXL undefined-variable exception because {@code v1},
+     * {@code v2}, and {@code v3} are not declared as loop or string variables.
+     * Un-ignore after implementing the orphan-variable rule in Sub-project 1.
+     */
+    @Ignore("Requires Sub-project 1 orphan-variable rule — not yet implemented in processor")
+    @Test
+    public void testAdjacentVariablesOnEmptyPrefixAreBothOrphan() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        public class Foo2 {
+                            private @PermuteDeclr(type = "Object",
+                                                   name = "${v1}${v2}c${v3}") Object c2;
+                        }
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
+
+        // ${v1} and ${v2} collectively cover the prefix before "c" in "c2", which is "".
+        // Both are orphan — at least one orphan error must be reported.
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("c2");
     }
 
     // -------------------------------------------------------------------------
