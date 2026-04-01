@@ -18,6 +18,7 @@
     <modules>
         <module>permuplate-annotations</module>
         <module>permuplate-core</module>
+        <module>permuplate-ide-support</module>
         <module>permuplate-processor</module>
         <module>permuplate-maven-plugin</module>
         <module>permuplate-apt-examples</module>
@@ -87,6 +88,16 @@
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
                 <version>${junit.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkiverse.permuplate</groupId>
+                <artifactId>quarkus-permuplate-ide-support</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>5.10.1</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.maven</groupId>
