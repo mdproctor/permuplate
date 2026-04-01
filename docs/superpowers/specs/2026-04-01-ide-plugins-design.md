@@ -30,61 +30,75 @@ An annotation string like `"${v1}Callable${v2}"` parses into alternating parts:
 Variable("v1") | Literal("Callable") | Variable("v2")
 ```
 
-Multiple variables in sequence are fully supported:
+Multiple static literals and multiple variables in sequence are fully supported:
+
 ```
-Variable("prefix") | Variable("i") | Literal("Callable") | Variable("j") | Variable("suffix")
+Variable("v") | Literal("Async") | Variable("i") | Literal("Handler") | Variable("suffix")
 ```
 
-The **static literal** is the non-`${...}` text. It is the anchor — it identifies which part of the class name this string references. Variables capture the surrounding prefix and suffix text dynamically at compile/generate time; the algorithm treats them as wildcards and only acts on the literal.
+**All static literals are anchors.** Every non-`${...}` segment participates in matching and validation. Variables are wildcards — they can match any text in the surrounding regions.
 
 ### String constant expansion
 
-Before any matching or validation, expand `strings` constants. `"${prefix}Callable${i}"` with `strings = {"prefix=My"}` becomes `"MyCallable${i}"`. Only integer loop variables (the permutation variable and `extraVars`) remain as `${...}` after expansion. The expanded form is what the algorithm operates on.
+Before any matching or validation, expand `strings` constants. `"${prefix}Callable${i}"` with `strings = {"prefix=My"}` becomes `"MyCallable${i}"`. Only integer loop variables remain as `${...}` after expansion. The expanded form is what the algorithm operates on.
 
 ### Matching
 
-Matching is purely **substring-based** — there is no camelCase splitting. The static literal must appear as a substring within the class name.
+Matching is purely **substring-based** — there is no camelCase splitting. All static literals must appear as substrings within the class name **in declaration order** (left to right).
 
-**Example 1:** literal `"Callable"`, class `"Callable2"` → `"Callable2".contains("Callable")` ✓
+**Single literal:** `"Callable"`, class `"ThisIsMyPrefixCallableThisIsMySuffix3"` → `"Callable"` found ✓
 
-**Example 2:** literal `"Callable"`, class `"ThisIsMyPrefixCallable3"` → `"ThisIsMyPrefixCallable3".contains("Callable")` ✓
+**Multiple literals — order matters:**
+- `"Async${i}Handler"` (literals `"Async"` then `"Handler"`) on `"AsyncDiskHandler2"`:
+  - Find `"Async"` → position 0 ✓
+  - Find `"Handler"` after position 5 → found at position 9 ✓ → matches
+- `"Async${i}Handler"` on `"HandlerAsyncDisk2"`:
+  - Find `"Async"` → position 7
+  - Find `"Handler"` after position 12 → NOT FOUND → no match (wrong order)
 
-**Example 3:** literal `"Callable"`, class `"ThisIsMyPrefixCallableThisIsMySuffix3"` → ✓ (substring found; prefix = `"ThisIsMyPrefix"`, suffix = `"ThisIsMySuffix3"`)
+The region between two consecutive literals is captured by the variable(s) between them. The region before the first literal and after the last literal are captured by the surrounding variables.
 
 ### Rename computation
 
-Given old class, new class, and annotation string — the algorithm:
+For each static literal in the string, apply the strip-prefix/strip-suffix operation independently:
 
-1. Find the static literal `L` as a substring in the old class name
-2. Record `old_prefix` = text before `L`; `old_suffix` = text after `L`
-3. In the new class name, strip `old_prefix` from the start and `old_suffix` from the end
-4. Whatever remains is the new literal
+1. For each literal `L` (in order): find its position in the old class name
+2. `old_prefix_L` = text between the previous literal's end (or class start) and `L`'s start
+3. `old_suffix_L` = text between `L`'s end and the next literal's start (or class end)
+4. In the new class name, try to strip `old_prefix_L` from the corresponding region start and `old_suffix_L` from the region end
+5. Whatever remains is the new literal for that segment
 
-**Example — only literal changes** (`"ThisIsMyPrefixCallableThisIsMySuffix3"` → `"ThisIsMyPrefixHookThisIsMySuffix3"`):
+**Single literal, only literal changes** (`"AsyncDiskHandler2"` → `"AsyncDiskProcessor2"`, string `"Async${i}Handler"`):
+- Literal 1: `"Async"`, old_prefix=`""`, old_suffix=`"DiskHandler2"` → new starts with `""` ✓, ends with `"DiskProcessor2"` not `"DiskHandler2"` → literal 1 unchanged ✓ (it's preserved in new name)
+- Literal 2: `"Handler"`, old_prefix=`"AsyncDisk"`, old_suffix=`"2"` → new starts with `"AsyncDisk"` ✓, strip `"2"` from remainder `"Processor2"` → new literal = `"Processor"`
+- Result: `"Async${i}Processor"` ✓
 
-- `L` = `"Callable"`, `old_prefix` = `"ThisIsMyPrefix"`, `old_suffix` = `"ThisIsMySuffix3"`
-- New class starts with `"ThisIsMyPrefix"` ✓ → remainder = `"HookThisIsMySuffix3"`
-- Remainder ends with `"ThisIsMySuffix3"` ✓ → new literal = `"Hook"`
-- String `"${v1}Callable${v2}"` → `"${v1}Hook${v2}"` ✓
+**Multiple literals, both change** (`"AsyncDiskHandler2"` → `"SyncSSDProcessor2"`, string `"Async${i}Handler"`):
+- Literal 1 `"Async"`: `"SyncSSDProcessor2"` does not start with `""` → trivially strips; does not start with `"Async"` in position — wait, `"Async"` was at position 0, new name at position 0 has `"Sync"` → literal changed; old_prefix=`""` strips, old_suffix=`"DiskHandler2"` doesn't match rest → **flag for manual review**
+- IDE shows: *"annotation string may need manual update — rename affected multiple anchors"*
 
-**Example — suffix also changes** (`"MyCallable2"` → `"YourHook3"` with string `"${v1}Callable${v2}"`):
+**Prefix/suffix also changed** (`"MyCallable2"` → `"YourHook3"`, string `"${v1}Callable${v2}"`):
+- `${v1}` and `${v2}` explicitly declare their slots are wildcards; prefix `"My"`→`"Your"` and suffix `"2"`→`"3"` are captured by those variables and are ignored
+- `"YourHook3"` does not start with `"My"` → strip by length of `"My"` as fallback? No — spec says: since the prefix is covered by a variable, the algorithm cannot determine the new literal automatically → **flag for manual review**
+- The Rule 2 error (unmatched literal) will fire on the stale string, directing the user to fix it
 
-- `L` = `"Callable"`, `old_prefix` = `"My"`, `old_suffix` = `"2"`
-- `${v1}` and `${v2}` are variables — they capture whatever prefix/suffix text exists at generate time. The user has explicitly declared that the prefix (`"My"`/`"Your"`) and suffix (`"2"`/`"3"`) are covered by variables and should be ignored.
-- New class `"YourHook3"` does not start with `"My"` → prefix changed; since it is captured by `${v1}`, ignore it
-- New class `"YourHook3"` does not end with `"2"` → suffix changed; since it is captured by `${v2}`, ignore it
-- The algorithm cannot automatically extract the new literal in this case; it flags the annotation string for manual review with a warning: *"annotation string may need manual update — class prefix/suffix also changed"*
-
-**Key principle:** the variables explicitly declare "I don't care what text fills my slot." The algorithm only updates the static literal. If the prefix or suffix also changed simultaneously, that is outside the scope of automatic update — the user is responsible.
+**Rule ordering:** Rule 2 (unmatched literal) is checked first and **short-circuits** Rules 3 and 4. If the literal is not found in the class name at all, checking for orphan variables is undefined and is skipped.
 
 ### Validation errors (all are compile errors)
 
-| Rule | Condition | Error message |
-|---|---|---|
-| **No variables** | String contains no `${...}` variables at all (e.g. `type = "Callable2"`) | `@PermuteDeclr type "Callable2" contains no variables — it will generate the same type for every permutation` |
-| **Unmatched literal** | Static literal (after expanding `strings` constants) does not appear as a substring of the class name | `@PermuteDeclr type literal "Foo" does not match any substring of the declared type "Callable2"` |
-| **Orphan variable** | A `${var}` exists but the text it corresponds to in the class name is empty — applies to each orphan variable individually, so `"${v1}${v2}Callable"` on `"Callable2"` reports both `${v1}` and `${v2}` as orphans | `@PermuteDeclr: variable ${v1} has no corresponding text in "Callable2" (prefix before "Callable" is empty) — remove it` |
-| **No anchor** | After expanding `strings` constants, the string contains only variables with no static literal | `@PermuteDeclr type string has no static literal to match against "Callable2" — add a literal portion or define the variable in @Permute strings` |
+| Rule | Scope | Condition | Error message |
+|---|---|---|---|
+| **R1 — `@Permute.className` has no variable** | `@Permute` only | `className` contains no `${...}` — every permutation produces the same class name | `@Permute className "FixedName" contains no variables — every permutation will produce the same class name; add a ${varName} expression` |
+| **R1b — `className` missing declared variable** | `@Permute` only | A declared `varName` or `extraVars` variable does not appear anywhere in `className` — that axis produces no variation | `@Permute className "Foo${i}" never uses extraVars variable "k" — every value of k generates the same class name, producing duplicates` |
+| **R2 — Unmatched literal** | All annotations | Any static literal (after expanding `strings`) is not a substring of the class name (checked in order; first mismatch short-circuits R3/R4) | `@PermuteDeclr type literal "Handler" does not match any substring of "AsyncDiskCallable2"` |
+| **R3 — Orphan variable** | All annotations | A `${var}` exists but the region it corresponds to in the class name is empty; reported per orphan variable | `@PermuteDeclr: variable ${v1} has no corresponding text in "Callable2" (no text before "Callable") — remove it` |
+| **R4 — No anchor** | All annotations | After `strings` expansion, string contains only variables with no static literal | `@PermuteDeclr type string has no static literal to match against "Callable2" — add a literal or define the variable in @Permute strings` |
+
+**Notes:**
+- R1 applies **only to `@Permute.className`** — inner annotations (`@PermuteDeclr`, `@PermuteParam`) may legitimately have attributes with no variable (e.g. `type = "Object"` when the type genuinely does not vary)
+- R1b catches the `from == to` case: with `from=3, to=3` and `className = "FixedName"`, only one class is generated so the Filer never fires a duplicate error — R1 catches it early with a clearer message
+- R2 short-circuits: if any literal is not found, R3 and R4 are skipped for that string
+- Multiple adjacent variables on a non-empty prefix/suffix (e.g. `"${v1}${v2}Callable"` on `"MyCallable2"`) — orphan detection is applied per-variable; since "My" is split ambiguously between v1 and v2, both are considered non-orphan as long as the region is non-empty. V1 edge case: behaviour when the region is non-empty but smaller than the number of preceding variables is undefined; the IDE shows a warning rather than error.
 
 ---
 
@@ -103,17 +117,41 @@ Given old class, new class, and annotation string — the algorithm:
 
 The new **substring-based** algorithm replaces the existing leading-literal prefix-only check for `className`. The existing `testClassNamePrefixMismatchIsError` tests remain valid — they are a subset of the new Rule 2 (unmatched literal).
 
-**Tests:** New test class `OrphanVariableTest` (or extend `PrefixValidationTest`) with cases for all four rules on all four attributes. Required cases include:
+**Tests:** New test class `OrphanVariableTest` plus additions to `DegenerateInputTest`. Required cases:
 
-- **No variables:** `type = "Callable2"` (no `${...}`) → compile error
-- **Unmatched literal:** `type = "Foo${i}"` on field `Callable2` → error ("Foo" not in "Callable2")
-- **Orphan variable — single:** `"${v1}Callable${v2}"` on `Callable2` → `${v1}` orphan (prefix before "Callable" is empty)
-- **Orphan variable — multiple adjacent:** `"${v1}${v2}Callable${v3}"` on `Callable2` → both `${v1}` and `${v2}` orphan
-- **No anchor — pure variables:** `"${v1}${v2}"` (no literal) → no-anchor error
-- **No anchor — after strings expansion:** `"${prefix}${i}"` with no matching `strings` entry → no-anchor error
-- **Valid — substring match:** `"${v1}Callable${v2}"` on `"ThisIsMyPrefixCallable3"` → no error
-- **Valid — multiple string variables:** `"${prefix}Callable${i}"` with `strings = {"prefix=My"}`, field type `"MyCallable2"` → expanded to `"MyCallable${i}"`, literal `"MyCallable"` matches `"MyCallable2"` → no error
-- **Valid — string variable expands to full literal:** `"${prefix}${i}"` with `strings = {"prefix=Callable"}`, field type `"Callable2"` → expanded to `"Callable${i}"`, literal `"Callable"` matches → no error
+**R1 — `@Permute.className` has no variable:**
+- `className = "FixedName"`, `from=3, to=5` → error (Filer duplicate would also catch this, but R1 catches it first)
+- `className = "FixedName"`, `from=3, to=3` (single permutation) → error (Filer would NOT catch this — only R1 does)
+- `className = "Foo${i}"`, `from=3, to=5` → no error (has variable)
+
+**R1b — declared variable absent from `className`:**
+- `varName="i"`, `extraVars={@PermuteVar(varName="k",...)}`, `className="Foo${i}"` (k not used) → error
+- `varName="i"`, `extraVars={@PermuteVar(varName="k",...)}`, `className="Foo${i}x${k}"` → no error
+
+**R2 — Unmatched literal:**
+- `type="Foo${i}"` on field `Callable2` → error ("Foo" not in "Callable2")
+- `type="Async${i}Handler"` on field `AsyncDiskCallable2` → error ("Handler" not in "AsyncDiskCallable2" after "Async")
+- `type="Async${i}Handler"` on field `AsyncDiskHandler2` → no error (both in order)
+- Multiple literals, first correct but second wrong: `"Async${i}Cache"` on `AsyncDiskHandler2` → error ("Cache" not found after "Async")
+
+**R3 — Orphan variable:**
+- `"${v1}Callable${v2}"` on `Callable2` → error on `${v1}` (prefix before "Callable" is empty)
+- `"${v1}${v2}Callable${v3}"` on `Callable2` → error on `${v1}` and `${v2}` (both orphan)
+- `"${v1}Callable${v2}"` on `MyCallable2` → no error (prefix "My" is non-empty)
+- `"Callable${v1}"` on `Callable2` → no error (`${v1}` corresponds to "2")
+
+**R4 — No anchor:**
+- `"${v1}${v2}"` (no literal) → error
+- `"${prefix}${i}"` with no `strings` entry for `prefix` → error
+
+**R2 short-circuits R3/R4:**
+- `"${v1}Foo${v2}"` on `Callable2` → only R2 fires ("Foo" not in "Callable2"); no additional orphan error for `${v1}` even though prefix is also empty
+
+**Valid — should NOT error:**
+- `"${v1}Callable${v2}"` on `MyCallable2` → valid (literal "Callable" found, prefix "My" non-empty, suffix "2" non-empty)
+- `"Async${i}Handler"` on `AsyncDiskHandler2` → valid (both literals found in order)
+- `"${prefix}${i}"` with `strings={"prefix=Callable"}`, field `Callable2` → expands to `"Callable${i}"`, valid
+- `type="Object"`, `name="o${i}"` on for-each `Object o2` → valid (type "Object" matches, name prefix "o" matches; type having no variable is intentional and allowed for inner annotations)
 
 ---
 
@@ -160,24 +198,33 @@ public class AnnotationStringAlgorithm {
 
 - `parse()`: empty string, all variables, all literal, mixed, adjacent variables, nested `${}` not supported (literal)
 - `expandStringConstants()`: single constant, multiple constants, constant not in strings (no expansion), constant that composes full literal
-- `matches()`: literal at start of class name, literal in middle, literal at end, literal spanning most of name, no match, empty literal (always matches), class name with only numeric suffix
+- `matches()`:
+  - Single literal: at start, middle, end of class name; no match; class name with only numeric suffix
+  - Multiple literals in correct order: `"Async${i}Handler"` on `"AsyncDiskHandler2"` → true
+  - Multiple literals in wrong order: `"Async${i}Handler"` on `"HandlerAsyncDisk2"` → false
+  - First literal present, second absent: `"Async${i}Cache"` on `"AsyncDiskHandler2"` → false
 - `computeRename()`:
-  - Only literal changes, prefix/suffix preserved: `"MyCallable2"` → `"MyHandler2"` → `"${v1}Handler${v2}"` ✓
-  - Long prefix and suffix, only literal changes: `"ThisIsMyPrefixCallableThisIsMySuffix3"` → `"ThisIsMyPrefixHookThisIsMySuffix3"` → `"${v1}Hook${v2}"` ✓
-  - Numeric suffix changes (captured by variable): `"Callable2"` → `"Handler3"` → `"Handler${i}"` ✓
-  - Prefix/suffix also changed: returns `NoMatch` (cannot auto-update; user handles manually)
-  - String has no match in old class: returns `NoMatch`
+  - Single literal, only literal changes: `"Callable2"` → `"Handler2"`, `"Callable${i}"` → `"Handler${i}"` ✓
+  - Long prefix+suffix preserved: `"ThisIsMyPrefixCallableThisIsMySuffix3"` → `"ThisIsMyPrefixHookThisIsMySuffix3"` → `"${v1}Hook${v2}"` ✓
+  - Numeric suffix changes (variable captures it): `"Callable2"` → `"Handler3"`, `"Callable${i}"` → `"Handler${i}"` ✓
+  - Multiple literals, second changes: `"AsyncDiskHandler2"` → `"AsyncDiskProcessor2"`, `"Async${i}Handler"` → `"Async${i}Processor"` ✓
+  - Multiple literals, both change: `"AsyncDiskHandler2"` → `"SyncSSDProcessor2"`, `"Async${i}Handler"` → `NoMatch` (manual review)
+  - Prefix also changed: `"MyCallable2"` → `"YourHook3"` → `NoMatch` (manual review)
+  - String has no match in old class: → `NoMatch`
 - `validate()`:
-  - **No variables:** `"Callable2"` → `NO_VARIABLES` error
-  - **Unmatched literal:** `"Foo${i}"` vs `"Callable2"` → `UNMATCHED_LITERAL` error
-  - **Orphan single:** `"${v1}Callable${v2}"` vs `"Callable2"` (prefix empty) → `ORPHAN_VARIABLE` for `v1`
-  - **Orphan multiple adjacent:** `"${v1}${v2}Callable${v3}"` vs `"Callable2"` → `ORPHAN_VARIABLE` for both `v1` and `v2`
-  - **No anchor — pure variables:** `"${v1}${v2}"` → `NO_ANCHOR` error
-  - **No anchor after expansion:** `"${prefix}${i}"` with empty constants → `NO_ANCHOR` error
-  - **Valid — middle match:** `"${v1}Callable${v2}"` vs `"ThisIsMyPrefixCallable3"` → no errors
-  - **Valid — string constant composes literal:** `"${prefix}${i}"` with `{"prefix":"Callable"}` vs `"Callable2"` → no errors (expands to `"Callable${i}"`, literal matches)
-  - **Valid — multiple string variables:** `"${a}${b}Callable${i}"` with `{"a":"My","b":""}` vs `"MyCallable2"` → no errors (expands to `"MyCallable${i}"`)
-  - **Valid — no variables before literal:** `"Callable${i}"` vs `"Callable2"` → no errors
+  - **R2 — Unmatched single literal:** `"Foo${i}"` vs `"Callable2"` → `UNMATCHED_LITERAL`
+  - **R2 — Unmatched second literal:** `"Async${i}Cache"` vs `"AsyncDiskHandler2"` → `UNMATCHED_LITERAL` for `"Cache"`
+  - **R2 — short-circuits R3/R4:** `"${v1}Foo${v2}"` vs `"Callable2"` → only `UNMATCHED_LITERAL`; no `ORPHAN_VARIABLE` reported
+  - **R3 — Orphan single:** `"${v1}Callable${v2}"` vs `"Callable2"` → `ORPHAN_VARIABLE` for `v1` (prefix empty)
+  - **R3 — Orphan multiple adjacent:** `"${v1}${v2}Callable${v3}"` vs `"Callable2"` → `ORPHAN_VARIABLE` for both `v1` and `v2`
+  - **R3 — Not orphan:** `"${v1}Callable${v2}"` vs `"MyCallable2"` → no errors (prefix "My" non-empty)
+  - **R3 — Suffix not orphan:** `"Callable${v1}"` vs `"Callable2"` → no errors (`${v1}` covers "2")
+  - **R4 — Pure variables:** `"${v1}${v2}"` → `NO_ANCHOR`
+  - **R4 — No expansion:** `"${prefix}${i}"` with no matching `strings` entry → `NO_ANCHOR`
+  - **Valid — substring match:** `"${v1}Callable${v2}"` vs `"ThisIsMyPrefixCallable3"` → no errors
+  - **Valid — multiple literals in order:** `"Async${i}Handler"` vs `"AsyncDiskHandler2"` → no errors
+  - **Valid — string constant composes literal:** `"${prefix}${i}"` with `{"prefix":"Callable"}` vs `"Callable2"` → expands to `"Callable${i}"`, no errors
+  - **Valid — type with no variable (inner annotation):** `type="Object"`, `name="o${i}"` vs for-each `Object o2` → no errors (R1 does not apply to inner annotations)
 
 ---
 
