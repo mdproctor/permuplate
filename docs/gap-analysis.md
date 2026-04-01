@@ -9,7 +9,7 @@
 
 Three categories of findings:
 
-1. **Hard gaps** — things Permuplate fundamentally cannot do today and would require new features
+1. **Hard gaps** — things Permuplate fundamentally cannot do today and would require new features (G3 was initially identified as a hard gap but was incorrect — removed)
 2. **Soft gaps** — things that almost work but have an awkward UX or a missing edge case
 3. **Newly identified patterns** — patterns we can already support but haven't demonstrated or tested
 
@@ -65,24 +65,15 @@ step2.filter((a, b) -> a.age() > b.age());
 
 ---
 
-### G3 — Overload selection by lambda arity (implicit dispatch)
+### ~~G3 — Overload selection by lambda arity~~ — NOT A GAP (removed)
 
-**What the Drools DSL ideally wants:**
-```java
-// User writes:
-builder.filter((ctx, p) -> p.age() > 50);          // infers 2-arg filter
-builder.filter((ctx, p1, p2) -> p1.age() > 18);    // infers 3-arg filter
+**This was identified as a gap but was incorrect.** The Drools DSL compiles fine with same-named `filter()` overloads for different arities, which revealed the error in the original analysis.
 
-// Both are named "filter" — Java resolves by SAM arity
-```
+Java's overload resolution for implicit-type lambdas considers the lambda's formal parameter count. From JLS 15.12.2.1, a lambda is "potentially compatible" with a functional interface only if the parameter counts match. When `filter(Condition2)` and `filter(Condition3)` are both candidates, a 2-parameter lambda `(a, b) -> ...` is only potentially compatible with `Condition2` (whose `test` takes 2 params), not with `Condition3`. The compiler narrows to exactly one candidate — no ambiguity.
 
-**The gap:** Java resolves method overloads by parameter type, not by lambda arity. If `filter(Condition2)` and `filter(Condition3)` both exist, the compiler **cannot** infer which to call from the lambda alone unless the functional interface types are unambiguous. This means overloads with erased `Object` parameters are **not resolvable** — the user must either cast or use different method names (`filter2()`, `filter3()`).
+**Permuplate's `@Permute` on a method already generates the correct overloads and Java resolves the call site correctly from the lambda arity.** No `methodName` attribute or differently-named methods are needed to solve this specific problem.
 
-**Impact:** The DSL must use either:
-- Differently-named methods (`filter2`, `filter3`, ...) — ugly but works
-- Typed functional interfaces (`Condition2<Person, Account>`) — requires G1 to be solved first
-
-**Note:** This is a Java language limitation, not specifically a Permuplate limitation. Permuplate generates the correct overloads; Java's type inference is what fails.
+Note: `methodName` templating (N2) may still be useful for the `path2()`, `path3()` pattern where the depth is in the name by convention — but that is a style choice, not a compilation requirement.
 
 ---
 
@@ -219,6 +210,5 @@ public interface Condition1 {
 | 4 | N3 — Verify @PermuteParam on abstract interface method | New pattern | Low | Needed for N1 |
 | 5 | S4 — Degenerate test for empty @PermuteParam range | Soft gap | Low | Edge case safety |
 | 6 | N2 — Method name templating (`path${i}()`) | New pattern → requires new feature | High | New capability |
-| 7 | G3 — Overload selection by lambda arity | Hard gap | N/A (Java limitation) | Document only |
-| 8 | G1 — Generic type parameter arity | Hard gap | Very high | New capability |
-| 9 | G2 — Return type narrowing by arity | Hard gap | Very high | New capability |
+| 7 | G1 — Generic type parameter arity | Hard gap | Very high | New capability |
+| 8 | G2 — Return type narrowing by arity | Hard gap | Very high | New capability |
