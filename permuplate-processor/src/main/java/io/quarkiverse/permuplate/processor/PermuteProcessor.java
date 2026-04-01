@@ -152,6 +152,36 @@ public class PermuteProcessor extends AbstractProcessor {
         if (!validateExtraVars(permute, typeElement, permuteMirror))
             return;
 
+        // R1: className must contain at least one ${...} variable
+        if (!permute.className().contains("${")) {
+            error(String.format(
+                    "@Permute className \"%s\" contains no variables — every permutation will" +
+                            " produce the same class name; add a ${%s} expression",
+                    permute.className(), permute.varName()),
+                    typeElement, permuteMirror, findAnnotationValue(permuteMirror, "className"));
+            return;
+        }
+
+        // R1b: every extraVars variable must appear somewhere in className
+        String classNameTemplate = permute.className();
+        List<String> missingVars = new ArrayList<>();
+        for (PermuteVar extra : permute.extraVars()) {
+            if (!classNameTemplate.contains("${" + extra.varName() + "}")) {
+                missingVars.add(extra.varName());
+            }
+        }
+        if (!missingVars.isEmpty()) {
+            for (String missing : missingVars) {
+                error(String.format(
+                        "@Permute className \"%s\" never uses extraVars variable \"%s\" —" +
+                                " every value of %s generates the same class name, producing" +
+                                " duplicates; add ${%s} to className",
+                        permute.className(), missing, missing, missing),
+                        typeElement, permuteMirror, findAnnotationValue(permuteMirror, "extraVars"));
+            }
+            return;
+        }
+
         // className prefix rule: the LEADING literal (before the first ${...}) must be
         // a prefix of the template class name. Using only the leading literal (rather
         // than all literal segments combined) correctly handles multi-variable classNames

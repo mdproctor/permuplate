@@ -417,4 +417,105 @@ public class DegenerateInputTest {
         assertThat(compilation).hadErrorContaining("conflicts");
     }
 
+    // -------------------------------------------------------------------------
+    // R1 — @Permute.className has no variable (compile error regardless of range)
+    // -------------------------------------------------------------------------
+
+    /**
+     * {@code className = "FixedName"} with {@code from=3, to=5} produces a duplicate
+     * class error via the Filer today, but R1 should catch it first with a clearer message.
+     */
+    @Test
+    public void testClassNameNoVariableWithRangeIsR1Error() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 5, className = "FixedName")
+                        public class Foo2 {}
+                        """.formatted(PKG, PERMUTE_FQN));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("FixedName");
+        assertThat(compilation).hadErrorContaining("no variables");
+    }
+
+    /**
+     * {@code className = "FixedName"} with {@code from=3, to=3}: only one iteration,
+     * so the Filer never fires a duplicate error. R1 must catch this case.
+     */
+    @Test
+    public void testClassNameNoVariableWithFromEqualsToIsR1Error() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 3, className = "FixedName")
+                        public class Foo2 {}
+                        """.formatted(PKG, PERMUTE_FQN));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("FixedName");
+        assertThat(compilation).hadErrorContaining("no variables");
+    }
+
+    /**
+     * A {@code className} with a variable does NOT trigger R1.
+     */
+    @Test
+    public void testClassNameWithVariableDoesNotTriggerR1() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        @Permute(varName = "i", from = 3, to = 3, className = "Foo${i}")
+                        public class Foo2 {}
+                        """.formatted(PKG, PERMUTE_FQN));
+
+        assertThat(compilation).succeeded();
+    }
+
+    // -------------------------------------------------------------------------
+    // R1b — extraVars variable absent from className (produces duplicates)
+    // -------------------------------------------------------------------------
+
+    /**
+     * {@code extraVars = {@PermuteVar(varName="k", ...)}} but {@code ${k}} never
+     * appears in {@code className} — every value of k generates the same class name.
+     */
+    @Test
+    public void testExtraVarsMissingFromClassNameIsR1bError() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        @Permute(varName = "i", from = 2, to = 3, className = "Foo${i}",
+                                 extraVars = { @PermuteVar(varName = "k", from = 2, to = 3) })
+                        public class Foo2 {}
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("k");
+        assertThat(compilation).hadErrorContaining("className");
+    }
+
+    /**
+     * When all declared variables appear in {@code className}, no R1b error.
+     */
+    @Test
+    public void testExtraVarsPresentInClassNameDoesNotTriggerR1b() {
+        var compilation = compile(Callable2.class, "Foo2",
+                """
+                        package %s;
+                        import %s;
+                        import %s;
+                        @Permute(varName = "i", from = 2, to = 3, className = "Foo${i}x${k}",
+                                 extraVars = { @PermuteVar(varName = "k", from = 2, to = 3) })
+                        public class Foo2 {}
+                        """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
+
+        assertThat(compilation).succeeded();
+    }
+
 }
