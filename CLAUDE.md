@@ -24,6 +24,7 @@ This is genuinely novel. Every comparable tool (Vavr generators, Freemarker temp
 permuplate-parent/
 ├── permuplate-annotations/     @Permute, @PermuteDeclr, @PermuteParam, @PermuteVar  (no runtime deps)
 ├── permuplate-core/            shared transformation engine: EvaluationContext, transformers, PermuteConfig
+├── permuplate-ide-support/     annotation string algorithm (matching, rename, validation); no IDE deps
 ├── permuplate-processor/       APT entry point only (thin shell depending on permuplate-core)
 ├── permuplate-maven-plugin/    Maven Mojo for pre-compilation generation including inline mode
 ├── permuplate-apt-examples/    APT examples (renamed from permuplate-example)
@@ -92,7 +93,7 @@ The sentinel's original name is registered as an **anchor**. Every method call i
 1. Reads source via `Trees` API using `getCharContent(true)` — works for file-based and in-memory sources
 2. Parses with `StaticJavaParser`
 3. Finds the class with `cu.findFirst(ClassOrInterfaceDeclaration.class, predicate)` — recursive form required for nested classes
-4. Calls `buildAllCombinations(permute)` to generate the cross-product of all variables (primary + `extraVars`), then iterates over each combination
+4. Calls `buildStringConstants(permute)` to extract string constants and `buildAllCombinations(permute)` to generate the cross-product of all variables (primary + `extraVars`), then iterates over each combination
 5. When writing, walks up `getEnclosingElement()` until a `PackageElement` is found
 
 ### Transformation pipeline (per permutation value)
@@ -150,6 +151,10 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | Template directory not on compile path | `src/main/permuplate/` (inline templates) is never added as a Maven compile source root. The Maven plugin reads it at `generate-sources` time and writes augmented parent classes to `target/generated-sources/permuplate/`. Javac compiles only the output dir. IDE users mark `src/main/permuplate` as a source root manually. |
 | InlineGenerator strips all permuplate annotations | When `keepTemplate = true`, the retained template class must have `@Permute`, `@PermuteDeclr`, and `@PermuteParam` all stripped — not just `@Permute` — otherwise javac cannot compile the annotations that reference types from `permuplate-annotations`. |
 | permuplate-core null-checks Messager | `PermuteDeclrTransformer` and `PermuteParamTransformer` take `Messager` as a parameter. The Maven plugin passes `null` (no Messager in Maven). All `messager.printMessage(...)` calls are guarded with `if (messager != null)`. |
+| Annotation string validation | All string attributes (`@PermuteDeclr type/name`, `@PermuteParam name`, `@Permute className`) are validated using `AnnotationStringAlgorithm.validate()` from `permuplate-ide-support`. The old `checkPrefix` (leading-literal + `startsWith`) is replaced by full substring matching (R2), orphan variable detection (R3), and no-anchor detection (R4). |
+| R1 applies only to @Permute.className | Inner annotations (`@PermuteDeclr`, `@PermuteParam`) may have attributes with no variable (e.g. `type = "Object"`) when the type genuinely does not vary. R1 (no variables error) is enforced only for `@Permute.className` in `PermuteProcessor`, not by the transformers. |
+| R2 short-circuits R3/R4 | If any static literal is not found as a substring of the target name, orphan variable (R3) and no-anchor (R4) checks are skipped — the orphan computation is undefined when the literal isn't found. |
+| Adjacent variables are collective | `${v1}${v2}Callable${v3}` — the variables before "Callable" collectively cover the prefix region. Orphan detection applies to the region as a whole, not per-variable. If prefix is non-empty, neither is orphan. If prefix is empty, both are orphan. |
 
 ---
 

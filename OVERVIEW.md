@@ -219,6 +219,8 @@ permuplate-parent/
 │   ├── PermuteParamTransformer.java — parameter expansion + anchor mechanism;
 │   │                                   validatePrefixes() for name prefix check
 │   └── PermuteConfig.java           — shared configuration model (parsed from annotations)
+├── permuplate-ide-support/
+│   └── AnnotationStringAlgorithm     — annotation string algorithm (matching, rename, validation; no IDE deps)
 ├── permuplate-processor/
 │   └── PermuteProcessor.java        — APT entry point (thin shell); type and method permutation paths;
 │                                       buildAllCombinations() for cross-product generation;
@@ -252,6 +254,7 @@ Tests are organised into focused test classes:
 | `DogFoodingTest` | `Callable1` generates `Callable2`–`Callable10` — Permuplate describes its own foundational types |
 | `ExampleTest` | Real-world templates including `BiCallable1x1` cross-product (9 interfaces via `extraVars`) |
 | `DegenerateInputTest` | All error paths with message content and source-position assertions |
+| `OrphanVariableTest` | R2 (substring matching), R3 (orphan variable — single, adjacent, non-orphan), R4 (no anchor), R2 short-circuits R3/R4 |
 | `InlineGenerationTest` | InlineGenerator (augmented parent CU), AnnotationReader (JavaParser to PermuteConfig), keepTemplate behavior |
 
 `ProcessorTestSupport` provides shared infrastructure: `templateSource()` reads real template `.java` files from `src/test/java/`; `compileTemplate()` adds generated `Callable{n}` support sources; `classLoaderFor()` loads generated `.class` bytes; `capturingProxy()` creates reflective proxies for behavioural assertions; `assertJoinN()` is a structural + behavioural assertion helper for the Join pattern.
