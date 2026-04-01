@@ -173,6 +173,73 @@ class AnnotationStringAlgorithmTest {
         assertFalse(AnnotationStringAlgorithm.matches(parse("${v1}${v2}"), "anything"));
     }
 
+    // =========================================================
+    // computeRename()
+    // =========================================================
+
+    @Test
+    void computeRename_singleLiteralOnlyLiteralChanges() {
+        var result = AnnotationStringAlgorithm.computeRename(parse("Callable${i}"), "Callable2", "Handler2");
+        assertInstanceOf(RenameResult.Updated.class, result);
+        assertEquals("Handler${i}", ((RenameResult.Updated) result).newTemplate());
+    }
+
+    @Test
+    void computeRename_longPrefixSuffixPreserved() {
+        var result = AnnotationStringAlgorithm.computeRename(
+                parse("${v1}Callable${v2}"),
+                "ThisIsMyPrefixCallableThisIsMySuffix3",
+                "ThisIsMyPrefixHookThisIsMySuffix3");
+        assertInstanceOf(RenameResult.Updated.class, result);
+        assertEquals("${v1}Hook${v2}", ((RenameResult.Updated) result).newTemplate());
+    }
+
+    @Test
+    void computeRename_numericSuffixChangesVariableCaptures() {
+        // "2" → "3": trailing ${i} captures the suffix, so suffix change is expected
+        var result = AnnotationStringAlgorithm.computeRename(parse("Callable${i}"), "Callable2", "Handler3");
+        assertInstanceOf(RenameResult.Updated.class, result);
+        assertEquals("Handler${i}", ((RenameResult.Updated) result).newTemplate());
+    }
+
+    @Test
+    void computeRename_multipleLiteralsSecondChanges() {
+        var result = AnnotationStringAlgorithm.computeRename(
+                parse("Async${i}Handler"), "AsyncDiskHandler2", "AsyncDiskProcessor2");
+        assertInstanceOf(RenameResult.Updated.class, result);
+        assertEquals("Async${i}Processor", ((RenameResult.Updated) result).newTemplate());
+    }
+
+    @Test
+    void computeRename_multipleLiteralsBothChange_needsDisambiguation() {
+        var result = AnnotationStringAlgorithm.computeRename(
+                parse("Async${i}Handler"), "AsyncDiskHandler2", "SyncSSDProcessor2");
+        assertInstanceOf(RenameResult.NeedsDisambiguation.class, result);
+        var nd = (RenameResult.NeedsDisambiguation) result;
+        assertFalse(nd.affectedLiterals().isEmpty());
+    }
+
+    @Test
+    void computeRename_prefixAlsoChanged_needsDisambiguation() {
+        var result = AnnotationStringAlgorithm.computeRename(
+                parse("${v1}Callable${v2}"), "MyCallable2", "YourHook3");
+        assertInstanceOf(RenameResult.NeedsDisambiguation.class, result);
+        assertEquals(List.of("Callable"), ((RenameResult.NeedsDisambiguation) result).affectedLiterals());
+    }
+
+    @Test
+    void computeRename_stringDoesNotMatchOldClass_noMatch() {
+        var result = AnnotationStringAlgorithm.computeRename(parse("Callable${i}"), "Handler2", "Processor2");
+        assertInstanceOf(RenameResult.NoMatch.class, result);
+    }
+
+    @Test
+    void computeRename_noChange_returnsNoMatch() {
+        // "Callable" didn't change — return NoMatch (no update needed)
+        var result = AnnotationStringAlgorithm.computeRename(parse("Callable${i}"), "Callable2", "Callable3");
+        assertInstanceOf(RenameResult.NoMatch.class, result);
+    }
+
     // helper used in this test class
     private static AnnotationStringTemplate parse(String s) {
         return AnnotationStringAlgorithm.parse(s);
