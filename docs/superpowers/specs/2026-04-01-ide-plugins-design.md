@@ -113,7 +113,7 @@ The user types `"Hook"`, clicks Update, and `"${v1}Hook${v2}"` is applied atomic
 - R1 applies **only to `@Permute.className`** — inner annotations (`@PermuteDeclr`, `@PermuteParam`) may legitimately have attributes with no variable (e.g. `type = "Object"` when the type genuinely does not vary)
 - R1b catches the `from == to` case: with `from=3, to=3` and `className = "FixedName"`, only one class is generated so the Filer never fires a duplicate error — R1 catches it early with a clearer message
 - R2 short-circuits: if any literal is not found, R3 and R4 are skipped for that string
-- Multiple adjacent variables on a non-empty prefix/suffix (e.g. `"${v1}${v2}Callable"` on `"MyCallable2"`) — orphan detection is applied per-variable; since "My" is split ambiguously between v1 and v2, both are considered non-orphan as long as the region is non-empty. V1 edge case: behaviour when the region is non-empty but smaller than the number of preceding variables is undefined; the IDE shows a warning rather than error.
+- Adjacent variables (e.g. `"${v1}${v2}Callable${v3}"` on `"MyCallable2"`) are treated as a **collective unit** for that prefix/suffix region. The algorithm does not split the region between them — at generate time `v1+v2` concatenates to produce whatever text fills the slot. Orphan detection applies to the region as a whole: if the prefix `"My"` is non-empty, neither `${v1}` nor `${v2}` is orphan; if the prefix were empty, both would be orphan. The rename algorithm strips the combined old prefix `"My"` and replaces it with the new prefix via the disambiguation dialog if needed — the individual split is irrelevant.
 
 ---
 
@@ -232,7 +232,9 @@ public class AnnotationStringAlgorithm {
   - **R2 — short-circuits R3/R4:** `"${v1}Foo${v2}"` vs `"Callable2"` → only `UNMATCHED_LITERAL`; no `ORPHAN_VARIABLE` reported
   - **R3 — Orphan single:** `"${v1}Callable${v2}"` vs `"Callable2"` → `ORPHAN_VARIABLE` for `v1` (prefix empty)
   - **R3 — Orphan multiple adjacent:** `"${v1}${v2}Callable${v3}"` vs `"Callable2"` → `ORPHAN_VARIABLE` for both `v1` and `v2`
-  - **R3 — Not orphan:** `"${v1}Callable${v2}"` vs `"MyCallable2"` → no errors (prefix "My" non-empty)
+  - **R3 — Not orphan (single variable):** `"${v1}Callable${v2}"` vs `"MyCallable2"` → no errors (prefix "My" non-empty)
+  - **R3 — Not orphan (adjacent variables, non-empty region):** `"${v1}${v2}Callable${v3}"` vs `"MyCallable2"` → no errors; `${v1}` and `${v2}` together cover prefix `"My"` — the collective region is non-empty so neither is orphan; individual split is irrelevant
+  - **R3 — Both orphan (adjacent variables, empty region):** `"${v1}${v2}Callable${v3}"` vs `"Callable2"` → `ORPHAN_VARIABLE` for both `${v1}` and `${v2}`; their collective region (the prefix before `"Callable"`) is empty
   - **R3 — Suffix not orphan:** `"Callable${v1}"` vs `"Callable2"` → no errors (`${v1}` covers "2")
   - **R4 — Pure variables:** `"${v1}${v2}"` → `NO_ANCHOR`
   - **R4 — No expansion:** `"${prefix}${i}"` with no matching `strings` entry → `NO_ANCHOR`
