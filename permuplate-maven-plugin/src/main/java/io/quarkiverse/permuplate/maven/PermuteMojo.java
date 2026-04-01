@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -188,7 +187,7 @@ public class PermuteMojo extends AbstractMojo {
     private void generateTopLevel(SourceScanner.AnnotatedType entry, PermuteConfig config)
             throws Exception {
         String templateClassName = entry.classDecl().getNameAsString();
-        List<Map<String, Object>> allCombinations = buildAllCombinations(config);
+        List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
 
         // Leading literal prefix check
         String leadingLiteral = config.className.contains("${")
@@ -237,7 +236,7 @@ public class PermuteMojo extends AbstractMojo {
 
     private void generateInline(SourceScanner.AnnotatedType entry, PermuteConfig config)
             throws Exception {
-        List<Map<String, Object>> allCombinations = buildAllCombinations(config);
+        List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
         CompilationUnit outputCu = InlineGenerator.generate(
                 entry.cu(), entry.classDecl(), config, allCombinations);
 
@@ -265,7 +264,7 @@ public class PermuteMojo extends AbstractMojo {
         }
         validateConfig(config, entry.sourceFile().toString());
 
-        List<Map<String, Object>> allCombinations = buildAllCombinations(config);
+        List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
         EvaluationContext firstCtx = new EvaluationContext(allCombinations.get(0));
         String outputClassName = firstCtx.evaluate(config.className);
 
@@ -323,32 +322,5 @@ public class PermuteMojo extends AbstractMojo {
         outputPath.getParent().toFile().mkdirs();
         Files.writeString(outputPath, source);
         getLog().info("Permuplate: generated " + qualifiedName);
-    }
-
-    private static List<Map<String, Object>> buildAllCombinations(PermuteConfig config) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (int i = config.from; i <= config.to; i++) {
-            Map<String, Object> vars = new HashMap<>();
-            vars.put(config.varName, i);
-            result.add(vars);
-        }
-        for (PermuteVarConfig extra : config.extraVars) {
-            List<Map<String, Object>> expanded = new ArrayList<>();
-            for (Map<String, Object> base : result) {
-                for (int v = extra.from; v <= extra.to; v++) {
-                    Map<String, Object> copy = new HashMap<>(base);
-                    copy.put(extra.varName, v);
-                    expanded.add(copy);
-                }
-            }
-            result = expanded;
-        }
-        for (Map<String, Object> vars : result) {
-            for (String entry : config.strings) {
-                int sep = entry.indexOf('=');
-                vars.put(entry.substring(0, sep).trim(), entry.substring(sep + 1));
-            }
-        }
-        return result;
     }
 }

@@ -241,14 +241,6 @@ public class PermuteDeclrTransformer {
         return s;
     }
 
-    /**
-     * Returns the static (non-{@code ${...}}) portion of a template string.
-     * For example, {@code "Callable${i}"} → {@code "Callable"}, {@code "${i}"} → {@code ""}.
-     */
-    static String staticPrefix(String template) {
-        return template.replaceAll("\\$\\{[^}]*\\}", "");
-    }
-
     // -------------------------------------------------------------------------
     // Pre-generation validation
     // -------------------------------------------------------------------------

@@ -34,6 +34,7 @@ import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteVar;
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
+import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
 import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
@@ -218,7 +219,7 @@ public class PermuteProcessor extends AbstractProcessor {
                 return;
         }
 
-        for (Map<String, Object> vars : buildAllCombinations(permute)) {
+        for (Map<String, Object> vars : PermuteConfig.buildAllCombinations(PermuteConfig.from(permute))) {
             generatePermutation(templateCu, typeElement, permute, new EvaluationContext(vars));
         }
     }
@@ -342,7 +343,7 @@ public class PermuteProcessor extends AbstractProcessor {
         }
 
         // Evaluate the output class name using the first combination's context.
-        List<Map<String, Object>> allCombinations = buildAllCombinations(permute);
+        List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(PermuteConfig.from(permute));
         EvaluationContext firstCtx = new EvaluationContext(allCombinations.get(0));
         String outputClassName;
         try {
@@ -405,51 +406,6 @@ public class PermuteProcessor extends AbstractProcessor {
         generatedCu.addType(generatedClass);
 
         writeGeneratedClass(enclosingClass, outputClassName, generatedCu.toString());
-    }
-
-    // -------------------------------------------------------------------------
-    // Variable combination builder
-    // -------------------------------------------------------------------------
-
-    /**
-     * Builds the full cross-product of variable bindings across the primary variable
-     * and all {@link Permute#extraVars()}, merged with {@link Permute#strings()} constants.
-     *
-     * <p>
-     * The primary variable is the outermost loop; {@code extraVars} are inner loops in
-     * declaration order. For primary i∈[2,3] and k∈[2,3], the result is:
-     * [{i=2,k=2}, {i=2,k=3}, {i=3,k=2}, {i=3,k=3}].
-     */
-    private static List<Map<String, Object>> buildAllCombinations(Permute permute) {
-        // Start with the primary variable's range
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (int i = permute.from(); i <= permute.to(); i++) {
-            Map<String, Object> vars = new HashMap<>();
-            vars.put(permute.varName(), i);
-            result.add(vars);
-        }
-
-        // Expand by each extraVar (cross-product)
-        for (PermuteVar extra : permute.extraVars()) {
-            List<Map<String, Object>> expanded = new ArrayList<>();
-            for (Map<String, Object> base : result) {
-                for (int v = extra.from(); v <= extra.to(); v++) {
-                    Map<String, Object> copy = new HashMap<>(base);
-                    copy.put(extra.varName(), v);
-                    expanded.add(copy);
-                }
-            }
-            result = expanded;
-        }
-
-        // Merge string constants into every combination
-        for (Map<String, Object> vars : result) {
-            for (String entry : permute.strings()) {
-                int sep = entry.indexOf('=');
-                vars.put(entry.substring(0, sep).trim(), entry.substring(sep + 1));
-            }
-        }
-        return result;
     }
 
     // -------------------------------------------------------------------------

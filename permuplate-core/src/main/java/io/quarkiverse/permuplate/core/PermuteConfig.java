@@ -1,5 +1,10 @@
 package io.quarkiverse.permuplate.core;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Data representation of a {@code @Permute} annotation, usable without javac's
  * annotation processing infrastructure. Both the APT processor (which reads from
@@ -40,5 +45,46 @@ public final class PermuteConfig {
         return new PermuteConfig(
                 permute.varName(), permute.from(), permute.to(), permute.className(),
                 permute.strings(), extraVars, permute.inline(), permute.keepTemplate());
+    }
+
+    /**
+     * Builds the full cross-product of variable bindings across the primary variable
+     * and all {@link PermuteConfig#extraVars}, merged with {@link PermuteConfig#strings} constants.
+     *
+     * <p>
+     * The primary variable is the outermost loop; {@code extraVars} are inner loops in
+     * declaration order. For primary i∈[2,3] and k∈[2,3], the result is:
+     * [{i=2,k=2}, {i=2,k=3}, {i=3,k=2}, {i=3,k=3}].
+     */
+    public static List<Map<String, Object>> buildAllCombinations(PermuteConfig config) {
+        // Start with the primary variable's range
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (int i = config.from; i <= config.to; i++) {
+            Map<String, Object> vars = new HashMap<>();
+            vars.put(config.varName, i);
+            result.add(vars);
+        }
+
+        // Expand by each extraVar (cross-product)
+        for (PermuteVarConfig extra : config.extraVars) {
+            List<Map<String, Object>> expanded = new ArrayList<>();
+            for (Map<String, Object> base : result) {
+                for (int v = extra.from; v <= extra.to; v++) {
+                    Map<String, Object> copy = new HashMap<>(base);
+                    copy.put(extra.varName, v);
+                    expanded.add(copy);
+                }
+            }
+            result = expanded;
+        }
+
+        // Merge string constants into every combination
+        for (Map<String, Object> vars : result) {
+            for (String entry : config.strings) {
+                int sep = entry.indexOf('=');
+                vars.put(entry.substring(0, sep).trim(), entry.substring(sep + 1));
+            }
+        }
+        return result;
     }
 }

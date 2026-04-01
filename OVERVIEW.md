@@ -287,13 +287,10 @@ The closest prior art is jOOQ's internal code generator for `Row1`–`Row22` and
 
 ## Possible Roadmap
 
-### Near-term
-
 ### Medium-term
 
-
 **IntelliJ / IDE plugin**
-A plugin that understands Permuplate annotations and shows virtual navigation from template to generated variants (and vice versa) would improve the refactoring workflow significantly.
+The algorithm foundation (`permuplate-ide-support`) is complete — it provides annotation string parsing, validation, and rename calculation with no IDE dependencies. The remaining work is the IntelliJ plugin implementation (virtual navigation from template to generated variants and vice versa) and a VS Code extension.
 
 **Gradle plugin support**
 Currently only Maven is supported (via `annotationProcessorPaths`). A Gradle setup using `annotationProcessor` configuration would reach a wider audience.
