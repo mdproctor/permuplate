@@ -86,7 +86,7 @@ public class PermuteMojo extends AbstractMojo {
      * IDE for navigation and refactoring support (IntelliJ: right-click →
      * <em>Mark Directory As → Sources Root</em>).
      */
-    @Parameter(defaultValue = "src/main/permuplate")
+    @Parameter(defaultValue = "${project.basedir}/src/main/permuplate")
     private File templateDirectory;
 
     /**
