@@ -30,40 +30,61 @@ An annotation string like `"${v1}Callable${v2}"` parses into alternating parts:
 Variable("v1") | Literal("Callable") | Variable("v2")
 ```
 
-The **static literal** is the non-`${...}` text. It is the anchor — it identifies which part of the class name this string references.
+Multiple variables in sequence are fully supported:
+```
+Variable("prefix") | Variable("i") | Literal("Callable") | Variable("j") | Variable("suffix")
+```
 
-### Matching
-
-Given static literal `"Callable"` and class `"MyCallable2"`:
-
-1. Strip numeric suffix from class name base: `"MyCallable2"` → `"MyCallable"`
-2. Split by camelCase boundaries: `["My", "Callable"]`
-3. The literal `"Callable"` matches word[1]
-
-Given `"Callable"` and `"Callable2"` → base `"Callable"` → `["Callable"]` → word[0].
-
-### Rename computation
-
-Given old class `"MyCallable2"`, new class `"YourHook2"`, annotation string `"${v1}Callable${v2}"`:
-
-1. Old base: `"MyCallable"` → words: `["My", "Callable"]`
-2. New base: `"YourHook"` → words: `["Your", "Hook"]`
-3. Literal `"Callable"` = word[1] in old → word[1] in new = `"Hook"`
-4. Replace: `"${v1}Hook${v2}"`
-
-The numeric suffix change (2→3) and the non-matching prefix/suffix change ("My"→"Your") don't affect the annotation string — only the matched word does.
+The **static literal** is the non-`${...}` text. It is the anchor — it identifies which part of the class name this string references. Variables capture the surrounding prefix and suffix text dynamically at compile/generate time; the algorithm treats them as wildcards and only acts on the literal.
 
 ### String constant expansion
 
-Before matching, expand any `strings` constants. `"${prefix}${i}"` with `strings = {"prefix=Callable"}` becomes `"Callable${i}"` for validation purposes.
+Before any matching or validation, expand `strings` constants. `"${prefix}Callable${i}"` with `strings = {"prefix=My"}` becomes `"MyCallable${i}"`. Only integer loop variables (the permutation variable and `extraVars`) remain as `${...}` after expansion. The expanded form is what the algorithm operates on.
+
+### Matching
+
+Matching is purely **substring-based** — there is no camelCase splitting. The static literal must appear as a substring within the class name.
+
+**Example 1:** literal `"Callable"`, class `"Callable2"` → `"Callable2".contains("Callable")` ✓
+
+**Example 2:** literal `"Callable"`, class `"ThisIsMyPrefixCallable3"` → `"ThisIsMyPrefixCallable3".contains("Callable")` ✓
+
+**Example 3:** literal `"Callable"`, class `"ThisIsMyPrefixCallableThisIsMySuffix3"` → ✓ (substring found; prefix = `"ThisIsMyPrefix"`, suffix = `"ThisIsMySuffix3"`)
+
+### Rename computation
+
+Given old class, new class, and annotation string — the algorithm:
+
+1. Find the static literal `L` as a substring in the old class name
+2. Record `old_prefix` = text before `L`; `old_suffix` = text after `L`
+3. In the new class name, strip `old_prefix` from the start and `old_suffix` from the end
+4. Whatever remains is the new literal
+
+**Example — only literal changes** (`"ThisIsMyPrefixCallableThisIsMySuffix3"` → `"ThisIsMyPrefixHookThisIsMySuffix3"`):
+
+- `L` = `"Callable"`, `old_prefix` = `"ThisIsMyPrefix"`, `old_suffix` = `"ThisIsMySuffix3"`
+- New class starts with `"ThisIsMyPrefix"` ✓ → remainder = `"HookThisIsMySuffix3"`
+- Remainder ends with `"ThisIsMySuffix3"` ✓ → new literal = `"Hook"`
+- String `"${v1}Callable${v2}"` → `"${v1}Hook${v2}"` ✓
+
+**Example — suffix also changes** (`"MyCallable2"` → `"YourHook3"` with string `"${v1}Callable${v2}"`):
+
+- `L` = `"Callable"`, `old_prefix` = `"My"`, `old_suffix` = `"2"`
+- `${v1}` and `${v2}` are variables — they capture whatever prefix/suffix text exists at generate time. The user has explicitly declared that the prefix (`"My"`/`"Your"`) and suffix (`"2"`/`"3"`) are covered by variables and should be ignored.
+- New class `"YourHook3"` does not start with `"My"` → prefix changed; since it is captured by `${v1}`, ignore it
+- New class `"YourHook3"` does not end with `"2"` → suffix changed; since it is captured by `${v2}`, ignore it
+- The algorithm cannot automatically extract the new literal in this case; it flags the annotation string for manual review with a warning: *"annotation string may need manual update — class prefix/suffix also changed"*
+
+**Key principle:** the variables explicitly declare "I don't care what text fills my slot." The algorithm only updates the static literal. If the prefix or suffix also changed simultaneously, that is outside the scope of automatic update — the user is responsible.
 
 ### Validation errors (all are compile errors)
 
 | Rule | Condition | Error message |
 |---|---|---|
-| Unmatched literal | Static literal doesn't match any camelCase word of the class name (even after expanding `strings` constants) | `@PermuteDeclr type literal "Foo" does not match any part of the declared type "Callable2"` |
-| Orphan variable | A `${var}` exists but the text it would correspond to in the class name is empty | `@PermuteDeclr: variable ${v1} has no corresponding text in "Callable2" — remove it or rename the class first` |
-| No anchor | String contains only variables, no static literal (even after expanding `strings`) | `@PermuteDeclr type string has no static literal to match against "Callable2" — add a literal portion or define the variable in @Permute strings` |
+| **No variables** | String contains no `${...}` variables at all (e.g. `type = "Callable2"`) | `@PermuteDeclr type "Callable2" contains no variables — it will generate the same type for every permutation` |
+| **Unmatched literal** | Static literal (after expanding `strings` constants) does not appear as a substring of the class name | `@PermuteDeclr type literal "Foo" does not match any substring of the declared type "Callable2"` |
+| **Orphan variable** | A `${var}` exists but the text it corresponds to in the class name is empty — applies to each orphan variable individually, so `"${v1}${v2}Callable"` on `"Callable2"` reports both `${v1}` and `${v2}` as orphans | `@PermuteDeclr: variable ${v1} has no corresponding text in "Callable2" (prefix before "Callable" is empty) — remove it` |
+| **No anchor** | After expanding `strings` constants, the string contains only variables with no static literal | `@PermuteDeclr type string has no static literal to match against "Callable2" — add a literal portion or define the variable in @Permute strings` |
 
 ---
 
@@ -80,9 +101,19 @@ Before matching, expand any `strings` constants. `"${prefix}${i}"` with `strings
 | `@PermuteParam` | `name` | Sentinel parameter name |
 | `@Permute` | `className` | Template class simple name |
 
-The new general camelCase-word algorithm **replaces** the existing leading-literal prefix-only check for `className`. The existing `testClassNamePrefixMismatchIsError` tests remain valid — they are a subset of the new Rule 1 (unmatched literal).
+The new **substring-based** algorithm replaces the existing leading-literal prefix-only check for `className`. The existing `testClassNamePrefixMismatchIsError` tests remain valid — they are a subset of the new Rule 2 (unmatched literal).
 
-**Tests:** New test class `OrphanVariableTest` with cases for all three rules on all four attributes. At least one "valid" test per rule (showing it doesn't fire when the string is correct).
+**Tests:** New test class `OrphanVariableTest` (or extend `PrefixValidationTest`) with cases for all four rules on all four attributes. Required cases include:
+
+- **No variables:** `type = "Callable2"` (no `${...}`) → compile error
+- **Unmatched literal:** `type = "Foo${i}"` on field `Callable2` → error ("Foo" not in "Callable2")
+- **Orphan variable — single:** `"${v1}Callable${v2}"` on `Callable2` → `${v1}` orphan (prefix before "Callable" is empty)
+- **Orphan variable — multiple adjacent:** `"${v1}${v2}Callable${v3}"` on `Callable2` → both `${v1}` and `${v2}` orphan
+- **No anchor — pure variables:** `"${v1}${v2}"` (no literal) → no-anchor error
+- **No anchor — after strings expansion:** `"${prefix}${i}"` with no matching `strings` entry → no-anchor error
+- **Valid — substring match:** `"${v1}Callable${v2}"` on `"ThisIsMyPrefixCallable3"` → no error
+- **Valid — multiple string variables:** `"${prefix}Callable${i}"` with `strings = {"prefix=My"}`, field type `"MyCallable2"` → expanded to `"MyCallable${i}"`, literal `"MyCallable"` matches `"MyCallable2"` → no error
+- **Valid — string variable expands to full literal:** `"${prefix}${i}"` with `strings = {"prefix=Callable"}`, field type `"Callable2"` → expanded to `"Callable${i}"`, literal `"Callable"` matches → no error
 
 ---
 
@@ -107,7 +138,7 @@ public sealed interface RenameResult {
     record NoMatch() implements RenameResult {}  // string doesn't reference this class
 }
 public record ValidationError(ErrorKind kind, String varName, String suggestion) {}
-public enum ErrorKind { UNMATCHED_LITERAL, ORPHAN_VARIABLE, NO_ANCHOR }
+public enum ErrorKind { NO_VARIABLES, UNMATCHED_LITERAL, ORPHAN_VARIABLE, NO_ANCHOR }
 
 // Operations
 public class AnnotationStringAlgorithm {
@@ -127,11 +158,26 @@ public class AnnotationStringAlgorithm {
 
 **Test coverage** (JUnit 5):
 
-- `parse()`: empty string, all variables, all literal, mixed, nested `${}`
-- `camelCaseWords()`: single word, two words, acronym, leading lowercase
-- `matches()`: prefix match, suffix match, middle match, no match, empty literal
-- `computeRename()`: single-word class, multi-word class, numeric suffix changes, orphan variable detected, no match returns `NoMatch`
-- `validate()`: all three error kinds, string constant expansion, valid strings don't error
+- `parse()`: empty string, all variables, all literal, mixed, adjacent variables, nested `${}` not supported (literal)
+- `expandStringConstants()`: single constant, multiple constants, constant not in strings (no expansion), constant that composes full literal
+- `matches()`: literal at start of class name, literal in middle, literal at end, literal spanning most of name, no match, empty literal (always matches), class name with only numeric suffix
+- `computeRename()`:
+  - Only literal changes, prefix/suffix preserved: `"MyCallable2"` → `"MyHandler2"` → `"${v1}Handler${v2}"` ✓
+  - Long prefix and suffix, only literal changes: `"ThisIsMyPrefixCallableThisIsMySuffix3"` → `"ThisIsMyPrefixHookThisIsMySuffix3"` → `"${v1}Hook${v2}"` ✓
+  - Numeric suffix changes (captured by variable): `"Callable2"` → `"Handler3"` → `"Handler${i}"` ✓
+  - Prefix/suffix also changed: returns `NoMatch` (cannot auto-update; user handles manually)
+  - String has no match in old class: returns `NoMatch`
+- `validate()`:
+  - **No variables:** `"Callable2"` → `NO_VARIABLES` error
+  - **Unmatched literal:** `"Foo${i}"` vs `"Callable2"` → `UNMATCHED_LITERAL` error
+  - **Orphan single:** `"${v1}Callable${v2}"` vs `"Callable2"` (prefix empty) → `ORPHAN_VARIABLE` for `v1`
+  - **Orphan multiple adjacent:** `"${v1}${v2}Callable${v3}"` vs `"Callable2"` → `ORPHAN_VARIABLE` for both `v1` and `v2`
+  - **No anchor — pure variables:** `"${v1}${v2}"` → `NO_ANCHOR` error
+  - **No anchor after expansion:** `"${prefix}${i}"` with empty constants → `NO_ANCHOR` error
+  - **Valid — middle match:** `"${v1}Callable${v2}"` vs `"ThisIsMyPrefixCallable3"` → no errors
+  - **Valid — string constant composes literal:** `"${prefix}${i}"` with `{"prefix":"Callable"}` vs `"Callable2"` → no errors (expands to `"Callable${i}"`, literal matches)
+  - **Valid — multiple string variables:** `"${a}${b}Callable${i}"` with `{"a":"My","b":""}` vs `"MyCallable2"` → no errors (expands to `"MyCallable${i}"`)
+  - **Valid — no variables before literal:** `"Callable${i}"` vs `"Callable2"` → no errors
 
 ---
 
