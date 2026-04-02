@@ -12,6 +12,7 @@ import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.AnnotationExpr;
@@ -209,6 +210,36 @@ public class PermuteDeclrTransformer {
                 }
             }
         });
+    }
+
+    /**
+     * Processes {@code @PermuteDeclr} on the parameters of a single method using the
+     * provided context. Called by InlineGenerator when generating @PermuteMethod overloads
+     * with the inner (i,j) context — before the method is added to the generated class,
+     * so downstream transforms see no remaining @PermuteDeclr annotations.
+     */
+    public static void processMethodParamDeclr(MethodDeclaration method,
+            EvaluationContext ctx) {
+        List<Parameter> annotated = new ArrayList<>();
+        method.getParameters().forEach(p -> {
+            if (hasPermuteDeclr(p.getAnnotations()))
+                annotated.add(p);
+        });
+        for (Parameter param : annotated) {
+            AnnotationExpr ann = getPermuteDeclr(param.getAnnotations());
+            String[] params = extractTwoParams(ann, null);
+            if (params == null)
+                continue;
+            String newType = ctx.evaluate(params[0]);
+            String newName = params[1];
+            param.setType(new ClassOrInterfaceType(null, newType));
+            param.getAnnotations().remove(ann);
+            if (!newName.isEmpty()) {
+                String oldName = param.getNameAsString();
+                param.setName(ctx.evaluate(newName));
+                method.getBody().ifPresent(body -> renameAllUsages(body, oldName, ctx.evaluate(newName)));
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
