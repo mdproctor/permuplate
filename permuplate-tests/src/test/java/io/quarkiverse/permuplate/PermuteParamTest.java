@@ -221,6 +221,86 @@ public class PermuteParamTest {
     }
 
     // -------------------------------------------------------------------------
+    // S4 — Degenerate: @PermuteParam where to evaluates to less than from
+    // -------------------------------------------------------------------------
+
+    /**
+     * When the {@code @PermuteParam} inner range is empty ({@code from > to}),
+     * the sentinel parameter is removed and no expanded parameters are generated.
+     * The processor must not error — an empty inner range is a valid degenerate
+     * case (e.g. the arity-1 case when {@code to="${i-1}"} and {@code i=1}).
+     */
+    @Test
+    public void testPermuteParamEmptyRangeRemovesSentinel() {
+        var source = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.EmptyRange2",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteParam;
+                        @Permute(varName="i", from=3, to=3, className="EmptyRange${i}")
+                        public class EmptyRange2 {
+                            public void method(
+                                @PermuteParam(varName="j", from="1", to="0", type="Object", name="o${j}")
+                                Object o1) {
+                                // empty inner range: from=1, to=0 → sentinel removed, 0 params generated
+                            }
+                        }
+                        """);
+
+        var compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+        var src = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.EmptyRange3")
+                .orElseThrow());
+        // Sentinel removed; method has 0 parameters
+        assertThat(src).contains("void method()");
+        assertThat(src).doesNotContain("o1");
+        assertThat(src).doesNotContain("@PermuteParam");
+    }
+
+    // -------------------------------------------------------------------------
+    // N3 — @PermuteParam on abstract interface methods (no body, no call sites)
+    // -------------------------------------------------------------------------
+
+    /**
+     * {@code @PermuteParam} on an interface abstract method (no body) must expand
+     * the parameter list without erroring on missing call sites. The anchor
+     * expansion step is a silent no-op when there is no method body.
+     */
+    @Test
+    public void testPermuteParamOnAbstractInterfaceMethod() {
+        var source = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.AbstractParam2",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteParam;
+                        @Permute(varName="i", from=3, to=3, className="AbstractParam${i}")
+                        public interface AbstractParam2 {
+                            void test(
+                                @PermuteParam(varName="j", from="1", to="${i}", type="Object", name="fact${j}")
+                                Object fact1);
+                        }
+                        """);
+
+        var compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+        var src = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.AbstractParam3")
+                .orElseThrow());
+        // Parameters expanded correctly
+        assertThat(src).contains("void test(Object fact1, Object fact2, Object fact3)");
+        assertThat(src).doesNotContain("@PermuteParam");
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 

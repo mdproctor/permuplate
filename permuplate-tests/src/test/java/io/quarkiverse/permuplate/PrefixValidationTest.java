@@ -3,7 +3,6 @@ package io.quarkiverse.permuplate;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.testing.compile.Compilation;
@@ -95,13 +94,11 @@ public class PrefixValidationTest {
      * This is intentional and accepted behaviour. No error must be reported.
      *
      * <p>
-     * <strong>Ignored:</strong> validation correctly passes (non-empty prefix region,
-     * no orphans), but the test template uses undeclared variable names ({@code v1},
-     * {@code v2}, {@code v3}) that cause a JEXL undefined-variable exception during
-     * generation. The test needs to be redesigned to either define these variables or
-     * test the validation layer in isolation.
+     * Variables {@code v1}, {@code v2}, {@code v3} are declared via {@code strings} so
+     * JEXL can evaluate them at generation time: {@code v1="my"}, {@code v2=""},
+     * {@code v3="2"} produces {@code myElement2} — the same as the sentinel name, making
+     * the rename a no-op and the compilation a clean success.
      */
-    @Ignore("Validation passes but undeclared variables v1/v2/v3 cause JEXL error during generation")
     @Test
     public void testAdjacentVariablesOnNonEmptyPrefixAreNotOrphan() {
         var compilation = compile(Callable2.class, "Foo2",
@@ -110,7 +107,8 @@ public class PrefixValidationTest {
                         import %s;
                         import %s;
                         import java.util.List;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
+                                 strings = {"v1=my", "v2=", "v3=2"})
                         public class Foo2 {
                             private List<Object> myElements;
                             public void go() {
