@@ -143,21 +143,9 @@ public class PermuteTypeParamTransformer {
                 continue;
             }
 
-            // R3: name leading literal must be a prefix of sentinel name
-            String leadingLiteral = nameTemplate.contains("${")
-                    ? nameTemplate.substring(0, nameTemplate.indexOf("${"))
-                    : nameTemplate;
-            if (!leadingLiteral.isEmpty() && !sentinelName.startsWith(leadingLiteral)) {
-                if (messager != null)
-                    messager.printMessage(Diagnostic.Kind.ERROR,
-                            "@PermuteTypeParam name literal part \"" + leadingLiteral
-                                    + "\" is not a prefix of type parameter \"" + sentinelName + "\"",
-                            element);
-                result.add(tp);
-                continue;
-            }
-
-            // Expand: generate one TypeParameter per j value
+            // Expand: generate one TypeParameter per j value.
+            // Note: no R3 prefix check here — for method-level sentinels the placeholder
+            // name (e.g. "A") is arbitrary and need not match the generated names ("T1", "B", …).
             expanded.add(sentinelName);
             for (int j = fromVal; j <= toVal; j++) {
                 EvaluationContext innerCtx = ctx.withVariable(varName, j);
