@@ -36,19 +36,20 @@ public class PermuteReturnTest {
 
     @Test
     public void testAptExplicitReturnType() {
-        // Step1..Step4 generated; join() returns Step${i+1}<T1..T${i+1}>; Step4.join() omitted
+        // NodeT template generates Node1..Node4.
+        // next() return type is replaced by @PermuteReturn to Node${i+1} (raw, no type args).
+        // Node4.next() is omitted (Node5 not in generated set).
+        // Generated classes cross-reference each other — compilation succeeds because all Node1..Node4 exist.
         var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.Step1",
+                "io.quarkiverse.permuplate.example.NodeT",
                 """
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        import io.quarkiverse.permuplate.PermuteDeclr;
-                        @Permute(varName="i", from=1, to=4, className="Step${i}")
-                        public class Step1 {
-                            @PermuteReturn(className="Step${i+1}",
-                                           typeArgVarName="j", typeArgFrom="1", typeArgTo="${i+1}", typeArgName="T${j}")
-                            public Object join(@PermuteDeclr(type="Object") Object src) { return null; }
+                        @Permute(varName="i", from=1, to=4, className="Node${i}")
+                        public class NodeT {
+                            @PermuteReturn(className="Node${i+1}")
+                            public Object next() { return null; }
                             public void execute() {}
                         }
                         """);
@@ -59,44 +60,51 @@ public class PermuteReturnTest {
 
         assertThat(compilation).succeeded();
 
-        // Step1: join() → Step2<T1, T2>
+        // Node1: next() → Node2
         String src1 = sourceOf(compilation
-                .generatedSourceFile("io.quarkiverse.permuplate.example.Step1").orElseThrow());
-        assertThat(src1).contains("Step2<T1, T2>");
+                .generatedSourceFile("io.quarkiverse.permuplate.example.Node1").orElseThrow());
+        assertThat(src1).contains("Node2 next()");
         assertThat(src1).contains("execute()");
         assertThat(src1).doesNotContain("@PermuteReturn");
 
-        // Step3: join() → Step4<T1, T2, T3, T4>
+        // Node3: next() → Node4
         String src3 = sourceOf(compilation
-                .generatedSourceFile("io.quarkiverse.permuplate.example.Step3").orElseThrow());
-        assertThat(src3).contains("Step4<T1, T2, T3, T4>");
+                .generatedSourceFile("io.quarkiverse.permuplate.example.Node3").orElseThrow());
+        assertThat(src3).contains("Node4 next()");
 
-        // Step4: join() omitted (Step5 not in generated set)
+        // Node4: next() omitted (Node5 not in generated set)
         String src4 = sourceOf(compilation
-                .generatedSourceFile("io.quarkiverse.permuplate.example.Step4").orElseThrow());
-        assertThat(src4).doesNotContain("join(");
+                .generatedSourceFile("io.quarkiverse.permuplate.example.Node4").orElseThrow());
+        assertThat(src4).doesNotContain("next(");
         assertThat(src4).contains("execute()");
     }
 
     @Test
     public void testAptExplicitWhenOverride() {
-        // when="true" forces generation even on the last class
-        var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.ForcedChain1",
+        // when="true" forces generation even on the last class (ForcedChain2.next() → ForcedChain3)
+        // ForcedChain3 is provided as a hand-written terminal class so compilation succeeds
+        var template = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.ForcedChainT",
                 """
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
                         @Permute(varName="i", from=1, to=2, className="ForcedChain${i}")
-                        public class ForcedChain1 {
+                        public class ForcedChainT {
                             @PermuteReturn(className="ForcedChain${i+1}", when="true")
                             public Object next() { return null; }
                         }
                         """);
+        var terminal = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.ForcedChain3",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        public class ForcedChain3 {}
+                        """);
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new PermuteProcessor())
-                .compile(source);
+                .compile(template, terminal);
 
         assertThat(compilation).succeeded();
         // ForcedChain2.next() generated (when="true" overrides boundary omission)
@@ -225,13 +233,13 @@ public class PermuteReturnTest {
     @Test
     public void testV2TypeArgVarNameWithoutTypeArgTo() {
         var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.BadV2",
+                "io.quarkiverse.permuplate.example.BadV2Step1",
                 """
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
                         @Permute(varName="i", from=2, to=3, className="BadV2Step${i}")
-                        public class BadV2 {
+                        public class BadV2Step1 {
                             @PermuteReturn(className="BadV2Step${i+1}", typeArgVarName="j")
                             public Object method() { return null; }
                         }
@@ -249,13 +257,13 @@ public class PermuteReturnTest {
     @Test
     public void testV3TypeArgFromGreaterThanTo() {
         var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.BadV3",
+                "io.quarkiverse.permuplate.example.BadV3Step1",
                 """
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
                         @Permute(varName="i", from=2, to=3, className="BadV3Step${i}")
-                        public class BadV3 {
+                        public class BadV3Step1 {
                             @PermuteReturn(className="BadV3Step${i+1}", typeArgVarName="j",
                                            typeArgFrom="5", typeArgTo="2", typeArgName="T${j}")
                             public Object method() { return null; }
@@ -273,13 +281,13 @@ public class PermuteReturnTest {
     @Test
     public void testV6TypeArgsAndTypeArgVarNameBothSet() {
         var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.BadV6",
+                "io.quarkiverse.permuplate.example.BadV6Step1",
                 """
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
                         @Permute(varName="i", from=2, to=3, className="BadV6Step${i}")
-                        public class BadV6 {
+                        public class BadV6Step1 {
                             @PermuteReturn(className="BadV6Step${i+1}",
                                            typeArgVarName="j", typeArgTo="${i+1}", typeArgName="T${j}",
                                            typeArgs="T1, T2")
