@@ -1,206 +1,238 @@
-# Session Handoff — Permuplate Design Work
+# Session Handoff — Permuplate
 
 **Last updated:** 2026-04-02  
-**Status:** ✅ Implementation complete — all features implemented, tested, and documented
+**Status:** ✅ **Implementation complete** — all features implemented, tested, and documented  
+**Tests:** 126 passing, 0 failures, 0 skipped  
+**Build command:** `/opt/homebrew/bin/mvn clean install`
 
 ---
 
-## What Was Done
+## One-Line Summary
 
-Designed and implemented Permuplate annotation-driven permutation features to support the **Drools RuleBuilder DSL** as the primary use case. All features are implemented, all tests pass (126 tests, 0 failures, 0 skipped), and documentation is complete.
-
-**If resuming:** all implementation is done. Focus on further design work (TODO-1/2/3 deferred inference improvements) or integration with the Drools project.
+Permuplate is a Java annotation processor that generates type-safe arity permutations from a single template class. All core features (N4, G1, G2a, G2b, G3, G4) have been designed, implemented, tested, and documented. The only remaining open question is a structural refactor (moving example tests into the example module).
 
 ---
 
 ## IntelliJ MCP — Use This First
 
-Both projects are open in IntelliJ. **Always prefer IntelliJ MCP tools over native file tools for this project** (per user preference stored in memory).
+**Always prefer IntelliJ MCP tools over native file tools** (user preference).
 
-Two projects are open:
+Two projects open in IntelliJ:
 - **Permuplate:** `/Users/mdproctor/claude/permuplate`
-- **Drools:** `/Users/mdproctor/dev/droolsoct2025`
+- **Drools (reference):** `/Users/mdproctor/dev/droolsoct2025`
 
-To verify both are reachable, call `mcp__intellij__get_project_modules` with each project path before doing anything else.
+Verify both with `mcp__intellij__get_project_modules` before doing anything else.
 
 ---
 
-## The Drools Use Case — Read This Code
+## What Has Been Implemented (Everything)
 
-The design is driven by the **`droolsvol2`** module in the Drools project. Read these files to understand what we are trying to generate with Permuplate:
+All features are fully implemented, reviewed, and merged to `main`.
 
-| File | Location | Why |
+| Feature | What it does | Key files |
 |---|---|---|
-| `RuleBuilderTest.java` | `droolsvol2/src/test/java/org/drools/core/` | Shows the DSL usage — the user-facing API. Read this first to understand what the DSL does. |
-| `RuleBuilder.java` | `droolsvol2/src/main/java/org/drools/core/` | The hand-written builder — `Join2First`, `Join2Second`, `From1First`, etc. This is the main target for Permuplate generation. |
-| `RuleOOPathBuilder.java` | `droolsvol2/src/main/java/org/drools/core/` | `Path2`–`Path6` classes and the `path${k}()` methods on `JoinNSecond`. Motivates G4. |
-| `RuleExtendsPoint.java` | `droolsvol2/src/main/java/org/drools/core/` | `RuleExtendsPoint2`–`RuleExtensionPoint6` — simple G1 case. |
-| `function/` directory | `droolsvol2/src/main/java/org/drools/core/function/` | `Consumer1`–`Consumer4`, `Predicate1`–`Predicate10`, `Function1`–`Function5`, `BaseTuple`, `Tuple1`–`Tuple6` — all hand-written, all G1 candidates. |
-
-### Use Cases in RuleBuilderTest
-
-`test3JoinsVariousUses()` — core join/filter/fn chain  
-`testCompactFilter()` — Variable-based filter with cross-fact predicates  
-`testPath()`, `testPath2()` — OOPath traversal (motivates G4 `path${k}()` methods)  
-`testNot()` — negation groups  
+| **N4** | `alpha(n)`, `lower(n)`, `typeArgList(from,to,style)` JEXL built-in functions available in every `${...}` expression | `EvaluationContext.java` (PermuplateStringFunctions nested class) |
+| **G1** | `@PermuteTypeParam` — expands a sentinel class or method type parameter into a sequence. `Consumer1<T1>` → `Consumer2<T1,T2>`, `Consumer3<T1,T2,T3>`, etc. Implicit expansion fires automatically when `@PermuteParam` uses `T${j}` type. | `PermuteTypeParamTransformer.java` |
+| **G2a** | `@PermuteDeclr` on method parameters — `name` is optional (default `""`): omit to change type only; set to also rename with body propagation | `PermuteDeclrTransformer.transformMethodParams()` + `processMethodParamDeclr()` |
+| **G2b** | `@PermuteReturn` — return type narrowing by arity. Implicit inference in Maven inline mode (zero annotations for T${j} naming). Boundary omission: last class has method silently omitted. | `InlineGenerator.applyImplicitInference()`, `applyPermuteReturn()` + `PermuteProcessor.applyPermuteReturn()` |
+| **G3** | `@PermuteMethod` — multiple method overloads per class (inner j loop). `to` inferred as `@Permute.to - i`. `name` attribute for distinct method names (`path2()`, `path3()`, ...). Extends/implements clause auto-expansion for sibling generated classes. | `InlineGenerator.applyPermuteMethod()`, `applyExtendsExpansion()` + `PermuteProcessor.applyPermuteMethodApt()` |
+| **G4** | Method-level `@PermuteTypeParam` — used inside `@PermuteMethod` for growing method type param lists (`<PB>`, `<PB,PC>`, `<PB,PC,PD>`). R3 prefix check intentionally omitted (sentinel is arbitrary placeholder). `@PermuteReturn.typeArgs` and `@PermuteMethod.name` were also part of G4 spec but were already implemented in G2b/G3. | `PermuteTypeParamTransformer.transformMethod()` |
+| **S3** | PermuteMojo now uses `AnnotationStringAlgorithm.matches()` (consistent with APT) | `PermuteMojo.generateTopLevel()` |
+| **S4** | Test for empty `@PermuteParam` range (from > to) | `PermuteParamTest.testPermuteParamEmptyRangeRemovesSentinel()` |
+| **S5** | `@Ignore` test removed — uses `strings={"v1=my","v2=","v3=2"}` to declare JEXL vars | `PrefixValidationTest` |
+| **N1/S1/S2** | Inline=true on interfaces + two templates in same parent — both tested | `InlineGenerationTest` |
+| **N3** | `@PermuteParam` on abstract interface methods — works, tested | `PermuteParamTest.testPermuteParamOnAbstractInterfaceMethod()` |
 
 ---
 
-## Design Documents Location
+## Test Classes
 
-All specs are in `/Users/mdproctor/claude/permuplate/docs/superpowers/specs/`:
+All in `permuplate-tests/src/test/java/io/quarkiverse/permuplate/`:
 
-| File | Status | What it designs |
+| Class | What it tests |
+|---|---|
+| `PermuteTest` | Type permutation range, nested class/interface promotion, string variables, cross-product via `extraVars` |
+| `PermuteDeclrTest` | Field, constructor param, for-each variable, and method parameter renaming |
+| `PermuteParamTest` | Fixed params before/after sentinel, multiple sentinels, anchor expansion, empty range, abstract interface |
+| `PermuteTypeParamTest` | `@PermuteTypeParam` explicit/implicit, bounds propagation, fixed type params, R1/R3/R4 validation |
+| `PermuteReturnTest` | `@PermuteReturn` APT explicit + Maven implicit inference, boundary omission, V2/V3/V6 validation |
+| `PermuteMethodTest` | `@PermuteMethod` multiple overloads, inferred `to`, leaf nodes, extends expansion, APT mode, method-level `@PermuteTypeParam` |
+| `ExpressionFunctionsTest` | `alpha`, `lower`, `typeArgList` — unit tests + end-to-end JEXL path tests |
+| `ExampleTest` | Real-world domain templates: `ProductFilter2`, `AuditRecord2`, `ValidationSuite.FieldValidator2`, `BiCallable1x1` |
+| `DogFoodingTest` | `Callable1` generates `Callable2`–`Callable10` |
+| `DegenerateInputTest` | All `@Permute` attribute error paths with message content and source-position assertions |
+| `PrefixValidationTest` | String-literal prefix rules for `@PermuteDeclr` and `@PermuteParam` across all placements |
+| `AptInlineGuardTest` | APT rejection of `inline=true`; `keepTemplate` warning |
+| `OrphanVariableTest` | R2 (substring matching), R3 (orphan variable), R4 (no anchor) |
+| `InlineGenerationTest` | `InlineGenerator` and `AnnotationReader`; interface templates; two templates in same parent |
+
+---
+
+## Module Structure
+
+```
+permuplate-parent/
+├── permuplate-annotations/     @Permute, @PermuteDeclr, @PermuteParam, @PermuteTypeParam,
+│                               @PermuteReturn, @PermuteMethod, @PermuteExtends, @PermuteVar
+├── permuplate-core/            EvaluationContext (with JEXL functions), transformers:
+│                               PermuteDeclrTransformer, PermuteParamTransformer,
+│                               PermuteTypeParamTransformer
+├── permuplate-ide-support/     AnnotationStringAlgorithm (matching, rename, validation)
+├── permuplate-processor/       APT entry point (PermuteProcessor) — thin shell on core
+├── permuplate-maven-plugin/    Maven Mojo + InlineGenerator + AnnotationReader
+├── permuplate-apt-examples/    APT examples (ProductFilter2, AuditRecord2, etc.)
+├── permuplate-mvn-examples/    Maven plugin examples (Handlers inline)
+└── permuplate-tests/           All unit tests using Google compile-testing
+```
+
+---
+
+## Key Architecture: How Each Feature Works
+
+### Pipeline order in InlineGenerator.generate()
+
+```
+1. Rename class + constructors
+2. PermuteTypeParamTransformer.transform()   — class-level type param expansion (G1)
+3. applyPermuteMethod()                      — @PermuteMethod inner j loop (G3)
+   └─ For each clone: transformMethod()      — method-level type params (G4)
+   └─ For each clone: applyPermuteReturn()   — return type per j
+   └─ For each clone: processMethodParamDeclr() — @PermuteDeclr on params per j
+4. PermuteDeclrTransformer.transform()       — @PermuteDeclr on fields/ctor/for-each
+5. PermuteParamTransformer.transform()       — @PermuteParam sentinel expansion
+6. collectExplicitReturnMethodNames()        — track explicit before stripping
+7. applyPermuteReturn()                      — explicit @PermuteReturn (G2b)
+8. applyImplicitInference()                  — T${j} return + param inference (G2b)
+9. applyExtendsExpansion()                   — extends clause expansion (G3)
+10. Strip @Permute annotation
+```
+
+### Pipeline order in PermuteProcessor.generatePermutation()
+
+```
+1. Clone + rename class + constructors
+2. PermuteTypeParamTransformer.transform()   — class-level type param expansion (G1)
+3. PermuteDeclrTransformer.transform()       — @PermuteDeclr on fields/ctor/for-each/method params
+4. PermuteParamTransformer.transform()       — @PermuteParam sentinel expansion
+5. applyPermuteMethodApt()                   — @PermuteMethod APT explicit (G3)
+6. applyPermuteReturn()                      — explicit @PermuteReturn (G2b)
+7. Strip @Permute annotation
+8. Write generated file via Filer
+```
+
+### Critical design decisions
+
+| Decision | Why |
+|---|---|
+| `alpha(n)` and `lower(n)` registered as JEXL lambda scripts in MapContext (NOT via JexlBuilder.namespaces) | JEXL3's uberspect does not autobox `Integer` to `int` for static method dispatch. Functions are available without prefix in all `${...}` expressions. Range 1–26; out-of-range throws at generation time. |
+| `typeArgList(from, to, style)` returns `""` when `from > to` | Empty-range case for growing type arg lists. Styles: `"T"` → `T1,T2,...`, `"alpha"` → `A,B,...`, `"lower"` → `a,b,...`. Unknown style throws at generation time. |
+| `@PermuteTypeParam` implicit expansion | When `@PermuteParam(type="T${j}")` references a class type parameter, class type params auto-expand (no annotation needed). Maven inline only — APT templates must compile with fixed type params. |
+| `@PermuteTypeParam` R1 restriction | Return type referencing an expanding type param → compile error (ambiguous across permutations). |
+| Method-level `@PermuteTypeParam` R3 omitted | The sentinel (`PB`, `A`) is an arbitrary placeholder — it need not match the generated names (`T1`, `B`, etc.). Class-level R3 is retained. |
+| `@PermuteReturn` implicit inference Conditions 1+2 | (1) return type base class in generated set; (2) type args = declared fixed params + undeclared `T+number` growing tip. Both must hold. Maven inline only. |
+| Boundary omission | Method omitted when return type class not in generated set. Applies to both `@PermuteReturn` (explicit) and implicit inference. `when="true"` overrides. |
+| Leaf node pattern | Last generated class has `join()` omitted — mirrors hand-written Drools pattern. Empty j range for `@PermuteMethod` is the multi-join equivalent. |
+| `T${j}` naming enables zero-annotation inference | Processor needs numeric suffix to identify the growing tip. `alpha(j)` names have no numeric pattern — inference does not fire. Use explicit `@PermuteReturn` for letter-based naming. |
+| `@PermuteDeclr` method parameter validation deferred | Sentinel type (`Object`) deliberately doesn't match annotation string (the actual generated type). `validatePrefixes()` does NOT cover method params — a comment explains this. |
+| `@PermuteMethod.to` is optional | Inferred as `@Permute.to - i`. Explicit `to` + `strings={"max=N"}` is the APT workaround for cross-module deps only. |
+| `applyPermuteMethod()` runs before PermuteDeclrTransformer | Each overload clone has `@PermuteDeclr` processed with inner (i,j) context. Downstream transform sees no remaining annotations on these methods. |
+| Extends clause expansion uses name-prefix family matching | `prefixBeforeFirstDigit()` guards against third-party classes that happen to share the template's embedded digit. `"Join"` expands; `"External"` does not. |
+| Two-pass scan for dependency ordering | Both APT (`RoundEnvironment.getElementsAnnotatedWith`) and Maven (file scan) scan all templates first, build generated class set + dependency graph, then generate in topological order. |
+| `applyPermuteReturnToSingleMethod()` has no boundary omission | In `@PermuteMethod` inner loop, the leaf-node mechanism is the empty j range, not class-name lookup. `when` expression guard still applies. |
+
+---
+
+## Open Question (Not Yet Implemented)
+
+### Moving example tests into the example module
+
+**The issue:** `ExampleTest.java` and `DogFoodingTest.java` live in `permuplate-tests/` but test templates from `permuplate-apt-examples/`. The template files exist as duplicates in both modules. Tests should co-locate with what they test.
+
+**The design decision needed:** How to make `ProcessorTestSupport` (which lives in `permuplate-tests/src/test/java/`) accessible to `permuplate-apt-examples/src/test/java/`:
+
+- **Option A (recommended):** Publish `permuplate-tests` as a Maven test-jar. `permuplate-apt-examples` depends on it via `<type>test-jar</type>`. Standard Maven pattern, no code duplication.
+- **Option B:** Extract `ProcessorTestSupport` to a new `permuplate-test-support` module. Cleanest architecture but adds a module.
+- **Option C:** Copy needed helpers into `permuplate-apt-examples`. Some duplication but zero new dependencies.
+
+**Work involved:** Create `permuplate-apt-examples/src/test/java/`, add test dependencies to its pom.xml, move `ExampleTest.java` + `DogFoodingTest.java`, update `templateSource()` to look in `src/main/java/` instead of `src/test/java/`, remove duplicate template files from `permuplate-tests/`.
+
+---
+
+## Deferred Features (TODOs — Not Started)
+
+| TODO | Idea | Why deferred |
 |---|---|---|
-| `2026-04-01-generic-type-params-g1-design.md` | **Approved** | `@PermuteTypeParam` — expanding class/method type parameters (`Consumer1<T1>` → `Consumer3<T1,T2,T3>`) |
-| `2026-04-02-return-type-narrowing-g2-design.md` | **Approved** | `@PermuteReturn`, `@PermuteDeclr` on parameters — return type narrowing by arity; implicit inference in inline mode |
-| `2026-04-02-multi-join-g3-design.md` | **Approved** | `@PermuteMethod` — multiple overloads per class; extends/implements expansion; dependency graph ordering |
-| `2026-04-02-named-method-series-g4-design.md` | **Approved** | `@PermuteMethod.name`, method-level `@PermuteTypeParam`, `@PermuteReturn.typeArgs` — named method series (`path2()`, `path3()`, ...) |
-| `2026-04-02-expression-language-functions-n4-design.md` | **Approved** | `alpha(n)`, `lower(n)`, `typeArgList(from,to,style)` JEXL functions |
-
-**Also read:**
-- `docs/gap-analysis.md` — the master gap list with Hard Gaps (G1–G4), Soft Gaps (S1–S5), New Patterns (N1–N4), and Future TODOs (TODO-1 through TODO-3)
+| **TODO-1** | `@PermuteParam` fully implicit — when parameter type is a T${j} class type param and name follows `name${j}`, infer `@PermuteParam` automatically | Complex coupling: `to` inference relies on outer loop being 1:1 with class type params; edge cases unclear |
+| **TODO-2** | Self-return inference — when `filter()` returns the same class as the template, auto-expand return type to match generated class | G2 Condition 2 fails (all type args declared, no undeclared tip); new mechanism needed |
+| **TODO-3** | `@PermuteDeclr` implicit on fields — when field type is a generated class with matching numeric suffix, infer without annotation | Low impact; explicit annotation is not painful |
 
 ---
 
-## Core Design Principles — Never Deviate From These
+## Things NOT Yet Done (New Gaps Found)
 
-### 1. APT and Maven Plugin Parity
+Two structural gaps identified during RuleBuilder analysis that have no implementation plan:
 
-**Goal:** Keep APT and Maven plugin as consistent as possible. Where they differ, the explicit annotation is the APT workaround — not a second-class path.
+1. **Growing switch statements** (`BaseTuple.get(int index)` / `set(int index)`) — each Tuple level adds a case. No Permuplate mechanism exists. Workaround: use array-based implementation (`Object[]`) instead of switch; typed getters/setters are covered by G4 `@PermuteMethod.name`.
 
-**Maven plugin (inline mode)** processes `src/main/permuplate/` templates:
-- Two-pass scan: first builds the complete generated class set + dependency graph across all template files, then generates in topological order
-- Supports **implicit inference** — JavaParser reads the template AST and infers what would otherwise require explicit annotations
-- Templates do NOT need to be compilable Java (they live in `src/main/permuplate/`, not on the compile source path)
+2. **`@PermuteReturn.typeArgs` with mixed fixed+growing** — partially addressed by `typeArgs="DS, ${typeArgList(1, i, 'T')}"`. The `extensionPoint()` case (returns `RuleExtendsPoint${i+1}<DS, T1,...,T${i}>`) needs this. Designed in G4 spec; not yet implemented in a test.
 
-**APT mode** processes annotated source files during `javac`:
-- Single-pass per compilation round; uses `RoundEnvironment.getElementsAnnotatedWith()` to see all `@Permute` elements in the current round
-- Supports the same dependency graph and topological ordering **within a compilation round** (same module)
-- Cross-module dependencies require explicit `to` + `strings={"max=N"}` — the one remaining gap vs Maven
-- Templates **must compile** — no undeclared type variables in method parameters; use `Object` sentinels with `@PermuteDeclr`/`@PermuteReturn` explicitly
+---
 
-**The invariant:** Explicit annotations (`@PermuteReturn`, `@PermuteDeclr`, explicit `to` on `@PermuteMethod`, `strings={"max=N"}`) are the bridge that makes APT capable of everything Maven plugin can do. The annotation API is identical; only the inference differs.
+## Core Design Principles
 
-### 2. JavaParser Inference — More Implicit Is Better
+### APT vs Maven Plugin
 
-We use JavaParser to read template ASTs and infer what the user would otherwise have to annotate. The more we can infer, the less the user writes. Current inferences (all inline/Maven plugin only unless noted):
+**Maven plugin (inline mode):**
+- Templates in `src/main/permuplate/` — NOT on compile path
+- Two-pass: scan all → dependency graph → generate in topological order
+- Supports all implicit inference (`T${j}` naming → zero annotations)
+- Use for `inline=true`, nested sibling classes
 
-| What is inferred | How | Both modes? |
+**APT mode:**
+- Templates in `src/main/java/` — must be valid compilable Java
+- Uses `RoundEnvironment` for all-templates scan (same-module)
+- Explicit annotations required (`Object` sentinels, `@PermuteReturn`, `@PermuteDeclr`)
+- Cross-module deps need explicit `to` + `strings={"max=N"}`
+
+**Choosing between T${j} and alpha(j):**
+
+| Approach | Naming | Annotation burden |
 |---|---|---|
-| Return type expansion (`Step2<T1,T2>` → `Step${i+1}First<T1..T${i+1}>`) | Return type class in generated set + `T${j}` naming convention | Maven only |
-| Parameter type expansion (undeclared type vars) | Same undeclared vars as return type's growing tip | Maven only |
-| `@PermuteMethod.to` upper bound | Read from enclosing `@Permute.to - i` | Both |
-| Dependency graph ordering | First-pass AST scan across all templates | Maven (across files); APT (within round) |
-| `@PermuteTypeParam` on class type params | When `@PermuteParam` uses `T${j}` type | Maven only |
+| Minimum annotations (Maven inline) | `T1, T2, T3` | Just `@Permute` — everything inferred |
+| Single-letter names (Maven inline) | `alpha(j)` → `A, B, C` | Explicit `@PermuteReturn` + `@PermuteDeclr` required |
+| APT mode | Any | Explicit `@PermuteReturn` + `@PermuteDeclr` + `Object` sentinels |
 
-**Explicit annotations are always the fallback** when inference doesn't apply: APT mode, `alpha(j)` naming, cross-module dependencies.
+### Error reporting
 
-### 3. `T${j}` vs `alpha(j)` Naming Convention
-
-This is **critical** to understand and document:
-
-- **`T${j}` naming** (T1, T2, T3, ...) — triggers implicit inference. Zero annotations beyond `@Permute` in Maven inline mode.
-- **`alpha(j)` naming** (A, B, C, ...) — does NOT trigger inference. Always requires explicit `@PermuteReturn` + `@PermuteDeclr`. The processor cannot reverse-engineer a letter into a numeric range.
-- **Why:** Inference needs a numeric suffix to identify the growing tip. Single letters have no pattern.
-
-The "Choosing your approach" table must appear prominently in all user-facing docs.
+All errors from `PermuteProcessor` must include at least `Element` location (element-level minimum). Attribute-level is preferred. No bare `messager.printMessage(ERROR, msg)` calls ever.
 
 ---
 
-## Key Design Decisions Made This Session
+## Key Files to Read First When Resuming
 
-### G2 — Return Type and Parameter Inference
+1. `docs/gap-analysis.md` — master list of all gaps, TODOs, status
+2. `CLAUDE.md` — non-obvious decisions table (now includes G1-G4 entries)
+3. `README.md` — user-facing docs with all annotations documented
+4. `docs/SESSION-HANDOFF.md` — this file
 
-When a method's return type is a generated class with undeclared type variables:
-- Return type: inferred automatically (inline mode)
-- Parameter types: any parameter whose type contains those same undeclared type variables is also inferred — **no `@PermuteDeclr` needed in the common case**
-
-### G3 — `@PermuteMethod.to` is Optional
-
-`to` defaults to `""` — inferred as `@Permute.to - i` from the enclosing class's annotation. `strings={"max=N"}` is only needed in APT mode for cross-module dependencies.
-
-### G3 — Dependency Graph
-
-Both APT and Maven plugin scan all `@Permute` templates before generating:
-- Maven: scans `src/main/permuplate/` explicitly
-- APT: uses `RoundEnvironment.getElementsAnnotatedWith(Permute.class)` + JavaParser
-Both build a dependency graph and generate in topological order. Cycle detection → error.
-
-### G4 — Three New Extensions
-
-1. **`@PermuteMethod.name`** — generates distinct method names per inner loop value (`path2`, `path3`, ...) instead of same-name overloads
-2. **Method-level `@PermuteTypeParam`** — `@Target(TYPE_PARAMETER)` already covers method type params; implementation extension needed; driven by `@PermuteMethod` inner variable; creates three-level nesting (i → k → j)
-3. **`@PermuteReturn.typeArgs`** — full JEXL string template for the complete type argument list; solves mixed fixed+growing args that the existing loop cannot express; also resolves the `extensionPoint()` gap (e.g., `"DS, ${typeArgList(1, i, 'T')}"`)
+### If picking up the "example tests" task:
+- `permuplate-tests/src/test/java/io/quarkiverse/permuplate/ExampleTest.java` — tests to move
+- `permuplate-tests/src/test/java/io/quarkiverse/permuplate/DogFoodingTest.java` — tests to move
+- `permuplate-tests/src/test/java/io/quarkiverse/permuplate/ProcessorTestSupport.java` — helper that needs to be shared
+- `permuplate-apt-examples/pom.xml` — needs test dependencies added
+- The template files listed in `permuplate-tests/src/test/java/.../example/` that are duplicates of `permuplate-apt-examples/src/main/java/.../example/`: `AuditRecord2.java`, `BiCallable1x1.java`, `ProductFilter2.java`, `ValidationSuite.java` — can be removed from `permuplate-tests/` after the move
 
 ---
 
-## Open Items — Check These Before Continuing
+## Annotation API Quick Reference
 
-### gap-analysis.md — Hard Gaps Remaining
-
-G1–G4 are all **specced and approved** but not yet implemented. Check the gap analysis for:
-- **S3, S5** — Soft gaps still open (Mojo prefix check, @Ignore test)
-- **TODO-1, TODO-2, TODO-3** — Deferred inference improvements (read before deciding to implement)
-
-### Things Identified But Not Yet Specced
-
-During the big-picture review of the RuleBuilder code, we identified additional gaps not yet written into specs:
-
-1. **Growing switch statements** (`Tuple.get(int index)` / `set(int index)`)  — The `BaseTuple` subclasses have switch statements that add one case per permutation. No Permuplate mechanism exists for this. Noted but not designed.
-
-2. **Self-return inference** (TODO-2 in gap-analysis.md) — `filter()` returning the same class as the template. G2's Condition 2 fails (no undeclared tip). Design deferred.
-
-3. **`@PermuteDeclr` implicit on fields** (TODO-3) — when field type is a generated class with matching numeric suffix. Design deferred.
-
-4. **`@PermuteParam` fully implicit** (TODO-1) — when parameter type is a class type param following `T${j}` and name follows `name${j}`. Complex; deferred.
-
-### Things NOT Yet Resolved in the Specs
-
-The gap analysis has two items that were identified but still need updating:
-- **Gap analysis not updated** to reflect that G1/G2/G3/G4/N4 have approved specs (they are still listed as "open gaps" without cross-references to the spec files)
-- **N4 spec** — `typeArgList` is defined in G3 as an "N4 extension" but is missing from N4's own spec testing and files sections
-
----
-
-## Conversation History Summary
-
-Key things we worked through (if the session crashed mid-discussion):
-
-1. Reviewed G1, G2, G3 specs from previous session — found last session's key inference conclusions (JavaParser-based, no explicit annotations in common case) had NOT been written to the docs. Fixed.
-2. Updated G2: `@PermuteDeclr` on parameters is also inferrable (same undeclared type vars as return type growing tip).
-3. Updated G3: `@PermuteReturn` and `@PermuteDeclr` are ALSO inferrable when `@PermuteMethod` provides the j context. The only annotation needed is `@PermuteMethod`.
-4. Updated G2/N4 documentation requirements: added "choosing your approach" table; explained WHY `T${j}` works but `alpha(j)` doesn't; added clear APT vs Maven guidance throughout.
-5. Updated G3: `@PermuteMethod.to` becomes optional (inferred from `@Permute.to - i`); removed `strings={"max=N"}` from common case; added dependency graph architecture; aligned APT and Maven parity.
-6. Reviewed RuleBuilder.java and RuleOOPathBuilder.java — identified the path use case (`path2()`, `path3()`, ...) as exposing three new gaps.
-7. Designed G4: `@PermuteMethod.name`, method-level `@PermuteTypeParam`, `@PermuteReturn.typeArgs`.
-8. Added TODO-1 (`@PermuteParam` fully implicit), TODO-2 (self-return inference), TODO-3 (`@PermuteDeclr` implicit on fields) to gap analysis as deferred items.
-
----
-
-## What To Do Next
-
-1. **Check and update the gap analysis** — mark G1–G4 and N4 as "Spec Approved" with links to spec files; update N4 to include `typeArgList`.
-
-2. **Continue the use-case review** — we had just finished reviewing the `path${k}()` case. There are more use cases in `RuleBuilderTest.java` that may expose further gaps:
-   - `testNot()` — negation groups (`not()` → `Not2`, `Group2`)
-   - `testCompactFilter()` — `Variable<T>` and variable-based filters
-   - The `extendsRule()` mechanism on `ParametersFirst` referencing `RuleExtendsPoint`
-   - The `Tuple.get()` / `set()` growing switch statements (no mechanism — potential G5)
-
-3. **When design is complete** — begin implementation in priority order: N4 → G1 → G2 → G3 → G4
-
----
-
-## Quick Reference — Annotation API
-
-| Annotation | Module | Purpose |
+| Annotation | Target | Purpose |
 |---|---|---|
-| `@Permute` | permuplate-annotations | On class/interface/method — drives the outer permutation loop |
-| `@PermuteDeclr` | permuplate-annotations | On field, for-each var, or method parameter — renames type and/or name per permutation |
-| `@PermuteParam` | permuplate-annotations | On a sentinel method parameter — expands it into a sequence of parameters |
-| `@PermuteTypeParam` | permuplate-annotations | On a sentinel type parameter (class or method level) — expands it into a sequence of type params |
-| `@PermuteReturn` | permuplate-annotations (G2/G4) | On a method — controls return type per permutation. `className` accepts class names OR type variable names (e.g., `${alpha(i)}`). `typeArgVarName/From/To/Name` for uniform growing series. `typeArgs` (G4) for mixed fixed+growing args (e.g., `"DS, ${typeArgList(1, i, 'T')}"`). `when` for boundary guard. |
-| `@PermuteMethod` | permuplate-annotations (G3/G4) | On a sentinel method — generates multiple overloads per class. `name` (G4): method name template for distinct names (e.g., `"path${k}"` → `path2()`, `path3()`); omit for same-name overloads. `to` inferred as `@Permute.to - i` when omitted. |
-| `@PermuteExtends` | permuplate-annotations (G3) | On a class — explicit override for extends/implements clause expansion |
-| `@PermuteVar` | permuplate-annotations | On `@Permute` — adds extra integer loop axes for cross-product generation |
+| `@Permute` | `CLASS`, `METHOD` | Outer loop — drives N classes or N method overloads |
+| `@PermuteVar` | (on `@Permute.extraVars`) | Additional integer loop axes for cross-product generation |
+| `@PermuteDeclr` | `FIELD`, `LOCAL_VARIABLE`, `PARAMETER` | Renames type (always) and identifier (when `name` non-empty) per permutation |
+| `@PermuteParam` | `PARAMETER` | Expands a sentinel parameter into N generated params; rewrites call-site anchors |
+| `@PermuteTypeParam` | `TYPE_PARAMETER` | Expands a sentinel type parameter (class or method level) into N type params |
+| `@PermuteReturn` | `METHOD` | Controls return type per permutation; implicit inference in Maven inline + T${j} naming |
+| `@PermuteMethod` | `METHOD` | Generates multiple overloads via inner j loop; `name` for distinct method names |
+| `@PermuteExtends` | `TYPE` | Explicit override for extends/implements clause expansion |
