@@ -10,12 +10,16 @@ import java.util.List;
 
 import org.junit.Test;
 
+import com.google.testing.compile.Compiler;
+import com.google.testing.compile.JavaFileObjects;
+
 import io.quarkiverse.permuplate.example.CtorDeclr2;
 import io.quarkiverse.permuplate.example.DualForEach2;
 import io.quarkiverse.permuplate.example.FieldDeclr2;
 import io.quarkiverse.permuplate.example.ForEachDeclr2;
 import io.quarkiverse.permuplate.example.RichJoin2;
 import io.quarkiverse.permuplate.example.TwoFieldDeclr2;
+import io.quarkiverse.permuplate.processor.PermuteProcessor;
 
 /**
  * Tests for {@code @PermuteDeclr}: declaration renaming and scope.
@@ -277,5 +281,113 @@ public class PermuteDeclrTest {
         // No stale annotations
         assertThat(src).doesNotContain("@PermuteDeclr");
         assertThat(src).doesNotContain("@Permute(");
+    }
+
+    // -------------------------------------------------------------------------
+    // Method parameter @PermuteDeclr — G2a
+    // -------------------------------------------------------------------------
+
+    /**
+     * @PermuteDeclr on a method parameter with name omitted — only type changes.
+     */
+    @Test
+    public void testMethodParamTypeOnlyNoRename() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.ChainStep2",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteDeclr;
+                        @Permute(varName="i", from=2, to=3, className="ChainStep${i}")
+                        public class ChainStep2 {
+                            public Object join(@PermuteDeclr(type="Source<T${i+1}>") Object src) {
+                                return null;
+                            }
+                        }
+                        """);
+
+        var compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+        String src2 = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.ChainStep2")
+                .orElseThrow());
+        assertThat(src2).contains("Object join(Source<T3> src)");
+        assertThat(src2).doesNotContain("@PermuteDeclr");
+
+        String src3 = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.ChainStep3")
+                .orElseThrow());
+        assertThat(src3).contains("Object join(Source<T4> src)");
+    }
+
+    /**
+     * @PermuteDeclr on a method parameter with name specified — both type and name change,
+     *               and the new name is propagated throughout the method body.
+     */
+    @Test
+    public void testMethodParamTypeAndNameWithBodyPropagation() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.RenameParam2",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteDeclr;
+                        @Permute(varName="i", from=3, to=3, className="RenameParam${i}")
+                        public class RenameParam2 {
+                            public String process(
+                                    @PermuteDeclr(type="Object", name="item${i}") Object item2) {
+                                return item2.toString();
+                            }
+                        }
+                        """);
+
+        var compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.RenameParam3")
+                .orElseThrow());
+        assertThat(src).contains("Object item3");
+        assertThat(src).contains("item3.toString()");
+        assertThat(src).doesNotContain("item2");
+        assertThat(src).doesNotContain("@PermuteDeclr");
+    }
+
+    /**
+     * Multiple @PermuteDeclr on multiple parameters in the same method.
+     */
+    @Test
+    public void testMultipleMethodParamDeclr() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.MultiParam2",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteDeclr;
+                        @Permute(varName="i", from=3, to=3, className="MultiParam${i}")
+                        public class MultiParam2 {
+                            public void process(
+                                    @PermuteDeclr(type="TypeA${i}") Object paramA,
+                                    @PermuteDeclr(type="TypeB${i}") Object paramB) {
+                            }
+                        }
+                        """);
+
+        var compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.MultiParam3")
+                .orElseThrow());
+        assertThat(src).contains("TypeA3");
+        assertThat(src).contains("TypeB3");
+        assertThat(src).doesNotContain("@PermuteDeclr");
     }
 }
