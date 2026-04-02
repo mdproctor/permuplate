@@ -28,6 +28,8 @@ import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
 import io.quarkiverse.permuplate.core.PermuteVarConfig;
+import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
+import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 
 /**
  * Generates permuted classes from {@code @Permute}-annotated templates.
@@ -189,14 +191,18 @@ public class PermuteMojo extends AbstractMojo {
         String templateClassName = entry.classDecl().getNameAsString();
         List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
 
-        // Leading literal prefix check
-        String leadingLiteral = config.className.contains("${")
-                ? config.className.substring(0, config.className.indexOf("${"))
-                : config.className;
-        if (!leadingLiteral.isEmpty() && !templateClassName.startsWith(leadingLiteral)) {
+        // Prefix check using full substring matching — consistent with APT processor.
+        // Skip when className has no static literals (all-variables case e.g. "${i}"):
+        // matches() returns false for those, but the appropriate error is a missing
+        // literal (caught as a JEXL evaluation error), not a match failure.
+        AnnotationStringTemplate classNameTemplate = AnnotationStringAlgorithm.parse(config.className);
+        if (!classNameTemplate.hasNoLiteral()
+                && !AnnotationStringAlgorithm.matches(classNameTemplate, templateClassName)) {
             throw new MojoExecutionException(entry.sourceFile() +
-                    ": @Permute className leading literal \"" + leadingLiteral +
-                    "\" is not a prefix of the template class name \"" + templateClassName + "\"");
+                    ": @Permute className \"" + config.className +
+                    "\" has a literal that does not appear as a substring of the template" +
+                    " class name \"" + templateClassName +
+                    "\" — the className expression must reference the template class name");
         }
 
         for (Map<String, Object> vars : allCombinations) {

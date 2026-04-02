@@ -165,6 +165,8 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | R1 applies only to @Permute.className | Inner annotations (`@PermuteDeclr`, `@PermuteParam`) may have attributes with no variable (e.g. `type = "Object"`) when the type genuinely does not vary. R1 (no variables error) is enforced only for `@Permute.className` in `PermuteProcessor`, not by the transformers. |
 | R2 short-circuits R3/R4 | If any static literal is not found as a substring of the target name, orphan variable (R3) and no-anchor (R4) checks are skipped — the orphan computation is undefined when the literal isn't found. |
 | Adjacent variables are collective | `${v1}${v2}Callable${v3}` — the variables before "Callable" collectively cover the prefix region. Orphan detection applies to the region as a whole, not per-variable. If prefix is non-empty, neither is orphan. If prefix is empty, both are orphan. |
+| `alpha(n)` and `lower(n)` built-in JEXL functions | Registered as JEXL lambda scripts in `MapContext` (not via `JexlBuilder.namespaces`) because JEXL3's uberspect does not autobox `Integer` arguments to `int` for static method dispatch. Functions are available without prefix in all `${...}` expressions. Range 1–26; out-of-range throws at generation time. |
+| `typeArgList(from, to, style)` | Returns `""` when `from > to` — the empty-range case for growing type arg lists. Styles: `"T"` → `T1,T2,...`, `"alpha"` → `A,B,...`, `"lower"` → `a,b,...`. Unknown style throws `IllegalArgumentException` at generation time. |
 
 ---
 
