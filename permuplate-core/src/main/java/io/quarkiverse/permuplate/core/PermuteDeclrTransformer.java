@@ -59,6 +59,8 @@ public class PermuteDeclrTransformer {
         transformConstructorParams(classDecl, ctx, messager);
         // For-each variables (narrowest scope — loop body only)
         transformForEachVars(classDecl, ctx, messager);
+        // Method parameters — type always; name+body rename only when name is non-empty
+        transformMethodParams(classDecl, ctx, messager);
     }
 
     // -------------------------------------------------------------------------
@@ -173,6 +175,43 @@ public class PermuteDeclrTransformer {
     }
 
     // -------------------------------------------------------------------------
+    // Method parameters (G2a)
+    // -------------------------------------------------------------------------
+
+    private static void transformMethodParams(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            Messager messager) {
+        classDecl.getMethods().forEach(method -> {
+            // Snapshot annotated params to avoid ConcurrentModification
+            List<Parameter> annotated = new ArrayList<>();
+            method.getParameters().forEach(p -> {
+                if (hasPermuteDeclr(p.getAnnotations()))
+                    annotated.add(p);
+            });
+
+            for (Parameter param : annotated) {
+                AnnotationExpr ann = getPermuteDeclr(param.getAnnotations());
+                String[] params = extractTwoParams(ann, messager);
+                if (params == null)
+                    continue;
+
+                String newType = ctx.evaluate(params[0]);
+                String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]); // "" = keep original name
+
+                param.setType(new ClassOrInterfaceType(null, newType));
+                param.getAnnotations().remove(ann);
+
+                if (!newName.isEmpty()) {
+                    // Name also changes — propagate rename within the method body only
+                    String oldName = param.getNameAsString();
+                    param.setName(newName);
+                    method.getBody().ifPresent(body -> renameAllUsages(body, oldName, newName));
+                }
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
     // Shared utilities
     // -------------------------------------------------------------------------
 
@@ -209,14 +248,16 @@ public class PermuteDeclrTransformer {
     }
 
     /**
-     * Extracts the two string parameters from a {@code @PermuteDeclr(type, name)} annotation.
-     * Supports both {@code @PermuteDeclr("t", "n")} (pair style) and
-     * {@code @PermuteDeclr(type="t", name="n")} (named style).
+     * Extracts the {@code type} and optional {@code name} parameters from a
+     * {@code @PermuteDeclr(type=..., name=...)} annotation.
+     * {@code name} is optional — defaults to {@code ""} (keep original name).
+     * Supports both named-parameter style: {@code @PermuteDeclr(type="t", name="n")}
+     * and type-only style: {@code @PermuteDeclr(type="t")}.
      */
     static String[] extractTwoParams(AnnotationExpr ann, Messager messager) {
         if (ann instanceof NormalAnnotationExpr) {
             NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
-            String type = null, name = null;
+            String type = null, name = ""; // name is optional, default ""
             for (MemberValuePair pair : normal.getPairs()) {
                 String val = stripQuotes(pair.getValue().toString());
                 if (pair.getNameAsString().equals("type"))
@@ -224,12 +265,13 @@ public class PermuteDeclrTransformer {
                 else if (pair.getNameAsString().equals("name"))
                     name = val;
             }
-            if (type != null && name != null)
+            if (type != null)
                 return new String[] { type, name };
         }
         if (messager != null) {
             messager.printMessage(Diagnostic.Kind.ERROR,
-                    "@PermuteDeclr must use named parameters: @PermuteDeclr(type=\"...\", name=\"...\")");
+                    "@PermuteDeclr must specify type: @PermuteDeclr(type=\"...\") " +
+                            "or @PermuteDeclr(type=\"...\", name=\"...\")");
         }
         return null;
     }
@@ -318,6 +360,12 @@ public class PermuteDeclrTransformer {
                     v.getNameAsString(), messager, element, stringConstants))
                 valid[0] = false;
         });
+
+        // Note: Method parameters are NOT validated here because they fundamentally differ
+        // from fields/for-each vars — the annotation string describes what the type BECOMES
+        // in the generated code (where the template is a generic placeholder like Object),
+        // not what it currently is. Validation happens in transformMethodParams where we have
+        // the EvaluationContext to properly evaluate the annotation strings.
 
         return valid[0];
     }

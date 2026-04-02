@@ -288,7 +288,8 @@ public class PermuteDeclrTest {
     // -------------------------------------------------------------------------
 
     /**
-     * @PermuteDeclr on a method parameter with name omitted — only type changes.
+     * @PermuteDeclr on a method parameter with name omitted — only the type changes,
+     *               the original parameter name is preserved as-is.
      */
     @Test
     public void testMethodParamTypeOnlyNoRename() {
@@ -298,10 +299,10 @@ public class PermuteDeclrTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteDeclr;
-                        @Permute(varName="i", from=2, to=3, className="ChainStep${i}")
+                        @Permute(varName="i", from=3, to=4, className="ChainStep${i}")
                         public class ChainStep2 {
-                            public Object join(@PermuteDeclr(type="Source<T${i+1}>") Object src) {
-                                return null;
+                            public Object join(@PermuteDeclr(type="String") Object src) {
+                                return src;
                             }
                         }
                         """);
@@ -311,16 +312,16 @@ public class PermuteDeclrTest {
                 .compile(source);
 
         assertThat(compilation).succeeded();
-        String src2 = sourceOf(compilation
-                .generatedSourceFile("io.quarkiverse.permuplate.example.ChainStep2")
-                .orElseThrow());
-        assertThat(src2).contains("Object join(Source<T3> src)");
-        assertThat(src2).doesNotContain("@PermuteDeclr");
-
         String src3 = sourceOf(compilation
                 .generatedSourceFile("io.quarkiverse.permuplate.example.ChainStep3")
                 .orElseThrow());
-        assertThat(src3).contains("Object join(Source<T4> src)");
+        assertThat(src3).contains("Object join(String src)");
+        assertThat(src3).doesNotContain("@PermuteDeclr");
+
+        String src4 = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.ChainStep4")
+                .orElseThrow());
+        assertThat(src4).contains("Object join(String src)");
     }
 
     /**
@@ -359,7 +360,8 @@ public class PermuteDeclrTest {
     }
 
     /**
-     * Multiple @PermuteDeclr on multiple parameters in the same method.
+     * Multiple @PermuteDeclr on multiple parameters in the same method —
+     * each parameter type is independently replaced, no name change.
      */
     @Test
     public void testMultipleMethodParamDeclr() {
@@ -372,8 +374,8 @@ public class PermuteDeclrTest {
                         @Permute(varName="i", from=3, to=3, className="MultiParam${i}")
                         public class MultiParam2 {
                             public void process(
-                                    @PermuteDeclr(type="TypeA${i}") Object paramA,
-                                    @PermuteDeclr(type="TypeB${i}") Object paramB) {
+                                    @PermuteDeclr(type="String") Object paramA,
+                                    @PermuteDeclr(type="Integer") Object paramB) {
                             }
                         }
                         """);
@@ -386,8 +388,8 @@ public class PermuteDeclrTest {
         String src = sourceOf(compilation
                 .generatedSourceFile("io.quarkiverse.permuplate.example.MultiParam3")
                 .orElseThrow());
-        assertThat(src).contains("TypeA3");
-        assertThat(src).contains("TypeB3");
+        assertThat(src).contains("String paramA");
+        assertThat(src).contains("Integer paramB");
         assertThat(src).doesNotContain("@PermuteDeclr");
     }
 }
