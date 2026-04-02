@@ -22,7 +22,7 @@ This is genuinely novel. Every comparable tool (Vavr generators, Freemarker temp
 
 ```
 permuplate-parent/
-├── permuplate-annotations/     @Permute, @PermuteDeclr, @PermuteParam, @PermuteVar  (no runtime deps)
+├── permuplate-annotations/     @Permute, @PermuteDeclr, @PermuteParam, @PermuteVar, @PermuteTypeParam, @PermuteReturn, @PermuteMethod, @PermuteExtends  (no runtime deps)
 ├── permuplate-core/            shared transformation engine: EvaluationContext, transformers, PermuteConfig
 ├── permuplate-ide-support/     annotation string algorithm (matching, rename, validation); no IDE deps
 ├── permuplate-processor/       APT entry point only (thin shell depending on permuplate-core)
@@ -167,6 +167,19 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | Adjacent variables are collective | `${v1}${v2}Callable${v3}` — the variables before "Callable" collectively cover the prefix region. Orphan detection applies to the region as a whole, not per-variable. If prefix is non-empty, neither is orphan. If prefix is empty, both are orphan. |
 | `alpha(n)` and `lower(n)` built-in JEXL functions | Registered as JEXL lambda scripts in `MapContext` (not via `JexlBuilder.namespaces`) because JEXL3's uberspect does not autobox `Integer` arguments to `int` for static method dispatch. Functions are available without prefix in all `${...}` expressions. Range 1–26; out-of-range throws at generation time. |
 | `typeArgList(from, to, style)` | Returns `""` when `from > to` — the empty-range case for growing type arg lists. Styles: `"T"` → `T1,T2,...`, `"alpha"` → `A,B,...`, `"lower"` → `a,b,...`. Unknown style throws `IllegalArgumentException` at generation time. |
+| `@PermuteTypeParam` implicit expansion | When `@PermuteParam(type="T${j}")` references a class type parameter, the class type params are automatically expanded to match (no `@PermuteTypeParam` annotation needed). Only fires in Maven plugin inline mode — APT templates must compile with fixed type params. |
+| `@PermuteTypeParam` R1 restriction | If a method's return type references an expanding type parameter, the processor reports a compile error. The return type would be ambiguous across permutations. Use `Object` or a fixed container type instead. |
+| `@PermuteTypeParam` on method type params (G4) | `@PermuteTypeParam` works on method type parameters inside `@PermuteMethod`. R3 prefix check is intentionally NOT applied — the sentinel (e.g. `PB` or `A`) is an arbitrary placeholder and need not match the generated names (`T1`, `B`, etc.). |
+| `@PermuteReturn` implicit inference conditions | Two conditions must BOTH hold: (1) return type base class is in the generated set; (2) return type args consist of declared class params (fixed) followed by undeclared `T+number` vars (growing tip). Both APT and Maven plugin check the same conditions; only inline mode infers automatically. |
+| `@PermuteReturn` boundary omission | Both implicit and explicit `@PermuteReturn`: when the evaluated return class is NOT in the generated set, the method is silently omitted. `when="true"` overrides this. Applies to `@PermuteMethod` overloads too (individual overload omitted when boundary fails). |
+| `@PermuteReturn` leaf node pattern | Last class in a generated range has `join()` omitted automatically — same pattern as hand-written Drools `Join5First` having no `join()`. Without this, the generated code would reference a non-existent type and fail to compile. |
+| `T${j}` naming enables zero-annotation inference | The processor needs a numeric suffix to identify the growing tip. Single-letter names (`A`, `B`, `C`) have no pattern — inference does not fire. Use `alpha(j)` + explicit `@PermuteReturn` for letter-based naming. |
+| `@PermuteDeclr` method parameter (G2a) | `name=""` (default) changes only the type, no rename propagation. When name is non-empty, type AND name change and the new name is propagated through the method body via `renameAllUsages`. Method params are NOT validated in `validatePrefixes()` because the sentinel type (`Object`) deliberately doesn't match the annotation string (the actual generated type). |
+| `@PermuteMethod` empty range = leaf node | When `from > to` after evaluation (e.g. i=max, to=0), the method is silently omitted from that generated class. This is the multi-join leaf-node mechanism — not an error. |
+| `@PermuteMethod.to` is optional | Inferred as `@Permute.to - i` from the enclosing class's `@Permute` annotation. Works in both APT and Maven plugin for same-module class families. Explicit `to` + `strings={"max=N"}` is the workaround for cross-module APT dependencies. |
+| `@PermuteMethod` pipeline position | `applyPermuteMethod()` in InlineGenerator runs BEFORE `PermuteDeclrTransformer` — each overload clone has `@PermuteDeclr` on its parameters consumed with the inner (i,j) context, so the downstream transform sees no remaining annotations on these methods. |
+| Extends clause implicit expansion (G3) | `applyExtendsExpansion()` uses name-prefix family matching (everything before the first digit) + embedded number match to detect sibling classes. Third-party classes with different name prefixes are safely skipped. Prefix family `"Join"` expands; `"External"` does not. |
+| Two-pass scan for dependency ordering | Both APT and Maven plugin scan all `@Permute` templates before generating any class — APT via `RoundEnvironment.getElementsAnnotatedWith`, Maven via file scan. The generated class set is built first; generation happens in topological order. |
 
 ---
 
@@ -222,6 +235,10 @@ assertThat(src).contains("c3.call(o1, o2, o3)");
 | `AptInlineGuardTest` | APT rejection of `inline=true`; `keepTemplate` warning |
 | `OrphanVariableTest` | R2 (substring matching), R3 (orphan variable), R4 (no anchor), R2 short-circuits R3/R4 |
 | `InlineGenerationTest` | `InlineGenerator` and `AnnotationReader` for Maven plugin inline generation |
+| `ExpressionFunctionsTest` | Built-in JEXL functions: `alpha`, `lower`, `typeArgList` — unit tests + end-to-end compile tests |
+| `PermuteTypeParamTest` | `@PermuteTypeParam`: explicit/implicit expansion, bounds propagation, fixed type params, R1/R3/R4 validation |
+| `PermuteReturnTest` | `@PermuteReturn`: APT explicit mode, implicit inference, boundary omission, V2/V3/V6 validation |
+| `PermuteMethodTest` | `@PermuteMethod`: multiple overloads, inferred `to`, leaf nodes, extends expansion, APT mode, method-level `@PermuteTypeParam` |
 
 ---
 

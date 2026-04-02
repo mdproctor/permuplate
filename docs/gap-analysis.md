@@ -19,7 +19,7 @@ Three categories of findings:
 
 ### G1 — Generic type parameter arity
 
-**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-01-generic-type-params-g1-design.md`
+**Status: Implemented** — see `docs/superpowers/specs/2026-04-01-generic-type-params-g1-design.md`
 
 **What the Drools DSL needs:**
 ```java
@@ -47,7 +47,7 @@ interface Condition2 { boolean test(Object fact1, Object fact2); }
 
 ### G4 — Named method series and method-level type parameter expansion
 
-**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-02-named-method-series-g4-design.md`
+**Status: Implemented** — see `docs/superpowers/specs/2026-04-02-named-method-series-g4-design.md`
 
 **What the Drools DSL needs:**
 ```java
@@ -70,7 +70,7 @@ interface Condition2 { boolean test(Object fact1, Object fact2); }
 
 ### G3 — Multi-join permutation (multiple overloads per class, two-variable boundary)
 
-**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-02-multi-join-g3-design.md`
+**Status: Implemented** — see `docs/superpowers/specs/2026-04-02-multi-join-g3-design.md`
 
 **What the Drools DSL needs:**
 ```java
@@ -93,7 +93,7 @@ public <C,D,E> Join4First<END,DS,B,C,D,E> join(Join3First<Void,DS,C,D,E> fromCDE
 
 ### G2 — Return type narrowing by arity (stateful builder types)
 
-**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-02-return-type-narrowing-g2-design.md`
+**Status: Implemented** — see `docs/superpowers/specs/2026-04-02-return-type-narrowing-g2-design.md`
 
 **What the Drools DSL needs:**
 ```java
@@ -240,7 +240,7 @@ Wait — `@Permute` on a method uses `className` for the generated **class**, no
 
 ### N4 — Expression language functions (`alpha`, `lower`, `typeArgList`)
 
-**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-02-expression-language-functions-n4-design.md`
+**Status: Implemented** — see `docs/superpowers/specs/2026-04-02-expression-language-functions-n4-design.md`
 
 **What it is:** Built-in functions registered in the JEXL engine and available in all string attributes. `alpha(n)` converts an integer to an uppercase letter (1-indexed: A=1, B=2, ..., Z=26); `lower(n)` converts to lowercase.
 
@@ -322,9 +322,9 @@ public interface Condition1 {
 | 3 | N1+S1+S2 — Test inline=true on interfaces + two templates | New pattern + soft gaps | Medium (needs RuleInterfaces example) | Validates real use case |
 | 4 | N3 — Verify @PermuteParam on abstract interface method | New pattern | Low | Needed for N1 |
 | 5 | S4 — Degenerate test for empty @PermuteParam range | Soft gap | Low | Edge case safety |
-| 6 | N4 — Expression language functions | **Spec Approved** | Low | Implement first — prerequisite for G2/G3/G4 Drools examples |
+| 6 | N4 — Expression language functions | **Implemented** | Low | Prerequisite for G2/G3/G4 Drools examples |
 | 7 | ~~N2 — Method name templating~~ | **Resolved by G4** | — | `@PermuteMethod.name` covers this |
-| 8 | G1 — Generic type parameter arity | **Spec Approved** | Very high | Implement after N4 |
-| 9 | G2 — Return type narrowing by arity | **Spec Approved** | Very high | Depends on G1 |
-| 10 | G3 — Multi-join permutation | **Spec Approved** | Very high | Depends on G1+G2+N4 |
-| 11 | G4 — Named method series + method-level type parameters | **Spec Approved** | High | Depends on G1+G2+G3+N4 |
+| 8 | G1 — Generic type parameter arity | **Implemented** | Very high | — |
+| 9 | G2 — Return type narrowing by arity | **Implemented** | Very high | Depends on G1 |
+| 10 | G3 — Multi-join permutation | **Implemented** | Very high | Depends on G1+G2+N4 |
+| 11 | G4 — Named method series + method-level type parameters | **Implemented** | High | Depends on G1+G2+G3+N4 |
