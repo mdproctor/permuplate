@@ -1,13 +1,17 @@
 package io.quarkiverse.permuplate.maven;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.expr.AnnotationExpr;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
@@ -63,6 +67,9 @@ public class InlineGenerator {
             outputParent.addMember(templateCopy);
         }
 
+        // Build complete generated class set for boundary omission
+        Set<String> allGeneratedNames = scanAllGeneratedClassNames(parentCu, config);
+
         // Generate and append each permuted nested class
         for (Map<String, Object> vars : allCombinations) {
             EvaluationContext ctx = new EvaluationContext(vars);
@@ -78,6 +85,9 @@ public class InlineGenerator {
             PermuteTypeParamTransformer.transform(generated, ctx, null, null);
             PermuteDeclrTransformer.transform(generated, ctx, null);
             PermuteParamTransformer.transform(generated, ctx, null);
+
+            // Apply @PermuteReturn — explicit override; boundary omission
+            applyPermuteReturn(generated, ctx, allGeneratedNames);
 
             // Strip @Permute
             generated.getAnnotations().removeIf(a -> {
@@ -95,6 +105,130 @@ public class InlineGenerator {
     }
 
     /**
+     * Scans the parent CU for all @Permute annotations and collects every class name
+     * that will be generated. Used for boundary omission in @PermuteReturn processing.
+     */
+    private static Set<String> scanAllGeneratedClassNames(CompilationUnit parentCu,
+            PermuteConfig thisConfig) {
+        Set<String> names = new HashSet<>();
+        addNamesFromConfig(thisConfig, names);
+
+        parentCu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> classDecl.getAnnotations().stream()
+                .filter(a -> a.getNameAsString().equals("Permute")
+                        || a.getNameAsString().equals("io.quarkiverse.permuplate.Permute"))
+                .forEach(ann -> {
+                    try {
+                        addNamesFromConfig(AnnotationReader.readPermute(ann), names);
+                    } catch (Exception ignored) {
+                    }
+                }));
+        return names;
+    }
+
+    private static void addNamesFromConfig(PermuteConfig config, Set<String> names) {
+        for (Map<String, Object> vars : PermuteConfig.buildAllCombinations(config)) {
+            try {
+                names.add(new EvaluationContext(vars).evaluate(config.className));
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /**
+     * Processes @PermuteReturn annotations on methods in the generated class:
+     * replaces the sentinel return type with the computed type, and removes
+     * methods whose boundary check fails.
+     */
+    private static void applyPermuteReturn(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            Set<String> allGeneratedNames) {
+
+        List<MethodDeclaration> toRemove = new ArrayList<>();
+
+        classDecl.getMethods().forEach(method -> {
+            // Find @PermuteReturn on this method
+            java.util.Optional<AnnotationExpr> annOpt = method.getAnnotations().stream()
+                    .filter(a -> a.getNameAsString().equals("PermuteReturn")
+                            || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteReturn"))
+                    .findFirst();
+
+            if (annOpt.isEmpty())
+                return;
+
+            AnnotationReader.PermuteReturnConfig cfg = AnnotationReader.readPermuteReturn(annOpt.get());
+            if (cfg == null)
+                return;
+
+            // Evaluate className
+            String evaluatedClass;
+            try {
+                evaluatedClass = ctx.evaluate(cfg.className());
+            } catch (Exception ignored) {
+                return;
+            }
+
+            // Boundary omission
+            boolean shouldGenerate;
+            if (cfg.when().isEmpty()) {
+                shouldGenerate = allGeneratedNames.contains(evaluatedClass);
+            } else {
+                try {
+                    shouldGenerate = Boolean.parseBoolean(ctx.evaluate("${" + cfg.when() + "}"));
+                } catch (Exception ignored) {
+                    shouldGenerate = allGeneratedNames.contains(evaluatedClass);
+                }
+            }
+
+            if (!shouldGenerate) {
+                toRemove.add(method);
+                return;
+            }
+
+            // Build return type string and replace
+            String returnTypeStr = buildReturnTypeStr(evaluatedClass, cfg, ctx);
+            try {
+                method.setType(StaticJavaParser.parseType(returnTypeStr));
+            } catch (Exception ignored) {
+            }
+
+            // Remove @PermuteReturn annotation
+            method.getAnnotations().removeIf(a -> a == annOpt.get());
+        });
+
+        toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+    }
+
+    private static String buildReturnTypeStr(String className,
+            AnnotationReader.PermuteReturnConfig cfg,
+            EvaluationContext ctx) {
+        if (cfg.hasTypeArgsExpr()) {
+            try {
+                String evaluated = ctx.evaluate("${" + cfg.typeArgs() + "}");
+                return evaluated.isEmpty() ? className : className + "<" + evaluated + ">";
+            } catch (Exception ignored) {
+                return className;
+            }
+        }
+        if (!cfg.hasTypeArgLoop())
+            return className;
+
+        String from = (cfg.typeArgFrom() == null || cfg.typeArgFrom().isEmpty()) ? "1" : cfg.typeArgFrom();
+        try {
+            int fromVal = ctx.evaluateInt(from);
+            int toVal = ctx.evaluateInt(cfg.typeArgTo());
+            StringBuilder sb = new StringBuilder(className).append("<");
+            for (int j = fromVal; j <= toVal; j++) {
+                if (j > fromVal)
+                    sb.append(", ");
+                sb.append(ctx.withVariable(cfg.typeArgVarName(), j).evaluate(cfg.typeArgName()));
+            }
+            return sb.append(">").toString();
+        } catch (Exception ignored) {
+            return className;
+        }
+    }
+
+    /**
      * Strips all Permuplate annotations ({@code @Permute}, {@code @PermuteDeclr},
      * {@code @PermuteParam}) from a class declaration and all of its members,
      * including field-level and parameter-level annotations.
@@ -104,7 +238,8 @@ public class InlineGenerator {
                 "Permute", "io.quarkiverse.permuplate.Permute",
                 "PermuteDeclr", "io.quarkiverse.permuplate.PermuteDeclr",
                 "PermuteParam", "io.quarkiverse.permuplate.PermuteParam",
-                "PermuteTypeParam", "io.quarkiverse.permuplate.PermuteTypeParam");
+                "PermuteTypeParam", "io.quarkiverse.permuplate.PermuteTypeParam",
+                "PermuteReturn", "io.quarkiverse.permuplate.PermuteReturn");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
