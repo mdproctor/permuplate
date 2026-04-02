@@ -153,6 +153,119 @@ public class InlineGenerationTest {
     }
 
     // -------------------------------------------------------------------------
+    // S1 — @Permute(inline=true) on an interface template
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies that {@link InlineGenerator} correctly handles a nested {@code interface}
+     * template (not just {@code class}). Interface methods are abstract with no body
+     * and no constructor — the generator must not treat them differently from class methods.
+     */
+    @Test
+    public void testInlineGenerationWithInterfaceTemplate() {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                package com.example;
+                public class RuleInterfaces {
+                    public interface Condition1 {
+                        boolean test(Object fact1);
+                    }
+                }
+                """);
+
+        ClassOrInterfaceDeclaration template = cu.findFirst(
+                ClassOrInterfaceDeclaration.class,
+                c -> c.getNameAsString().equals("Condition1")).orElseThrow();
+
+        PermuteConfig config = new PermuteConfig("i", 2, 3, "Condition${i}",
+                new String[0], new PermuteVarConfig[0], true, false);
+
+        CompilationUnit output = InlineGenerator.generate(cu, template, config,
+                List.of(Map.of("i", 2), Map.of("i", 3)));
+        String src = output.toString();
+
+        // Generated interfaces present
+        assertThat(src).contains("interface Condition2");
+        assertThat(src).contains("interface Condition3");
+        // Template removed (keepTemplate = false)
+        assertThat(src).doesNotContain("interface Condition1");
+        // Methods preserved
+        assertThat(src).contains("boolean test(Object fact1)");
+        // No @Permute residue
+        assertThat(src).doesNotContain("@Permute");
+    }
+
+    // -------------------------------------------------------------------------
+    // S1+S2+N1 — Two @Permute(inline=true) templates in the same parent class
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies that two independent {@code @Permute}-annotated nested interfaces inside
+     * the same parent class are processed sequentially and merged correctly.
+     * The second {@link InlineGenerator#generate} call uses the output of the first as
+     * its parent CU — this simulates how {@code PermuteMojo} chains multiple templates.
+     * <ul>
+     * <li>S1: both templates are interfaces (not classes)</li>
+     * <li>S2: two templates in one parent</li>
+     * <li>N1: two independent permutation families ({@code Condition} and {@code Action})</li>
+     * </ul>
+     */
+    @Test
+    public void testTwoInterfaceTemplatesInSameParent() {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                package com.example;
+                public class RuleInterfaces {
+                    public interface Condition1 {
+                        boolean test(Object fact1);
+                    }
+                    public interface Action1 {
+                        void execute(Object obj1);
+                    }
+                }
+                """);
+
+        // ── First template: Condition1 → Condition2, Condition3 ───────────────
+        ClassOrInterfaceDeclaration condition1 = cu.findFirst(
+                ClassOrInterfaceDeclaration.class,
+                c -> c.getNameAsString().equals("Condition1")).orElseThrow();
+
+        PermuteConfig condConfig = new PermuteConfig("i", 2, 3, "Condition${i}",
+                new String[0], new PermuteVarConfig[0], true, false);
+
+        CompilationUnit afterConditions = InlineGenerator.generate(cu, condition1, condConfig,
+                List.of(Map.of("i", 2), Map.of("i", 3)));
+
+        // ── Second template: Action1 → Action2, Action3 ───────────────────────
+        // Action1 is still present in afterConditions (it was not the processed template)
+        ClassOrInterfaceDeclaration action1 = afterConditions.findFirst(
+                ClassOrInterfaceDeclaration.class,
+                c -> c.getNameAsString().equals("Action1")).orElseThrow();
+
+        PermuteConfig actionConfig = new PermuteConfig("i", 2, 3, "Action${i}",
+                new String[0], new PermuteVarConfig[0], true, false);
+
+        CompilationUnit finalOutput = InlineGenerator.generate(afterConditions, action1, actionConfig,
+                List.of(Map.of("i", 2), Map.of("i", 3)));
+        String src = finalOutput.toString();
+
+        // Both Condition family generated
+        assertThat(src).contains("interface Condition2");
+        assertThat(src).contains("interface Condition3");
+        // Both Action family generated
+        assertThat(src).contains("interface Action2");
+        assertThat(src).contains("interface Action3");
+        // Both templates removed (keepTemplate = false)
+        assertThat(src).doesNotContain("interface Condition1");
+        assertThat(src).doesNotContain("interface Action1");
+        // Parent class preserved
+        assertThat(src).contains("class RuleInterfaces");
+        // Methods preserved in each family
+        assertThat(src).contains("boolean test(Object fact1)");
+        assertThat(src).contains("void execute(Object obj1)");
+        // No annotation residue
+        assertThat(src).doesNotContain("@Permute");
+    }
+
+    // -------------------------------------------------------------------------
     // AnnotationReader: reads @Permute values from JavaParser AST
     // -------------------------------------------------------------------------
 
