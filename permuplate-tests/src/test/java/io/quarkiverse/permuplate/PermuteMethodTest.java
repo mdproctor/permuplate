@@ -187,4 +187,78 @@ public class PermuteMethodTest {
         assertThat(src3).doesNotContain("join(");
         assertThat(src3).contains("execute()");
     }
+
+    // =========================================================================
+    // Method-level @PermuteTypeParam — G4
+    // =========================================================================
+
+    @Test
+    public void testMethodLevelTypeParamExplicit() {
+        // @PermuteMethod(k=2..4, name="path${k}") + @PermuteTypeParam(j=1..k-1, name="P${j}")
+        // k=2: path2<P1>(); k=3: path3<P1, P2>(); k=4: path4<P1, P2, P3>()
+        String template = """
+                package com.example;
+                public class Parent {
+                    public static class Step1<T1> {
+                        @io.quarkiverse.permuplate.PermuteMethod(varName="k", from="2", to="4", name="path${k}")
+                        public <@io.quarkiverse.permuplate.PermuteTypeParam(varName="j", from="1", to="${k-1}", name="P${j}") PB>
+                               Object path2() { return null; }
+                    }
+                }
+                """;
+
+        String out = generateInline(template, "Step1", "i", 1, 1, "Step${i}", 1);
+        assertThat(out).contains("<P1>");
+        assertThat(out).contains("path2");
+        assertThat(out).contains("<P1, P2>");
+        assertThat(out).contains("path3");
+        assertThat(out).contains("<P1, P2, P3>");
+        assertThat(out).contains("path4");
+        assertThat(out).doesNotContain("@PermuteTypeParam");
+        assertThat(out).doesNotContain("@PermuteMethod");
+    }
+
+    @Test
+    public void testMethodLevelTypeParamTConvention() {
+        // T${j} convention: k=2 → <T1>, k=3 → <T1, T2>
+        String template = """
+                package com.example;
+                public class Parent {
+                    public static class Base1<T1> {
+                        @io.quarkiverse.permuplate.PermuteMethod(varName="k", from="2", to="3", name="step${k}")
+                        public <@io.quarkiverse.permuplate.PermuteTypeParam(varName="j", from="1", to="${k-1}", name="T${j}") A>
+                               Object step2() { return null; }
+                    }
+                }
+                """;
+
+        String out = generateInline(template, "Base1", "i", 1, 1, "Base${i}", 1);
+        assertThat(out).contains("step2");
+        assertThat(out).contains("<T1>");
+        assertThat(out).contains("step3");
+        assertThat(out).contains("<T1, T2>");
+    }
+
+    @Test
+    public void testMethodLevelTypeParamAlphaNaming() {
+        // alpha(j+1) naming: k=2 → <B>, k=3 → <B, C>, k=4 → <B, C, D>
+        String template = """
+                package com.example;
+                public class Parent {
+                    public static class Join1<T1> {
+                        @io.quarkiverse.permuplate.PermuteMethod(varName="k", from="2", to="4", name="path${k}")
+                        public <@io.quarkiverse.permuplate.PermuteTypeParam(varName="j", from="1", to="${k-1}", name="${alpha(j+1)}") PB>
+                               Object path2() { return null; }
+                    }
+                }
+                """;
+
+        String out = generateInline(template, "Join1", "i", 1, 1, "Join${i}", 1);
+        assertThat(out).contains("path2");
+        assertThat(out).contains("<B>");
+        assertThat(out).contains("path3");
+        assertThat(out).contains("<B, C>");
+        assertThat(out).contains("path4");
+        assertThat(out).contains("<B, C, D>");
+    }
 }
