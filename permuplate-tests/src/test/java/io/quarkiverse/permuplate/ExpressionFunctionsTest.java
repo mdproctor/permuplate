@@ -155,14 +155,16 @@ public class ExpressionFunctionsTest {
 
     @Test
     public void testLowerInPermuteParamName() {
+        // Template is JoinLower4 (arity-4 placeholder) so that generating JoinLower3
+        // (i=3) does not collide with the template class name.
         var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.JoinLower3",
+                "io.quarkiverse.permuplate.example.JoinLower4",
                 """
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteParam;
                         @Permute(varName="i", from=3, to=3, className="JoinLower${i}")
-                        public class JoinLower3 {
+                        public class JoinLower4 {
                             public void join(
                                 // to="${i}" (not "${i-1}") because this template has no for-each loop;
                                 // the CLAUDE.md ${i-1} convention applies only when a for-each variable
@@ -183,6 +185,33 @@ public class ExpressionFunctionsTest {
         assertThat(src).contains("Object facta");
         assertThat(src).contains("Object factb");
         assertThat(src).contains("Object factc");
+    }
+
+    // -------------------------------------------------------------------------
+    // End-to-end: typeArgList unknown style throws via JEXL path
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testTypeArgListUnknownStyleInJexlExpression() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.BadStyle3",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteDeclr;
+                        @Permute(varName="i", from=3, to=3, className="BadStyle${i}")
+                        public class BadStyle3 {
+                            @PermuteDeclr(type="${typeArgList(1, i, 'X')}", name="field${i}")
+                            Object field3;
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("typeArgList");
     }
 
     // -------------------------------------------------------------------------
