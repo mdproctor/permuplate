@@ -181,4 +181,36 @@ public class AnnotationReader {
         return new PermuteReturnConfig(className, typeArgVarName, typeArgFrom,
                 typeArgTo, typeArgName, typeArgs, when);
     }
+
+    /** Parsed @PermuteMethod configuration. */
+    public record PermuteMethodConfig(String varName, String from, String to, String name) {
+        public boolean hasExplicitTo() {
+            return to != null && !to.isEmpty();
+        }
+
+        public boolean hasName() {
+            return name != null && !name.isEmpty();
+        }
+    }
+
+    /**
+     * Reads a {@code @PermuteMethod} annotation from a JavaParser {@link AnnotationExpr}.
+     * Returns {@code null} if not a {@link NormalAnnotationExpr} or {@code varName} absent.
+     */
+    public static PermuteMethodConfig readPermuteMethod(AnnotationExpr ann) {
+        if (!(ann instanceof NormalAnnotationExpr))
+            return null;
+        NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
+        String varName = null, from = "1", to = "", name = "";
+        for (MemberValuePair pair : normal.getPairs()) {
+            String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+            switch (pair.getNameAsString()) {
+                case "varName" -> varName = val;
+                case "from" -> from = val;
+                case "to" -> to = val;
+                case "name" -> name = val;
+            }
+        }
+        return varName == null ? null : new PermuteMethodConfig(varName, from, to, name);
+    }
 }

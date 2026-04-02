@@ -302,7 +302,10 @@ public class PermuteProcessor extends AbstractProcessor {
         // replaces the sentinel TypeParameter with freshly constructed TypeParameters that carry
         // no annotations — so @PermuteTypeParam disappears by construction. No explicit removal needed.
 
-        // 5b. @PermuteReturn — replace Object sentinel return type + boundary omission
+        // 5b. @PermuteMethod — generate overloads with explicit @PermuteReturn
+        applyPermuteMethodApt(classDecl, ctx, permute, typeElement);
+
+        // 5c. @PermuteReturn — replace Object sentinel return type + boundary omission
         applyPermuteReturn(classDecl, ctx, generatedSet, typeElement);
 
         // 6. Remove @Permute from the class
@@ -597,6 +600,172 @@ public class PermuteProcessor extends AbstractProcessor {
         } else {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, message, element);
         }
+    }
+
+    /**
+     * Processes {@code @PermuteMethod} annotations in APT mode.
+     *
+     * <p>
+     * For each method annotated with {@code @PermuteMethod}, evaluates the inner
+     * variable range using the outer permutation context, then for each {@code j}
+     * value in that range clones the method, evaluates any {@code @PermuteReturn}
+     * annotation (return type only — no boundary omission), strips {@code @PermuteMethod},
+     * and adds the resulting overload to the class. The original sentinel method is removed.
+     *
+     * <p>
+     * Boundary omission is driven by the {@code to} expression: when
+     * {@code to < from} (e.g. {@code to = "${max - i}"} with {@code i = max}),
+     * the inner loop produces zero iterations, so no overloads are emitted.
+     */
+    private void applyPermuteMethodApt(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            Permute permute,
+            TypeElement element) {
+
+        List<MethodDeclaration> toRemove = new ArrayList<>();
+        List<MethodDeclaration> toAdd = new ArrayList<>();
+
+        classDecl.getMethods().forEach(method -> {
+            // Find @PermuteMethod annotation
+            Optional<NormalAnnotationExpr> pmAnnOpt = method.getAnnotations().stream()
+                    .filter(a -> {
+                        String n = a.getNameAsString();
+                        return (n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod"))
+                                && a instanceof NormalAnnotationExpr;
+                    })
+                    .map(a -> (NormalAnnotationExpr) a)
+                    .findFirst();
+            if (pmAnnOpt.isEmpty())
+                return;
+
+            NormalAnnotationExpr pmAnn = pmAnnOpt.get();
+            String varName = getAnnAttr(pmAnn, "varName");
+            String fromStr = getAnnAttr(pmAnn, "from");
+            String toStr = getAnnAttr(pmAnn, "to");
+            String nameTempl = getAnnAttr(pmAnn, "name");
+
+            if (varName == null || varName.isEmpty())
+                return;
+
+            // Evaluate from
+            int fromVal;
+            try {
+                fromVal = ctx.evaluateInt(fromStr == null || fromStr.isEmpty() ? "1" : fromStr);
+            } catch (Exception ignored) {
+                fromVal = 1;
+            }
+
+            // Evaluate to: infer as @Permute.to - currentI when not explicit
+            int toVal;
+            if (toStr == null || toStr.isEmpty()) {
+                // Infer: @Permute.to - current value of primary variable
+                try {
+                    int currentI = ctx.evaluateInt(permute.varName());
+                    toVal = permute.to() - currentI;
+                } catch (Exception ignored) {
+                    toVal = fromVal - 1;
+                }
+            } else {
+                try {
+                    toVal = ctx.evaluateInt(toStr);
+                } catch (Exception ignored) {
+                    return;
+                }
+            }
+
+            toRemove.add(method);
+
+            for (int j = fromVal; j <= toVal; j++) {
+                EvaluationContext innerCtx = ctx.withVariable(varName, j);
+                MethodDeclaration clone = method.clone();
+
+                // Strip @PermuteMethod from clone
+                clone.getAnnotations().removeIf(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod");
+                });
+
+                // Apply @PermuteReturn: evaluate return type (no boundary omission)
+                applyPermuteReturnSimple(clone, innerCtx, element);
+
+                // Apply @PermuteDeclr on parameters with innerCtx
+                io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                        .processMethodParamDeclr(clone, innerCtx);
+
+                // Apply name template if set
+                if (nameTempl != null && !nameTempl.isEmpty()) {
+                    try {
+                        clone.setName(innerCtx.evaluate(nameTempl));
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                toAdd.add(clone);
+            }
+        });
+
+        toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+        toAdd.forEach(classDecl::addMember);
+    }
+
+    /**
+     * Applies a single {@code @PermuteReturn} annotation on a method in APT mode,
+     * evaluating the return type with the given context. No boundary omission is
+     * performed — the caller controls whether to generate the method.
+     */
+    private void applyPermuteReturnSimple(MethodDeclaration method,
+            EvaluationContext ctx,
+            TypeElement element) {
+
+        Optional<NormalAnnotationExpr> annOpt = method.getAnnotations().stream()
+                .filter(a -> {
+                    String n = a.getNameAsString();
+                    return (n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn"))
+                            && a instanceof NormalAnnotationExpr;
+                })
+                .map(a -> (NormalAnnotationExpr) a)
+                .findFirst();
+
+        if (annOpt.isEmpty())
+            return;
+
+        NormalAnnotationExpr ann = annOpt.get();
+        String classNameTemplate = getAnnAttr(ann, "className");
+        String typeArgVarName = getAnnAttr(ann, "typeArgVarName");
+        String typeArgFrom = getAnnAttr(ann, "typeArgFrom");
+        String typeArgTo = getAnnAttr(ann, "typeArgTo");
+        String typeArgName = getAnnAttr(ann, "typeArgName");
+        String typeArgs = getAnnAttr(ann, "typeArgs");
+
+        if (classNameTemplate == null || classNameTemplate.isEmpty())
+            return;
+
+        String evaluatedClassName;
+        try {
+            evaluatedClassName = ctx.evaluate(classNameTemplate);
+        } catch (Exception e) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "@PermuteReturn: cannot evaluate className \"" + classNameTemplate
+                            + "\": " + e.getMessage(),
+                    element);
+            return;
+        }
+
+        String returnTypeStr = buildReturnTypeStr(evaluatedClassName,
+                typeArgVarName, typeArgFrom, typeArgTo, typeArgName, typeArgs, ctx);
+
+        try {
+            method.setType(StaticJavaParser.parseType(returnTypeStr));
+        } catch (Exception e) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "@PermuteReturn: cannot parse computed return type \"" + returnTypeStr
+                            + "\": " + e.getMessage(),
+                    element);
+            return;
+        }
+
+        // Remove @PermuteReturn annotation from the method
+        method.getAnnotations().removeIf(a -> a == ann);
     }
 
     /**

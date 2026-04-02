@@ -31,6 +31,9 @@ import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
  */
 public class InlineGenerator {
 
+    private static final String PM_SIMPLE = "PermuteMethod";
+    private static final String PM_FQ = "io.quarkiverse.permuplate.PermuteMethod";
+
     private InlineGenerator() {
     }
 
@@ -83,6 +86,14 @@ public class InlineGenerator {
 
             // Apply transformations (null messager — Maven plugin has no Messager)
             PermuteTypeParamTransformer.transform(generated, ctx, null, null);
+
+            // Capture post-G1 type parameter names for extends expansion (used in Task 5)
+            Set<String> postG1TypeParams = new java.util.LinkedHashSet<>();
+            generated.getTypeParameters().forEach(tp -> postG1TypeParams.add(tp.getNameAsString()));
+
+            // @PermuteMethod: generate overloads with (i,j) context — before other transforms
+            applyPermuteMethod(generated, ctx, config, vars, allGeneratedNames);
+
             PermuteDeclrTransformer.transform(generated, ctx, null);
             PermuteParamTransformer.transform(generated, ctx, null);
 
@@ -94,6 +105,13 @@ public class InlineGenerator {
             // Apply implicit return type + parameter type inference (Mechanism 1)
             // Skip methods that had explicit @PermuteReturn (they were just processed above)
             applyImplicitInference(generated, ctx, allGeneratedNames, explicitReturnMethods);
+
+            // Extends/implements clause expansion (Task 5)
+            int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
+            int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
+            if (templateEmbeddedNum >= 0 && currentEmbeddedNum >= 0) {
+                applyExtendsExpansion(generated, templateClassName, templateEmbeddedNum, currentEmbeddedNum);
+            }
 
             // Strip @Permute
             generated.getAnnotations().removeIf(a -> {
@@ -138,6 +156,356 @@ public class InlineGenerator {
             } catch (Exception ignored) {
             }
         }
+    }
+
+    /**
+     * Processes @PermuteMethod: for each inner j value, clones the sentinel method,
+     * processes @PermuteReturn and @PermuteDeclr with the (i,j) context, applies
+     * implicit inference, and adds the overload to the class. The sentinel is removed.
+     *
+     * <p>
+     * Runs BEFORE PermuteDeclrTransformer so that @PermuteDeclr on each clone's
+     * parameters is consumed with the inner context — the downstream transform sees
+     * no remaining @PermuteDeclr annotations on these methods.
+     */
+    private static void applyPermuteMethod(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            PermuteConfig config,
+            Map<String, Object> vars,
+            Set<String> allGeneratedNames) {
+
+        List<MethodDeclaration> toRemove = new ArrayList<>();
+        List<MethodDeclaration> toAdd = new ArrayList<>();
+
+        classDecl.getMethods().forEach(method -> {
+            java.util.Optional<AnnotationExpr> pmAnnOpt = method.getAnnotations().stream()
+                    .filter(a -> a.getNameAsString().equals(PM_SIMPLE)
+                            || a.getNameAsString().equals(PM_FQ))
+                    .findFirst();
+            if (pmAnnOpt.isEmpty())
+                return;
+
+            AnnotationReader.PermuteMethodConfig pmCfg = AnnotationReader.readPermuteMethod(pmAnnOpt.get());
+            if (pmCfg == null)
+                return;
+
+            // Evaluate from
+            int fromVal;
+            try {
+                fromVal = ctx.evaluateInt(pmCfg.from().isEmpty() ? "1" : pmCfg.from());
+            } catch (Exception ignored) {
+                fromVal = 1;
+            }
+
+            // Evaluate to: infer as @Permute.to - currentI when not explicit
+            int toVal;
+            if (!pmCfg.hasExplicitTo()) {
+                int currentI = ((Number) vars.get(config.varName)).intValue();
+                toVal = config.to - currentI;
+            } else {
+                try {
+                    toVal = ctx.evaluateInt(pmCfg.to());
+                } catch (Exception ignored) {
+                    return;
+                }
+            }
+
+            toRemove.add(method);
+
+            // Collect declared class type parameter names for undeclared-var detection
+            Set<String> declaredTypeParams = new java.util.LinkedHashSet<>();
+            classDecl.getTypeParameters().forEach(tp -> declaredTypeParams.add(tp.getNameAsString()));
+
+            for (int j = fromVal; j <= toVal; j++) {
+                EvaluationContext innerCtx = ctx.withVariable(pmCfg.varName(), j);
+                MethodDeclaration clone = method.clone();
+
+                // Strip @PermuteMethod from clone
+                clone.getAnnotations()
+                        .removeIf(a -> a.getNameAsString().equals(PM_SIMPLE) || a.getNameAsString().equals(PM_FQ));
+
+                // Handle explicit @PermuteReturn first; fall through to implicit expansion otherwise.
+                // Use a temporary wrapper class so applyPermuteReturn can operate on it.
+                ClassOrInterfaceDeclaration tmpClass = new ClassOrInterfaceDeclaration();
+                tmpClass.setName("_Tmp");
+                classDecl.getTypeParameters().forEach(tp -> tmpClass.addTypeParameter(tp.clone()));
+                tmpClass.addMember(clone);
+
+                Set<String> explicitMethods = collectExplicitReturnMethodNames(tmpClass);
+                applyPermuteReturn(tmpClass, innerCtx, allGeneratedNames);
+
+                // If boundary omission removed the method, skip this j value
+                if (tmpClass.getMethods().isEmpty()) {
+                    continue;
+                }
+
+                // Retrieve the (possibly @PermuteReturn-updated) clone
+                clone = tmpClass.getMethods().get(0);
+
+                // Implicit j-based expansion: expand undeclared T+number vars and embedded
+                // class-name numbers by (j-1), so that j=1 is a no-op and j>1 expands the tip.
+                // This fires only on types NOT already handled by @PermuteReturn.
+                String methodKey = clone.getNameAsString() + clone.getParameters().toString();
+                if (!explicitMethods.contains(methodKey)) {
+                    expandMethodTypesForJ(clone, declaredTypeParams, j);
+                }
+
+                // Process @PermuteDeclr on parameters with innerCtx
+                io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                        .processMethodParamDeclr(clone, innerCtx);
+
+                // Process @PermuteParam with innerCtx
+                ClassOrInterfaceDeclaration tmpParam = new ClassOrInterfaceDeclaration();
+                tmpParam.setName("_TmpParam");
+                tmpParam.addMember(clone);
+                PermuteParamTransformer.transform(tmpParam, innerCtx, null);
+                if (!tmpParam.getMethods().isEmpty()) {
+                    clone = tmpParam.getMethods().get(0);
+                }
+
+                // Apply name template if set
+                if (pmCfg.hasName()) {
+                    try {
+                        clone.setName(innerCtx.evaluate(pmCfg.name()));
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                toAdd.add(clone);
+            }
+        });
+
+        toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+        toAdd.forEach(classDecl::addMember);
+    }
+
+    /**
+     * Applies j-based implicit type expansion to a method's return type and parameter types.
+     *
+     * <p>
+     * For each type string (return and each param), finds undeclared T+number vars
+     * (the "growing tip"), expands them by adding T(firstTip+1)..T(firstTip+j-1), and
+     * increments the first embedded integer in the base class name by (j-1). When j=1
+     * this is a no-op (offset=0, tip unchanged).
+     *
+     * <p>
+     * Used by {@code applyPermuteMethod} to expand the template method's types for each
+     * inner j value without relying on {@code allGeneratedNames} or class name suffix heuristics.
+     */
+    private static void expandMethodTypesForJ(MethodDeclaration method,
+            Set<String> declaredTypeParams, int j) {
+        if (j <= 1)
+            return; // j=1 is always a no-op
+
+        int offset = j - 1;
+
+        // Expand return type
+        String rt = method.getTypeAsString();
+        String newRt = expandTypeStringForJ(rt, declaredTypeParams, offset);
+        if (!newRt.equals(rt)) {
+            try {
+                method.setType(StaticJavaParser.parseType(newRt));
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Expand each parameter type
+        method.getParameters().forEach(param -> {
+            String pt = param.getTypeAsString();
+            String newPt = expandTypeStringForJ(pt, declaredTypeParams, offset);
+            if (!newPt.equals(pt)) {
+                try {
+                    param.setType(StaticJavaParser.parseType(newPt));
+                } catch (Exception ignored) {
+                }
+            }
+        });
+    }
+
+    /**
+     * Expands a single type string for the j-based inner loop.
+     *
+     * <p>
+     * For a type like {@code "Join2First<T1, T2>"} where T2 is undeclared:
+     * <ul>
+     * <li>Finds the growing tip (undeclared T+number vars), e.g. T2</li>
+     * <li>Expands tip to T2, T3, ..., T(firstTipNum + offset)</li>
+     * <li>Increments the first embedded integer in the base class name by offset</li>
+     * </ul>
+     *
+     * <p>
+     * If no undeclared T+number vars are present, the type string is returned unchanged.
+     */
+    private static String expandTypeStringForJ(String typeStr,
+            Set<String> declaredTypeParams, int offset) {
+        ReturnTypeInfo info = parseReturnTypeInfo(typeStr);
+        if (info == null)
+            return typeStr;
+
+        // Find undeclared T+number vars (growing tip)
+        List<String> growingTip = new ArrayList<>();
+        for (String arg : info.typeArgs()) {
+            if (!declaredTypeParams.contains(arg) && isTNumberVar(arg)) {
+                growingTip.add(arg);
+            }
+        }
+        if (growingTip.isEmpty())
+            return typeStr;
+
+        int firstTipNum = Integer.parseInt(growingTip.get(0).substring(1));
+        int newLastTipNum = firstTipNum + offset;
+
+        // Rebuild type args: preserve fixed args in position, expand tip
+        List<String> newTypeArgs = buildExpandedTypeArgs(info.typeArgs(), declaredTypeParams,
+                firstTipNum, newLastTipNum);
+
+        // Increment the first embedded integer in the base class name by offset
+        String newBase = incrementFirstEmbeddedNumber(info.baseClass(), offset);
+
+        if (newTypeArgs.isEmpty())
+            return newBase;
+        return newBase + "<" + String.join(", ", newTypeArgs) + ">";
+    }
+
+    /**
+     * Finds the first contiguous run of digits in a class name and increments it by offset.
+     * E.g. {@code incrementFirstEmbeddedNumber("Join2First", 1)} → {@code "Join3First"}.
+     * If no digits found, returns the name unchanged.
+     */
+    private static String incrementFirstEmbeddedNumber(String name, int offset) {
+        int start = -1;
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i))) {
+                start = i;
+                break;
+            }
+        }
+        if (start < 0)
+            return name;
+        int end = start;
+        while (end < name.length() && Character.isDigit(name.charAt(end)))
+            end++;
+        int num = Integer.parseInt(name.substring(start, end));
+        return name.substring(0, start) + (num + offset) + name.substring(end);
+    }
+
+    /**
+     * Expands extends/implements clauses whose base class name carries the same
+     * first embedded number as the template class (e.g. {@code Join1Second} on template
+     * {@code Join1First}, both having embedded number {@code 1}).
+     *
+     * <p>
+     * Expansion rule (implicit): replace the embedded number in the extends base
+     * class name with {@code (currentEmbeddedNum + 1)}, and expand the type
+     * argument list to {@code T1, T2, ..., T(currentEmbeddedNum + 1)}.
+     *
+     * <p>
+     * The expansion fires only when the extends base class first embedded number
+     * equals the template class first embedded number. Classes whose name has no
+     * embedded number (e.g. {@code BaseStep}) are left unchanged.
+     *
+     * @param classDecl the generated class being processed
+     * @param templateName the name of the template class (e.g. "Join1First")
+     * @param templateEmbeddedNum the first embedded number of the template class (e.g. 1 for Join1First)
+     * @param currentEmbeddedNum the first embedded number of the generated class (e.g. 2 for Join2First)
+     */
+    private static void applyExtendsExpansion(ClassOrInterfaceDeclaration classDecl,
+            String templateName,
+            int templateEmbeddedNum,
+            int currentEmbeddedNum) {
+
+        String templateNamePrefix = prefixBeforeFirstDigit(templateName);
+        int newNum = currentEmbeddedNum + 1;
+
+        com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> extended = classDecl
+                .getExtendedTypes();
+        for (int idx = 0; idx < extended.size(); idx++) {
+            com.github.javaparser.ast.type.ClassOrInterfaceType ext = extended.get(idx);
+            String baseName = ext.getNameAsString();
+
+            // Guard: only expand if the base class shares the same prefix-before-digit
+            // as the template class. This prevents incorrectly expanding third-party
+            // classes (e.g. External1Lib) that happen to share the template's embedded digit.
+            if (!prefixBeforeFirstDigit(baseName).equals(templateNamePrefix))
+                continue;
+
+            // Only expand if extends base class has same first embedded number as the template
+            int extNum = firstEmbeddedNumber(baseName);
+            if (extNum < 0 || extNum != templateEmbeddedNum)
+                continue;
+
+            // The extends type args must be a T+number sequence (the growing tip pattern)
+            java.util.Optional<com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.Type>> typeArgsOpt = ext
+                    .getTypeArguments();
+            if (typeArgsOpt.isEmpty() || typeArgsOpt.get().isEmpty())
+                continue;
+
+            List<String> extArgNames = typeArgsOpt.get().stream()
+                    .map(com.github.javaparser.ast.type.Type::asString)
+                    .collect(java.util.stream.Collectors.toList());
+
+            // Verify the type args are all T+number vars (the growing tip pattern)
+            boolean allTNumber = extArgNames.stream().allMatch(InlineGenerator::isTNumberVar);
+            if (!allTNumber)
+                continue;
+
+            // Build new base class name: replace embedded number with newNum
+            String newBaseName = replaceFirstEmbeddedNumber(baseName, newNum);
+
+            // Build new type args: T1..T(newNum)
+            StringBuilder typeArgsSb = new StringBuilder();
+            for (int t = 1; t <= newNum; t++) {
+                if (t > 1)
+                    typeArgsSb.append(", ");
+                typeArgsSb.append("T").append(t);
+            }
+            String newExtStr = newBaseName + "<" + typeArgsSb + ">";
+            try {
+                extended.set(idx, StaticJavaParser.parseClassOrInterfaceType(newExtStr));
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /**
+     * Returns the substring of {@code name} up to (but not including) its first digit.
+     * E.g. {@code "Join1Second"} → {@code "Join"}, {@code "BaseStep"} → {@code "BaseStep"}.
+     */
+    private static String prefixBeforeFirstDigit(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i)))
+                return name.substring(0, i);
+        }
+        return name;
+    }
+
+    /** Returns the first contiguous run of digits in a name as an integer, or -1 if none. */
+    private static int firstEmbeddedNumber(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i))) {
+                int end = i;
+                while (end < name.length() && Character.isDigit(name.charAt(end)))
+                    end++;
+                try {
+                    return Integer.parseInt(name.substring(i, end));
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        return -1;
+    }
+
+    /** Replaces the first contiguous run of digits in {@code name} with {@code newNum}. */
+    private static String replaceFirstEmbeddedNumber(String name, int newNum) {
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i))) {
+                int end = i;
+                while (end < name.length() && Character.isDigit(name.charAt(end)))
+                    end++;
+                return name.substring(0, i) + newNum + name.substring(end);
+            }
+        }
+        return name; // no digits found — return unchanged
     }
 
     /**
@@ -497,7 +865,9 @@ public class InlineGenerator {
                 "PermuteDeclr", "io.quarkiverse.permuplate.PermuteDeclr",
                 "PermuteParam", "io.quarkiverse.permuplate.PermuteParam",
                 "PermuteTypeParam", "io.quarkiverse.permuplate.PermuteTypeParam",
-                "PermuteReturn", "io.quarkiverse.permuplate.PermuteReturn");
+                "PermuteReturn", "io.quarkiverse.permuplate.PermuteReturn",
+                "PermuteMethod", "io.quarkiverse.permuplate.PermuteMethod",
+                "PermuteExtends", "io.quarkiverse.permuplate.PermuteExtends");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
