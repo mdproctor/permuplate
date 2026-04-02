@@ -36,6 +36,7 @@ import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
 import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 
@@ -267,11 +268,23 @@ public class PermuteProcessor extends AbstractProcessor {
         // JavaParser does not propagate class renames to constructors automatically.
         classDecl.getConstructors().forEach(ctor -> ctor.setName(newClassName));
 
+        // 1b. Expand class type parameters (@PermuteTypeParam — explicit and implicit)
+        // Note: @PermuteTypeParam is on TypeParameters (not the class annotation list).
+        // The transformer replaces each sentinel TypeParameter with j expanded TypeParameters
+        // that carry no annotations — so @PermuteTypeParam disappears by construction.
+        PermuteTypeParamTransformer.transform(classDecl, ctx,
+                processingEnv.getMessager(), typeElement);
+
         // 2, 3 & 4. @PermuteDeclr — fields, constructor params, then for-each vars
         PermuteDeclrTransformer.transform(classDecl, ctx, processingEnv.getMessager());
 
         // 5. @PermuteParam — expand parameter list + anchor expansion at call sites
         PermuteParamTransformer.transform(classDecl, ctx, processingEnv.getMessager());
+
+        // Note: @PermuteTypeParam annotations on TypeParameters are NOT in classDecl.getAnnotations()
+        // (which only contains class-level annotations). The PermuteTypeParamTransformer in step 1b
+        // replaces the sentinel TypeParameter with freshly constructed TypeParameters that carry
+        // no annotations — so @PermuteTypeParam disappears by construction. No explicit removal needed.
 
         // 6. Remove @Permute from the class
         classDecl.getAnnotations().removeIf(a -> {
