@@ -131,4 +131,54 @@ public class AnnotationReader {
             super(message);
         }
     }
+
+    /** Parsed @PermuteReturn configuration read from JavaParser AST. */
+    public record PermuteReturnConfig(
+            String className,
+            String typeArgVarName,
+            String typeArgFrom,
+            String typeArgTo,
+            String typeArgName,
+            String typeArgs,
+            String when) {
+
+        public boolean hasTypeArgLoop() {
+            return typeArgVarName != null && !typeArgVarName.isEmpty();
+        }
+
+        public boolean hasTypeArgsExpr() {
+            return typeArgs != null && !typeArgs.isEmpty();
+        }
+    }
+
+    /**
+     * Reads a {@code @PermuteReturn} annotation from a JavaParser {@link AnnotationExpr}.
+     * Returns {@code null} if the annotation is not a {@link NormalAnnotationExpr}
+     * or if {@code className} is missing.
+     */
+    public static PermuteReturnConfig readPermuteReturn(AnnotationExpr ann) {
+        if (!(ann instanceof NormalAnnotationExpr))
+            return null;
+        NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
+
+        String className = null, typeArgVarName = "", typeArgFrom = "1",
+                typeArgTo = "", typeArgName = "", typeArgs = "", when = "";
+
+        for (MemberValuePair pair : normal.getPairs()) {
+            String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+            switch (pair.getNameAsString()) {
+                case "className" -> className = val;
+                case "typeArgVarName" -> typeArgVarName = val;
+                case "typeArgFrom" -> typeArgFrom = val;
+                case "typeArgTo" -> typeArgTo = val;
+                case "typeArgName" -> typeArgName = val;
+                case "typeArgs" -> typeArgs = val;
+                case "when" -> when = val;
+            }
+        }
+        if (className == null)
+            return null;
+        return new PermuteReturnConfig(className, typeArgVarName, typeArgFrom,
+                typeArgTo, typeArgName, typeArgs, when);
+    }
 }

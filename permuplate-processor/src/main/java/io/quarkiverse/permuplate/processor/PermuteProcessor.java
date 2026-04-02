@@ -27,6 +27,8 @@ import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.expr.MemberValuePair;
+import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
 
@@ -220,13 +222,27 @@ public class PermuteProcessor extends AbstractProcessor {
                 return;
         }
 
+        // Build generated set once for boundary omission in @PermuteReturn
+        Set<String> generatedSet = buildGeneratedSet(permute);
         for (Map<String, Object> vars : PermuteConfig.buildAllCombinations(PermuteConfig.from(permute))) {
-            generatePermutation(templateCu, typeElement, permute, new EvaluationContext(vars));
+            generatePermutation(templateCu, typeElement, permute, new EvaluationContext(vars), generatedSet);
         }
     }
 
+    /** Computes the full set of class names that this @Permute annotation will generate. */
+    private Set<String> buildGeneratedSet(Permute permute) {
+        Set<String> names = new HashSet<>();
+        for (Map<String, Object> vars : PermuteConfig.buildAllCombinations(PermuteConfig.from(permute))) {
+            try {
+                names.add(new EvaluationContext(vars).evaluate(permute.className()));
+            } catch (Exception ignored) {
+            }
+        }
+        return names;
+    }
+
     private void generatePermutation(CompilationUnit templateCu, TypeElement typeElement,
-            Permute permute, EvaluationContext ctx) {
+            Permute permute, EvaluationContext ctx, Set<String> generatedSet) {
         String templateClassName = typeElement.getSimpleName().toString();
         AnnotationMirror permuteMirror = findAnnotationMirror(typeElement, "io.quarkiverse.permuplate.Permute");
 
@@ -285,6 +301,9 @@ public class PermuteProcessor extends AbstractProcessor {
         // (which only contains class-level annotations). The PermuteTypeParamTransformer in step 1b
         // replaces the sentinel TypeParameter with freshly constructed TypeParameters that carry
         // no annotations — so @PermuteTypeParam disappears by construction. No explicit removal needed.
+
+        // 5b. @PermuteReturn — replace Object sentinel return type + boundary omission
+        applyPermuteReturn(classDecl, ctx, generatedSet, typeElement);
 
         // 6. Remove @Permute from the class
         classDecl.getAnnotations().removeIf(a -> {
@@ -578,6 +597,186 @@ public class PermuteProcessor extends AbstractProcessor {
         } else {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, message, element);
         }
+    }
+
+    /**
+     * Processes @PermuteReturn annotations on methods:
+     * - Validates V2 (typeArgVarName requires typeArgTo+typeArgName) and V3 (from > to) and V6 (typeArgs+typeArgVarName)
+     * - Evaluates className; applies boundary omission (omit method if class not in generated set, unless when="true")
+     * - Replaces the method return type with the computed type
+     * - Removes @PermuteReturn from the method
+     */
+    private void applyPermuteReturn(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            Set<String> generatedSet,
+            TypeElement element) {
+
+        List<MethodDeclaration> toRemove = new ArrayList<>();
+
+        classDecl.getMethods().forEach(method -> {
+            // Find @PermuteReturn on this method
+            Optional<NormalAnnotationExpr> annOpt = method.getAnnotations().stream()
+                    .filter(a -> {
+                        String n = a.getNameAsString();
+                        return (n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn"))
+                                && a instanceof NormalAnnotationExpr;
+                    })
+                    .map(a -> (NormalAnnotationExpr) a)
+                    .findFirst();
+
+            if (annOpt.isEmpty())
+                return;
+
+            NormalAnnotationExpr ann = annOpt.get();
+
+            // Read attributes
+            String classNameTemplate = getAnnAttr(ann, "className");
+            String typeArgVarName = getAnnAttr(ann, "typeArgVarName");
+            String typeArgTo = getAnnAttr(ann, "typeArgTo");
+            String typeArgName = getAnnAttr(ann, "typeArgName");
+            String typeArgs = getAnnAttr(ann, "typeArgs");
+            String whenExpr = getAnnAttr(ann, "when");
+            String typeArgFrom = getAnnAttr(ann, "typeArgFrom");
+
+            if (classNameTemplate == null || classNameTemplate.isEmpty())
+                return;
+
+            // V6: typeArgs and typeArgVarName both set
+            if (typeArgVarName != null && !typeArgVarName.isEmpty()
+                    && typeArgs != null && !typeArgs.isEmpty()) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                        "@PermuteReturn: typeArgs and typeArgVarName are mutually exclusive — use one or the other",
+                        element);
+                return;
+            }
+
+            // V2: typeArgVarName requires typeArgTo and typeArgName
+            if (typeArgVarName != null && !typeArgVarName.isEmpty()) {
+                if (typeArgTo == null || typeArgTo.isEmpty() || typeArgName == null || typeArgName.isEmpty()) {
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                            "@PermuteReturn: typeArgVarName requires both typeArgTo and typeArgName to be specified.",
+                            element);
+                    return;
+                }
+            }
+
+            // Evaluate className
+            String evaluatedClassName;
+            try {
+                evaluatedClassName = ctx.evaluate(classNameTemplate);
+            } catch (Exception e) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                        "@PermuteReturn: cannot evaluate className \"" + classNameTemplate + "\": " + e.getMessage(),
+                        element);
+                return;
+            }
+
+            // V3: typeArgFrom > typeArgTo
+            if (typeArgVarName != null && !typeArgVarName.isEmpty()
+                    && typeArgTo != null && !typeArgTo.isEmpty()) {
+                try {
+                    int fromVal = ctx.evaluateInt(typeArgFrom == null || typeArgFrom.isEmpty() ? "1" : typeArgFrom);
+                    int toVal = ctx.evaluateInt(typeArgTo);
+                    if (fromVal > toVal) {
+                        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                                "@PermuteReturn has invalid type argument range: from=" + fromVal
+                                        + " is greater than to=" + toVal,
+                                element);
+                        return;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            // Boundary omission check
+            boolean shouldGenerate;
+            if (whenExpr == null || whenExpr.isEmpty()) {
+                shouldGenerate = generatedSet.contains(evaluatedClassName);
+            } else {
+                try {
+                    // Wrap in ${...} for JEXL evaluation (same convention as EvaluationContext.evaluateInt).
+                    // Boolean.parseBoolean handles both string "true"/"false" and boolean true/false from JEXL.
+                    // Falls back to boundary-omission behaviour on exception (e.g. malformed expression).
+                    String evaluated = ctx.evaluate("${" + whenExpr + "}");
+                    shouldGenerate = Boolean.parseBoolean(evaluated);
+                } catch (Exception ignored) {
+                    shouldGenerate = generatedSet.contains(evaluatedClassName);
+                }
+            }
+
+            if (!shouldGenerate) {
+                toRemove.add(method);
+                return;
+            }
+
+            // Build return type string
+            String returnTypeStr = buildReturnTypeStr(evaluatedClassName,
+                    typeArgVarName, typeArgFrom, typeArgTo, typeArgName, typeArgs, ctx);
+
+            // Replace the method return type
+            try {
+                method.setType(StaticJavaParser.parseType(returnTypeStr));
+            } catch (Exception e) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                        "@PermuteReturn: cannot parse computed return type \"" + returnTypeStr
+                                + "\": " + e.getMessage(),
+                        element);
+                return;
+            }
+
+            // Remove @PermuteReturn annotation from the method
+            method.getAnnotations().removeIf(a -> a == ann);
+        });
+
+        // Remove boundary-omitted methods
+        toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+    }
+
+    /** Builds the return type string from className + type argument configuration. */
+    private String buildReturnTypeStr(String className,
+            String typeArgVarName, String typeArgFrom, String typeArgTo,
+            String typeArgName, String typeArgs, EvaluationContext ctx) {
+
+        // typeArgs: full JEXL expression for the complete type arg list
+        if (typeArgs != null && !typeArgs.isEmpty()) {
+            try {
+                String evaluated = ctx.evaluate("${" + typeArgs + "}");
+                return evaluated.isEmpty() ? className : className + "<" + evaluated + ">";
+            } catch (Exception ignored) {
+                return className;
+            }
+        }
+
+        // typeArgVarName loop
+        if (typeArgVarName == null || typeArgVarName.isEmpty()) {
+            return className; // raw return type (no type args)
+        }
+
+        String from = (typeArgFrom == null || typeArgFrom.isEmpty()) ? "1" : typeArgFrom;
+        try {
+            int fromVal = ctx.evaluateInt(from);
+            int toVal = ctx.evaluateInt(typeArgTo);
+            StringBuilder sb = new StringBuilder(className).append("<");
+            for (int j = fromVal; j <= toVal; j++) {
+                if (j > fromVal)
+                    sb.append(", ");
+                sb.append(ctx.withVariable(typeArgVarName, j).evaluate(typeArgName));
+            }
+            return sb.append(">").toString();
+        } catch (Exception ignored) {
+            return className;
+        }
+    }
+
+    /** Extracts a named attribute value from a NormalAnnotationExpr, stripping quotes. Returns null if absent. */
+    private static String getAnnAttr(NormalAnnotationExpr ann, String attrName) {
+        for (MemberValuePair pair : ann.getPairs()) {
+            if (pair.getNameAsString().equals(attrName)) {
+                return io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                        .stripQuotes(pair.getValue().toString());
+            }
+        }
+        return null;
     }
 
     private void writeGeneratedClass(TypeElement typeElement, String newClassName, String source) {
