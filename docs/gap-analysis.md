@@ -19,6 +19,8 @@ Three categories of findings:
 
 ### G1 — Generic type parameter arity
 
+**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-01-generic-type-params-g1-design.md`
+
 **What the Drools DSL needs:**
 ```java
 // Type-safe filter: only compiles if fact types match
@@ -43,7 +45,32 @@ interface Condition2 { boolean test(Object fact1, Object fact2); }
 
 ---
 
+### G4 — Named method series and method-level type parameter expansion
+
+**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-02-named-method-series-g4-design.md`
+
+**What the Drools DSL needs:**
+```java
+// On JoinNSecond: path methods with different names, growing method type params, complex return types
+<PB>       Path2<Join3First<..., Tuple2<C,PB>>,  Tuple1<C>,      C, PB>        path2()
+<PB,PC>    Path3<Join3First<..., Tuple3<C,PB,PC>>,Tuple2<C,PB>,  C, PB, PC>    path3()
+<PB,PC,PD> Path4<Join3First<..., Tuple4<C,...,PD>>,Tuple4<...>,  C, PB, PC, PD> path4()
+```
+
+**Three new capabilities required:**
+1. `@PermuteMethod.name` — optional name template; generates distinct method names per inner loop value instead of same-name overloads
+2. Method-level `@PermuteTypeParam` — driven by `@PermuteMethod`'s inner variable; introduces a third loop level (i → k → j)
+3. `@PermuteReturn.typeArgs` — full JEXL template for the complete type argument list; handles mixed fixed + growing args that the existing loop mechanism cannot express
+
+**Also resolves:** `extensionPoint()` returning `RuleExtendsPoint${i+1}<DS, T1,...,T${i}>` (mixed fixed + growing type args, previously a design gap).
+
+**Depends on:** G1, G2, G3, N4
+
+---
+
 ### G3 — Multi-join permutation (multiple overloads per class, two-variable boundary)
+
+**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-02-multi-join-g3-design.md`
 
 **What the Drools DSL needs:**
 ```java
@@ -65,6 +92,8 @@ public <C,D,E> Join4First<END,DS,B,C,D,E> join(Join3First<Void,DS,C,D,E> fromCDE
 ---
 
 ### G2 — Return type narrowing by arity (stateful builder types)
+
+**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-02-return-type-narrowing-g2-design.md`
 
 **What the Drools DSL needs:**
 ```java
@@ -181,7 +210,13 @@ public class RuleInterfaces {
 
 ---
 
-### N2 — `@Permute` on a method to generate depth-named overloads
+### N2 — `@Permute` on a method to generate depth-named overloads *(Resolved by G4)*
+
+**Status: Resolved** — `@PermuteMethod.name` attribute (designed in G4) provides method name templating. The path use case (`path2()`, `path3()`, ...) is the primary example. No separate implementation needed beyond G4.
+
+---
+
+### N2 (original problem statement, kept for reference)
 
 **What it is:** The Drools DSL has `path2()`, `path3()`, `path5()` as static factory methods with different names encoding their depth. This is the `@Permute on a method` pattern — generating N method overloads in one class.
 
@@ -203,7 +238,9 @@ Wait — `@Permute` on a method uses `className` for the generated **class**, no
 
 ---
 
-### N4 — Expression language functions (`alpha`, `lower`)
+### N4 — Expression language functions (`alpha`, `lower`, `typeArgList`)
+
+**Status: Spec Approved** — see `docs/superpowers/specs/2026-04-02-expression-language-functions-n4-design.md`
 
 **What it is:** Built-in functions registered in the JEXL engine and available in all string attributes. `alpha(n)` converts an integer to an uppercase letter (1-indexed: A=1, B=2, ..., Z=26); `lower(n)` converts to lowercase.
 
@@ -238,6 +275,44 @@ public interface Condition1 {
 
 ---
 
+## Future Enhancement TODOs (not yet prioritised)
+
+### TODO-1 — `@PermuteParam` fully implicit via JavaParser inference
+
+**Idea:** When a method parameter's type is a class type parameter following the `T${j}` naming convention (e.g., `T1 arg1`), infer `@PermuteParam` automatically — no annotation needed. `from` inferred from the numeric suffix of the type param (1); `to` inferred as `@Permute.varName` (the outer loop, since the expansion should match the class's type parameter count). Name template inferred if the parameter name also follows `name${j}` convention.
+
+**Benefit:** Makes `Consumer${i}`, `Predicate${i}`, `Function${i}` family templates truly zero-annotation beyond `@Permute`.
+
+**Complexity:** The coupling between type parameter expansion (G1) and parameter expansion (`@PermuteParam`) needs to be airtight. The `to` inference relies on the outer variable controlling both — valid when the expansion is 1:1 with class type params, but edge cases (different ranges, multiple sentinel params) need careful design.
+
+**Status:** Deferred — value not yet clear enough to justify the design complexity.
+
+---
+
+### TODO-2 — Self-return inference via JavaParser
+
+**Idea:** When a method's return type is the same class as the template class AND the return type's arguments are exactly the class's declared type parameters in order, automatically expand the return type to match the generated class. E.g., `filter()` returning `Join1First<END, DS, T1>` from `Join1First<END, DS, T1>` → becomes `Join3First<END, DS, T1, T2, T3>` for i=3. Zero false positives — exact same class with exact same args is unambiguous.
+
+**Benefit:** Self-returning fluent methods (filter(), builder pattern) work without `@PermuteReturn`. Required for the JoinN family's filter() chain.
+
+**Workaround until implemented:** Explicit `@PermuteReturn` on each self-returning method.
+
+**Status:** Deferred — implement G1/G2 first; revisit once the core is working.
+
+---
+
+### TODO-3 — `@PermuteDeclr` implicit on fields and for-each variables
+
+**Idea:** When a field's (or for-each variable's) type is a generated class whose numeric suffix matches the outer Permuplate variable value at the template base, infer `@PermuteDeclr` automatically. E.g., `Callable2 c2` in a `Join2` template (i=2) → infer `type="Callable${i}", name="c${i}"`. Only fires when type is in the generated set AND suffix matches — low false-positive risk.
+
+**Benefit:** Removes `@PermuteDeclr` from field and for-each declarations in the common case.
+
+**Workaround until implemented:** Explicit `@PermuteDeclr` on each field/for-each variable (already designed and working).
+
+**Status:** Deferred — low enough impact that explicit annotations are not painful; revisit after core implementation.
+
+---
+
 ## Priority Order for Working Through Gaps
 
 | # | Item | Type | Effort | Impact |
@@ -247,8 +322,9 @@ public interface Condition1 {
 | 3 | N1+S1+S2 — Test inline=true on interfaces + two templates | New pattern + soft gaps | Medium (needs RuleInterfaces example) | Validates real use case |
 | 4 | N3 — Verify @PermuteParam on abstract interface method | New pattern | Low | Needed for N1 |
 | 5 | S4 — Degenerate test for empty @PermuteParam range | Soft gap | Low | Edge case safety |
-| 6 | N4 — Expression language functions (`alpha`, `lower`) | New pattern | Low | Enables Drools naming; prerequisite for G2 Drools example |
-| 7 | N2 — Method name templating (`path${i}()`) | New pattern → requires new feature | High | New capability |
-| 8 | G1 — Generic type parameter arity | Hard gap | Very high | New capability |
-| 9 | G2 — Return type narrowing by arity | Hard gap | Very high | New capability |
-| 10 | G3 — Multi-join permutation (multiple overloads + two-variable boundary) | Hard gap | Very high | New capability; depends on G1+G2+N4 |
+| 6 | N4 — Expression language functions | **Spec Approved** | Low | Implement first — prerequisite for G2/G3/G4 Drools examples |
+| 7 | ~~N2 — Method name templating~~ | **Resolved by G4** | — | `@PermuteMethod.name` covers this |
+| 8 | G1 — Generic type parameter arity | **Spec Approved** | Very high | Implement after N4 |
+| 9 | G2 — Return type narrowing by arity | **Spec Approved** | Very high | Depends on G1 |
+| 10 | G3 — Multi-join permutation | **Spec Approved** | Very high | Depends on G1+G2+N4 |
+| 11 | G4 — Named method series + method-level type parameters | **Spec Approved** | High | Depends on G1+G2+G3+N4 |

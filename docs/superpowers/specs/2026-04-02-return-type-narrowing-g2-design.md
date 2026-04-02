@@ -56,6 +56,21 @@ When both conditions hold, the processor automatically:
 1. Determines the offset expression — e.g., `Step2` in `Step1` → `Step${i+1}`
 2. Expands the type argument list per permutation: fixed args pass through, growing tip extends by one
 3. Omits the method when the evaluated class name is not in the generated set (see Leaf Node below)
+4. **Parameter type inference:** For each method parameter whose declared type references a type variable that is NOT declared on the enclosing class (i.e., appears in the return type's growing tip), the processor automatically substitutes the inferred expansion into the parameter type. No `@PermuteDeclr` annotation is required on the parameter in the common case.
+
+### Parameter Type Inference
+
+**The key insight:** Undeclared type variables in parameter types are the same type variables as in the return type's growing tip. When return type inference fires, the processor already knows which type variables form the growing tip (e.g., `T2` in `Step1<T1>` — declared is `T1`, so growing tip is `T2`). Any parameter type that references those same undeclared variables is automatically updated with the same substitution.
+
+This means the common case template is annotation-free beyond `@Permute` — no `@PermuteDeclr` on parameters needed:
+
+```java
+// T2 in Source<T2> is the same undeclared type var as in Step2<T1, T2>
+public Step2<T1, T2> join(Source<T2> src) { ... }
+// → Source<T2> src, Source<T3> src, Source<T4> src per permutation
+```
+
+Parameter type inference is **inline mode only** — in APT mode the template must be valid compilable Java, so undeclared type variables in parameter types cause a compile error. Use `@PermuteDeclr` explicitly in APT mode.
 
 ### Template and generated output
 
@@ -64,9 +79,9 @@ When both conditions hold, the processor automatically:
 @Permute(varName="i", from=1, to=4, className="Step${i}", inline=true, keepTemplate=true)
 public class Step1<T1> {
     // Return type inferred — no @PermuteReturn needed.
-    // @PermuteDeclr on the parameter handles the changing Source<T${i+1}> type.
-    public Step2<T1, T2> join(
-            @PermuteDeclr(type="Source<T${i+1}>") Source<T2> src) { ... }
+    // Parameter type also inferred — no @PermuteDeclr needed.
+    // T2 in Source<T2> is undeclared on Step1<T1>; the processor maps it to T${i+1} automatically.
+    public Step2<T1, T2> join(Source<T2> src) { ... }
     public void execute(Action1 action) { ... }
 }
 ```
@@ -82,7 +97,9 @@ public class Step4<T1, T2, T3, T4> { /* join() omitted — Step5 not in generate
 
 ### When inference does NOT apply
 
-If Condition 1 or Condition 2 is not met, inference is skipped and the return type is left unchanged. Use `@PermuteReturn` explicitly in those cases. A warning is emitted (see Validation, rule V4) when Condition 1 holds but Condition 2 does not — this is likely a user error.
+If Condition 1 or Condition 2 is not met, return type inference is skipped and the return type is left unchanged. Use `@PermuteReturn` explicitly in those cases. A warning is emitted (see Validation, rule V4) when Condition 1 holds but Condition 2 does not — this is likely a user error.
+
+Parameter type inference similarly does not apply when the type convention is not `T${j}` (e.g., `alpha(j)` naming), or when the parameter type references a mix of declared and undeclared variables that the processor cannot unambiguously resolve. Use `@PermuteDeclr` explicitly in those cases.
 
 ---
 
@@ -111,7 +128,9 @@ This mirrors the Drools hand-written pattern exactly: `Join5First` has no `.join
 @Target(ElementType.METHOD)
 public @interface PermuteReturn {
     /**
-     * Template expression for the return type class name (e.g., {@code "Step${i+1}"}).
+     * Template expression for the return type. Typically a class name
+     * (e.g., {@code "Step${i+1}"}), but may also be a type variable name
+     * (e.g., {@code "${alpha(i)}"} to return the i-th type parameter).
      * Evaluated against the outer permutation context for each generated class.
      */
     String className();
@@ -130,6 +149,16 @@ public @interface PermuteReturn {
 
     /** Type argument name template (e.g., {@code "T${j}"}). */
     String typeArgName() default "";
+
+    /**
+     * Full type argument list template — a JEXL expression producing the complete
+     * comma-separated type argument list. Use when type args are a mix of fixed values
+     * and growing series (e.g., {@code "DS, ${typeArgList(1, i, 'T')}"}).
+     * Overrides {@code typeArgVarName}/{@code typeArgFrom}/{@code typeArgTo}/{@code typeArgName}
+     * when set. Mutually exclusive with {@code typeArgVarName} (see V6).
+     * See <strong>G4</strong> for the full design and examples.
+     */
+    String typeArgs() default "";
 
     /**
      * Optional JEXL guard expression controlling whether this method is generated
@@ -164,6 +193,8 @@ Use `@PermuteReturn` in these situations — each one should be documented clear
 | **Return type is a non-linear offset** | E.g., `Step${i+2}` (skipping one) — inference always assumes `i+1`. |
 | **Leaf class must reference an external class** | `when="true"` overrides boundary omission to force generation. |
 | **No type arguments needed** | Raw return type — omit `typeArgVarName`. |
+| **Mixed fixed + growing type args** | The `typeArgVarName` loop produces only a uniform series. When some type args are fixed (e.g., `DS`) and others grow (e.g., `T1,...,T${i}`), use `typeArgs="DS, ${typeArgList(1, i, 'T')}"` instead. See G4 for full design. |
+| **Return type is a type variable** | `className="${alpha(i)}"` returns the i-th type parameter (e.g., for typed getters like `getB()` returning `B`). `typeArgVarName` is not applicable in this case. |
 
 ### APT mode template
 
@@ -176,6 +207,8 @@ public class Step1<T1> {
     @PermuteReturn(className="Step${i+1}",
                    typeArgVarName="j", typeArgFrom="1", typeArgTo="${i+1}", typeArgName="T${j}")
     public Object join(@PermuteDeclr(type="Source<T${i+1}>") Object src) { ... }
+    // APT mode: Object sentinels required so the template compiles.
+    // Parameter type inference is not available — @PermuteDeclr must be explicit.
 }
 ```
 
@@ -183,7 +216,12 @@ The processor reads the source text via `getCharContent` (JavaParser), sees `@Pe
 
 ---
 
-## Mechanism 3: `@PermuteDeclr` on Method Parameters
+## Mechanism 3: `@PermuteDeclr` on Method Parameters (Explicit Override)
+
+In inline mode, parameter type inference (Mechanism 1, step 4) handles the common case automatically. `@PermuteDeclr` on a parameter is required when inference does not apply:
+- **APT mode** — template must compile; undeclared type variables not allowed
+- **Non-`T${j}` naming** — e.g., `alpha(j)` naming; inference Condition 2 fails
+- **Partial substitution** — only some type arguments in the parameter type are undeclared
 
 ### Extension
 
@@ -204,11 +242,12 @@ When placed on a method parameter:
 - `name` = `""`: only the type changes, no rename propagation needed
 - `name` = non-empty: type AND name are replaced, rename is propagated through the method body
 
-### Usage
+### Usage (APT mode — inference not available)
 
 ```java
-public Step2<T1, T2> join(
-        @PermuteDeclr(type="Source<T${i+1}>") Source<T2> src) { ... }
+// APT mode: Object is the sentinel type (compiles); @PermuteDeclr provides the actual type
+public Object join(
+        @PermuteDeclr(type="Source<T${i+1}>") Object src) { ... }
 //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  type changes; name "src" stays the same
 ```
 
@@ -221,8 +260,9 @@ For `i=1` → `Source<T2> src`; for `i=2` → `Source<T3> src`; for `i=3` → `S
 | Feature | APT | Maven plugin (inline) |
 |---|---|---|
 | Implicit return type inference | No — template must compile with `Object` sentinel | Yes — template references generated class directly |
+| Implicit parameter type inference | No — template must compile; no undeclared type vars | Yes — inferred from return type's growing tip |
 | `@PermuteReturn` explicit | Yes | Yes (overrides inference) |
-| `@PermuteDeclr` on parameters | Yes (with `Object` sentinel) | Yes (with typed sentinel) |
+| `@PermuteDeclr` on parameters (explicit override) | Yes (required; use `Object` sentinel) | Yes (overrides inference; needed for `alpha(j)` naming) |
 | Boundary omission | Yes (same inference rule) | Yes |
 | Template sentinel return type | `Object` | Actual next class (`Step2<T1, T2>`) |
 
@@ -237,6 +277,7 @@ For `i=1` → `Source<T2> src`; for `i=2` → `Source<T3> src`; for `i=3` → `S
 | **V3** | `@PermuteReturn` `typeArgFrom` evaluates greater than `typeArgTo` | Error | `@PermuteReturn has invalid type argument range: from=N is greater than to=M` |
 | **V4** | Implicit inference Condition 1 holds (return type in generated set) but Condition 2 fails (type args don't follow `T${j}` convention) | Warning | `Return type "Step2" is in the generated class set but its type arguments don't follow the T${j} naming convention — inference skipped. Use @PermuteReturn explicitly to control the return type expansion.` |
 | **V5** | `@PermuteReturn` is present on a method whose sentinel return type is also a generated class (both explicit and inference would apply) | Warning | `@PermuteReturn is present — implicit return type inference is suppressed for this method. The sentinel return type is ignored.` |
+| **V6** | `@PermuteReturn` has both `typeArgs` and `typeArgVarName` set | Error | `@PermuteReturn: typeArgs and typeArgVarName are mutually exclusive — use one or the other` |
 
 All errors follow the project's error reporting standard: attribute-level where possible, element-level minimum.
 
@@ -257,9 +298,9 @@ public class RuleBuilder<CTX> {
     public class Join1First<T1> {
 
         // Return type inferred: Join2First<T1, T2> → Join${i+1}First<T1..T${i+1}>
+        // Parameter type also inferred: T2 in Source<T2> is undeclared → Source<T${i+1}>
         // Omitted automatically on Join5First (the leaf node — no Join6First exists)
-        public Join2First<T1, T2> join(
-                @PermuteDeclr(type="Source<T${i+1}>") Source<T2> source) { ... }
+        public Join2First<T1, T2> join(Source<T2> source) { ... }
 
         public void execute(Action1<CTX, T1> action) { ... }
 
@@ -333,23 +374,36 @@ Documentation of the implicit inference and the leaf-node boundary behaviour is 
 
 ### `@PermuteReturn` Javadoc
 - State that this annotation is **not needed in the common case** — implicit inference handles it when the return type is a generated class following the `T${j}` convention
-- List all four situations where explicit annotation IS required (table from "When to use" section above)
+- Explain **why** the `T${j}` convention is required: the processor identifies the growing tip by finding type variables that are NOT declared on the enclosing class AND match a `T+number` pattern. Single-letter names like `A`, `B`, `C` have no numeric pattern — the processor cannot determine that `B` is the second in a growing series, so inference does not fire.
+- List all situations where explicit annotation IS required (table from "When to use" section above)
 - State clearly: boundary omission applies by default; use `when="true"` to override
+- Note that `alpha(j)` from N4 can be used in `typeArgName` to produce `A, B, C` naming when explicit `@PermuteReturn` is used
 
 ### `@PermuteDeclr` Javadoc
 - Add section: new `PARAMETER` target and optional `name` attribute
 - Note that `name = ""` (default) changes only the type, not the parameter name
+- Note that parameter type inference (no annotation needed) applies in inline mode when the type follows `T${j}` convention — `@PermuteDeclr` on a parameter is the explicit override for APT mode or non-`T${j}` naming
 
 ### README / user guide
 - New section: **Return type narrowing** with the full `Step1`–`Step4` example showing generated output
 - **Prominent callout box:** "The leaf class: why the last generated class has no `join()` method" — explain the boundary inference rule and why it exists. Without this, users will think Permuplate has a bug.
-- Comparison table: implicit inference (inline mode) vs. explicit `@PermuteReturn` (APT or override)
+- **"Choosing your approach" table** — this is load-bearing user guidance; must appear prominently:
+
+  | Goal | Mode | Type param naming | Annotation burden |
+  |---|---|---|---|
+  | Minimum annotations | Inline (Maven plugin) | `T1, T2, T3` (`T${j}`) | Zero — inference handles return type and parameters |
+  | Custom naming (`A, B, C`) | Inline (Maven plugin) | `alpha(j)` via N4 | Explicit `@PermuteReturn` + `@PermuteDeclr` on each affected method |
+  | APT mode (template must compile) | APT | Any | Explicit `@PermuteReturn` + `@PermuteDeclr`, `Object` sentinels required |
+
+- Explain **why** `T${j}` naming enables inference but `A, B, C` does not: the processor pattern-matches on the numeric suffix to identify the growing tip. There is no such pattern in single-letter names.
+- Note that `alpha(j)` produces `A, B, C` output and works fully with explicit `@PermuteReturn` — it only disables *implicit* inference, not the feature itself.
 - Note the `when` attribute escape hatch for hand-written leaf classes
 
 ### CLAUDE.md non-obvious decisions table
 - Add: implicit return type inference conditions (both must hold)
 - Add: boundary omission rule (applies to both implicit and explicit `@PermuteReturn`)
 - Add: leaf node pattern — last class in range has inferred methods omitted; mirrors Drools hand-written pattern
+- Add: `T${j}` naming enables zero-annotation inference; `alpha(j)` or APT mode requires explicit `@PermuteReturn` + `@PermuteDeclr` — the processor needs a numeric pattern to identify the growing tip
 
 ---
 
@@ -360,8 +414,9 @@ New test class `PermuteReturnTest`:
 - **Implicit / basic:** `Step1<T1>` template → `Step1`–`Step4` generated, `Step4` has no `join()`
 - **Implicit / with bounds:** `Step1<T1 extends Comparable<T1>>` → bounds propagate through return type
 - **Implicit / fixed type params survive:** `Step1<T1, R>` where `R` is fixed → `R` passes through in return type, does not expand
-- **Implicit / with `@PermuteDeclr` on parameter:** `Source<T2>` → `Source<T${i+1}>` in each generated class
-- **Explicit `@PermuteReturn` / APT mode:** `Object` sentinel → correct typed return in each generated class
+- **Implicit / parameter type inferred (no `@PermuteDeclr`):** `Source<T2>` in `Step1<T1>` → `Source<T2>` in `Step1`, `Source<T3>` in `Step2`, `Source<T4>` in `Step3` — no annotation on parameter
+- **Implicit / parameter with non-growing type (fixed):** parameter type `String` (no undeclared type vars) → left unchanged across all permutations
+- **Explicit `@PermuteReturn` / APT mode:** `Object` sentinels for both return and parameter → correct typed output in each generated class
 - **Explicit `@PermuteReturn` / `when` override:** boundary omission suppressed; last class has method pointing to external type
 - **Drools-style `T${j}` chain:** `Join1First<T1>`–`Join5First<T1..T5>` with implicit inference; `Join5First` has no `join()`
 - **Drools-style `alpha(j)` chain:** `Join1First<A>`–`Join5First<A..E>` with explicit `@PermuteReturn`; `Join5First` has no `join()` — requires N4 expression functions

@@ -58,6 +58,8 @@ public interface Condition1<T1 extends Comparable<T1>> {
 
 **`@PermuteTypeParam` is not needed in the common case.** Use it only when expanding type parameters *without* a corresponding `@PermuteParam` — typically phantom types for compile-time DSL safety.
 
+`@PermuteTypeParam` also works on **method-level type parameters** (not just class-level). When placed on a method type parameter inside a `@PermuteMethod`-annotated method, it is driven by the `@PermuteMethod` inner variable. See **G4** for the full design of this capability.
+
 ```java
 // Explicit — phantom type, no method parameters to expand
 class Step1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="T${j}") T1> { }

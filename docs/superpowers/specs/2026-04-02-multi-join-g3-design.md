@@ -37,6 +37,8 @@ G3 introduces three new capabilities:
 | `typeArgList(from, to, style)` | N4 extension | JEXL function generating a comma-separated type argument list for use in `@PermuteDeclr.type` strings |
 | Extends/implements expansion | G2 extension | Implicit inference applied to `extends`/`implements` type references (same rules as G2 return type inference, different syntactic position) |
 
+> **G4 extends G3:** `@PermuteMethod` gains an optional `name` attribute for generating methods with distinct names per inner loop value (e.g., `path2`, `path3`, ...). See **G4** for the full design.
+
 All three capabilities compose with G1 (`@PermuteTypeParam`), G2 (`@PermuteReturn`, `@PermuteDeclr`), and N4 (`alpha`, `lower`).
 
 ---
@@ -66,17 +68,51 @@ public @interface PermuteMethod {
      * Inner loop upper bound — expression evaluated against the outer context
      * (e.g., {@code "${max - i}"}). When {@code from > to} after evaluation,
      * no overloads are generated for this permutation (empty range = silent no-op).
+     *
+     * <p>When empty (the default), the upper bound is <strong>inferred</strong>
+     * as {@code @Permute.to - i} from the enclosing class's {@code @Permute}
+     * annotation. This works in both Maven plugin and APT mode when the class
+     * family is self-contained in the same template/source file.
+     *
+     * <p>Set {@code to} explicitly when:
+     * <ul>
+     *   <li>The bound comes from a different class family or template file (Maven
+     *       plugin handles this via the dependency graph; APT requires it always
+     *       for cross-file dependencies)</li>
+     *   <li>Using a non-linear bound (e.g., {@code "${max - i - 1}"})</li>
+     *   <li>APT mode with cross-file dependencies — inference is not available
+     *       across files in APT; use explicit {@code to} as the workaround</li>
+     * </ul>
      */
-    String to();
+    String to() default "";
+
+    /**
+     * Optional method name template (e.g., {@code "path${k}"}). When set, each
+     * generated overload has a distinct name produced by evaluating this expression
+     * with the current inner loop value — e.g., {@code path2()}, {@code path3()}, etc.
+     * When empty (the default), all overloads share the sentinel method's name,
+     * which is the standard pattern for {@code join()} overloads.
+     *
+     * <p>The sentinel method's own name is used only as a template anchor; it does
+     * not appear in the output when {@code name} is set.
+     *
+     * <p>When {@code name} is set and all overloads share the same return type and
+     * parameter types, they become distinct named methods rather than overloads —
+     * no compile conflict occurs even with identical signatures. See G4 for the
+     * full design and the path use case.
+     */
+    String name() default "";
 }
 ```
 
 ### Behaviour
 
-`@PermuteMethod` is placed on a **sentinel method** alongside `@PermuteReturn` and/or `@PermuteDeclr`. For each outer permutation value `i`, the processor evaluates the inner loop `j` from `from` to `to`. For each `(i, j)` pair it generates one overload of the method — the sentinel appears once in the template but produces multiple methods in the output.
+`@PermuteMethod` is placed on a **sentinel method**. For each outer permutation value `i`, the processor evaluates the inner loop `j` from `from` to `to`. For each `(i, j)` pair it generates one overload of the method — the sentinel appears once in the template but produces multiple methods in the output.
 
 - The inner variable `j` is added to the JEXL context and is available in `@PermuteReturn`, `@PermuteDeclr.type`/`name`, and the `@PermuteReturn.when` expression.
-- When `from > to` after evaluation (e.g., i=5, max=5 → `to = 5-5 = 0`), **no overloads are generated** — this is the natural leaf-node handling for the multi-join case.
+- When `to` is omitted, it is **inferred as `@Permute.to - i`** from the enclosing class's `@Permute` annotation. No `strings={"max=N"}` declaration needed.
+- When `from > to` after evaluation (e.g., i=5, @Permute.to=5 → `to = 5-5 = 0`), **no overloads are generated** — this is the natural leaf-node handling for the multi-join case.
+- In inline mode (Maven plugin), `@PermuteReturn` and `@PermuteDeclr` on parameters are also inferred from the template — see "Inference" section below. In APT mode, or when using `alpha(j)` naming, use explicit `@PermuteReturn` and `@PermuteDeclr` as the workaround.
 - `@PermuteReturn`'s boundary omission rule still applies independently: if the evaluated return type class is not in the generated set, that specific overload is omitted. Both mechanisms are complementary.
 
 ### Empty range = leaf node for multi-join
@@ -95,9 +131,41 @@ This is the two-variable equivalent of G2's single-variable boundary omission. W
 
 **Document this prominently.** Users will not expect the leaf class to have no join methods unless told explicitly. The reason (empty range when `i = max`) must be stated clearly in Javadoc and the user guide.
 
-### Composition with `@PermuteReturn` and `@PermuteDeclr`
+### Inference: `@PermuteReturn` and `@PermuteDeclr` not required in the common case
+
+**The key insight (extends G2 parameter inference):** When `@PermuteMethod` provides the `j` context, both the return type and parameter types are fully inferrable from the template. The only annotation required in the common case is `@PermuteMethod`.
+
+The same two conditions from G2 apply, but the growing tip now uses `i+j` instead of `i+1`:
+
+**Condition 1:** The return type class is in the generated set.
+**Condition 2:** The return type's type arguments consist of the class's declared type params (fixed) followed by undeclared type variables (the growing tip).
+
+When both conditions hold with `@PermuteMethod(varName="j")`:
+- Return type class offset becomes `j`: `Join2First` in `Join1Second` → `Join${i+j}First` (at sentinel `j=1`, offset = 1 = j; generalize to j)
+- Growing tip grows by j: type args become `T1..T${i+j}`
+- **`@PermuteReturn` is inferred — no explicit annotation needed**
+
+For parameter types (same undeclared-type-variable insight as G2):
+- Parameter class in the generated set: numeric suffix matching `j` at sentinel → `Join${j}First`
+- Undeclared type vars in parameter = return type's growing tip → expand to `T${i+1}..T${i+j}`
+- **`@PermuteDeclr` is inferred — no explicit annotation needed**
+
+**Common case template — `@PermuteMethod` only:**
 
 ```java
+@PermuteMethod(varName="j", from="1", to="${max - i}")
+public Join2First<T1, T2> join(Join1First<T2> fromJ) { ... }
+```
+
+- `Join2First<T1, T2>`: T1 declared (fixed), T2 undeclared (growing tip). With j: return inferred as `Join${i+j}First<T1,...,T${i+j}>`.
+- `Join1First<T2>`: in generated set, suffix `1` matches `j=1` (sentinel) → `Join${j}First`. T2 is undeclared (same growing tip) → expands to `T${i+1}..T${i+j}`.
+
+Inference is **inline mode only** (same restriction as G2 — APT templates must compile). Use explicit `@PermuteReturn` + `@PermuteDeclr` in APT mode or when using non-`T${j}` naming (e.g., `alpha(j)` — see G2's Drools-style example).
+
+### Composition with `@PermuteReturn` and `@PermuteDeclr` (explicit, when inference does not apply)
+
+```java
+// Required for: APT mode, alpha(j) naming, or any non-T${j} convention
 @PermuteMethod(varName="j", from="1", to="${max - i}")
 @PermuteReturn(className="Join${i+j}First",
                typeArgVarName="k", typeArgFrom="1", typeArgTo="${i+j}", typeArgName="T${k}")
@@ -117,16 +185,32 @@ For `Join4Second` (i=4), max=5:
 
 For `Join5Second` (i=5), max=5: no overloads (empty range).
 
-### `max` variable
+### Dependency Graph and Generation Order
 
-The upper bound `max` must be available in the JEXL context. Declare it via the `strings` attribute on `@Permute`:
+Both the Maven plugin and the APT processor use the same two-pass strategy:
+
+**Pass 1 — Scan:** Before generating any class, read every `@Permute`-annotated template using JavaParser and build the **complete generated class set**. Inspect type references in each template (return types, parameter types, extends/implements clauses) to determine which templates depend on classes generated by other templates.
+
+**Pass 2 — Generate:** Process templates in topological dependency order — so `Callable${j}` and `Tuple${j}` templates are fully resolved before any `Join${i}Second` template that references them. `@PermuteMethod.to` inference has access to the full generated set regardless of which file a class family lives in. Cycles produce an error (see M7).
+
+**How each mode performs the scan:**
+
+- **Maven plugin:** Scans all files under `src/main/permuplate/` explicitly. Sees every template regardless of compilation boundaries.
+- **APT:** Uses `RoundEnvironment.getElementsAnnotatedWith(Permute.class)` to collect all `@Permute`-annotated elements in the current compilation round, then reads each via `getCharContent` + JavaParser. Sees all templates compiled in the same `javac` invocation.
+
+**The one remaining limitation in APT:** If templates are split across separate `javac` invocations (e.g., two independent Maven modules each with their own template files that cross-reference each other), APT cannot see across compilation boundaries. The Maven plugin can. This is unusual — within a single module all templates are compiled together. When it does arise, explicit `to` + `strings={"max=N"}` is the workaround:
 
 ```java
+// Workaround for cross-compilation-boundary dependencies in APT:
 @Permute(varName="i", from=1, to=5, className="Join${i}Second",
-         strings={"max=5"}, inline=true, keepTemplate=true)
+         strings={"max=5"})
+public class Join1Second<...> {
+    @PermuteMethod(varName="j", from="1", to="${max - i}")
+    public Join2First<T1, T2> join(Join1First<T2> fromJ) { ... }
+}
 ```
 
-The value of `max` must match `to`. This is a **user responsibility** — Permuplate does not validate that `strings.max == @Permute.to`. Document this constraint clearly.
+For the common case — all templates in one module — both modes behave identically.
 
 ---
 
@@ -241,18 +325,17 @@ public class Join1First<T1> extends Join1Second<T1> { ... }
 // src/main/permuplate/.../JoinChain.java
 
 // ── Join${i}Second family ──────────────────────────────────────────────────
+// No strings={"max=N"} needed — @PermuteMethod.to is inferred as @Permute.to - i = 5 - i.
 @Permute(varName="i", from=1, to=5, className="Join${i}Second",
-         strings={"max=5"}, inline=true, keepTemplate=true)
+         inline=true, keepTemplate=true)
 public class Join1Second<@PermuteTypeParam(varName="k", from="1", to="${i}", name="T${k}") T1> {
 
-    // Generates one join() overload per valid j value.
-    // Empty range when i=max → Join5Second has no join() methods (the leaf).
-    @PermuteMethod(varName="j", from="1", to="${max - i}")
-    @PermuteReturn(className="Join${i+j}First",
-                   typeArgVarName="k", typeArgFrom="1", typeArgTo="${i+j}", typeArgName="T${k}")
-    public Join2First<T1, T2> join(
-            @PermuteDeclr(type="Join${j}First<${typeArgList(i+1, i+j, 'T')}>")
-            Join1First<T2> fromJ) { ... }
+    // Return type and parameter type are fully inferred — no @PermuteReturn or @PermuteDeclr needed.
+    // to is inferred as @Permute.to - i (5 - i): Join5Second gets 0 overloads (the leaf).
+    // Join2First<T1,T2> → Join${i+j}First<T1..T${i+j}> (return inferred, G3 inference).
+    // Join1First<T2>: suffix 1=j at sentinel → Join${j}First; T2 is growing tip → T${i+1}..T${i+j}.
+    @PermuteMethod(varName="j")
+    public Join2First<T1, T2> join(Join1First<T2> fromJ) { ... }
 
     public void execute(Consumer1<T1> action) { ... }
 }
@@ -299,19 +382,35 @@ public class Join2First<T1, T2> extends Join2Second<T1, T2> {
 }
 ```
 
-### With `alpha(j)` naming (explicit `@PermuteReturn` required — N4)
+### With `alpha(j)` naming (explicit `@PermuteReturn` and `@PermuteDeclr` required — N4)
+
+Inference does **not** apply here: `alpha(j)` naming fails G2 Condition 2 (requires `T${j}` convention). Both `@PermuteReturn` and `@PermuteDeclr` must be explicit. This is also the pattern to use in **APT mode** regardless of naming.
+
+`@PermuteMethod.to` can still be omitted (inferred from `@Permute.to - i`) in Maven plugin inline mode. In APT mode, set it explicitly via `strings={"max=N"}`:
 
 ```java
-@Permute(varName="i", from=1, to=5, className="Join${i}Second",
-         strings={"max=5"}, inline=true, keepTemplate=true)
+// Maven plugin inline mode — alpha naming, to inferred, @PermuteReturn/@PermuteDeclr explicit:
+@Permute(varName="i", from=1, to=5, className="Join${i}Second", inline=true, keepTemplate=true)
 public class Join1Second<@PermuteTypeParam(varName="k", from="1", to="${i}", name="${alpha(k)}") A> {
 
-    @PermuteMethod(varName="j", from="1", to="${max - i}")
+    @PermuteMethod(varName="j")   // to inferred as 5 - i
     @PermuteReturn(className="Join${i+j}First",
                    typeArgVarName="k", typeArgFrom="1", typeArgTo="${i+j}", typeArgName="${alpha(k)}")
     public Join2First<A, B> join(
             @PermuteDeclr(type="Join${j}First<${typeArgList(i+1, i+j, 'alpha')}>")
             Join1First<B> fromJ) { ... }
+}
+
+// APT mode — all explicit (to, @PermuteReturn, @PermuteDeclr):
+@Permute(varName="i", from=1, to=5, className="Join${i}Second",
+         strings={"max=5"})   // max declared explicitly; APT cannot infer cross-file bounds
+public class Join1Second<@PermuteTypeParam(varName="k", from="1", to="${i}", name="${alpha(k)}") A> {
+
+    @PermuteMethod(varName="j", from="1", to="${max - i}")
+    @PermuteReturn(className="Join${i+j}First",
+                   typeArgVarName="k", typeArgFrom="1", typeArgTo="${i+j}", typeArgName="${alpha(k)}")
+    public Object join(
+            @PermuteDeclr(type="Join${j}First<${typeArgList(i+1, i+j, 'alpha')}>") Object fromJ) { ... }
 }
 ```
 
@@ -338,10 +437,13 @@ G3 builds directly on G1 (for type parameter expansion on the class declaration)
 | Rule | Condition | Severity | Message |
 |---|---|---|---|
 | **M1** | `@PermuteMethod` on a method outside a `@Permute`-annotated type | Error | `@PermuteMethod found outside a @Permute-annotated type` |
-| **M2** | `@PermuteMethod` present but no `@PermuteReturn` — all generated overloads would have identical signatures | Warning | `@PermuteMethod without @PermuteReturn: all generated overloads have the same signature — this will produce a compile error` |
+| **M2** | `@PermuteMethod` present, `name` not set, no `@PermuteReturn`, and return type / parameter inference does not apply — all generated overloads would have identical signatures | Warning | `@PermuteMethod without @PermuteReturn: all generated overloads have the same signature — this will produce a compile error. Add @PermuteReturn, set name, or use T${j} naming to trigger inference.` |
 | **M3** | `typeArgList` called with unknown style string | Error (at generation time) | `typeArgList: unknown style "X" — use "T", "alpha", or "lower"` |
 | **M4** | `@PermuteExtends` on a class that is not `@Permute`-annotated | Error | `@PermuteExtends found outside a @Permute-annotated type` |
 | **M5** | `strings` declares `max` with a value that doesn't match `@Permute.to` | Warning | `strings key "max" value N does not match @Permute to=M — boundary expression "${max - i}" will be incorrect` |
+| **M6** | `@PermuteMethod.to` is omitted and a referenced class family is not visible in the current scan (cross-compilation-boundary dependency in APT, or a missing template file in Maven) | Error | `@PermuteMethod: cannot infer upper bound — class family matching the parameter type is not in the generated set visible to this processor invocation. Set to explicitly, e.g. to="${max - i}" with strings={"max=N"}.` |
+| **M7** | Dependency graph cycle detected | Error | `Circular dependency detected: [Template A] → [Template B] → [Template A]. Restructure templates to eliminate the cycle.` — applies to both APT (within a compilation round) and Maven plugin (across all template files) |
+| **M8** | `@PermuteMethod.name` evaluates to the same string for two different inner loop values | Warning | `@PermuteMethod name="${name}" produces duplicate method name "${evaluated}" for k=N and k=M — overloads with the same name and signature will produce a compile error` |
 
 ---
 
@@ -351,7 +453,9 @@ G3 builds directly on G1 (for type parameter expansion on the class declaration)
 - Explain that it generates **overloads** (multiple methods per class), not variants of the class
 - State clearly that an empty range (from > to) silently generates **no methods** — this is the leaf-node mechanism
 - Document the two-variable context (outer `i`, inner `j`) and that both are available in `@PermuteReturn`, `@PermuteDeclr`, and `when`
-- Explain the `max` pattern: declare via `strings={"max=N"}` matching `@Permute.to`
+- **`to` inference:** when omitted, `to` is inferred from the complete generated class set, which both APT and Maven plugin build via a first-pass scan before generating anything. Works for all templates visible in the current invocation (same module for APT, all template files for Maven plugin).
+- **Cross-module limitation (APT only):** If templates in separate Maven modules cross-reference each other, APT cannot see across module boundaries. Use explicit `to` with `strings={"max=N"}` in that case. Maven plugin handles this automatically. Document this as the one remaining gap — explicit annotations are the bridge.
+- Note that `@PermuteReturn` and `@PermuteDeclr` on the method are also inferred in Maven plugin inline mode (T${j} naming) — explicit annotations are the APT workaround and the path for `alpha(j)` naming
 
 ### `typeArgList` Javadoc
 - Document all three styles (`"T"`, `"alpha"`, `"lower"`) with examples
@@ -366,12 +470,27 @@ G3 builds directly on G1 (for type parameter expansion on the class declaration)
 - New section: **Multi-join permutation** — the full Drools join chain as the worked example
 - **Callout box:** "The leaf class in multi-join: why `Join5Second` has no `join()` methods" — the empty range rule is subtle
 - Explain the G1 → G2 → G3 progression: class type params, single return narrowing, multi-overload generation
-- The `strings={"max=N"}` pattern for expressing the maximum arity as a JEXL variable
+- **APT vs Maven plugin table** — for every G3 feature, clearly state which mode supports it and what the explicit annotation workaround is for the one remaining limitation:
+
+  | Feature | Maven plugin (inline) | APT |
+  |---|---|---|
+  | Dependency graph + topological ordering | ✓ across all template files in `src/main/permuplate/` | ✓ across all `@Permute` elements in the current compilation round |
+  | Cycle detection | ✓ error | ✓ error |
+  | `@PermuteMethod.to` inferred from same-module generated classes | ✓ | ✓ |
+  | `@PermuteMethod.to` inferred across separate compilation modules | ✓ (Maven scans all files) | ✗ — use explicit `to` + `strings={"max=N"}` |
+  | `@PermuteReturn` inferred (T${j} naming) | ✓ | ✗ — use explicit `@PermuteReturn` |
+  | `@PermuteDeclr` on parameters inferred (T${j} naming) | ✓ | ✗ — use explicit `@PermuteDeclr`, `Object` sentinel |
+  | `alpha(j)` naming | Explicit `@PermuteReturn` + `@PermuteDeclr` | Explicit `@PermuteReturn` + `@PermuteDeclr` |
+
+- Note that `strings={"max=N"}` is only needed for cross-module dependencies in APT — within a single module, both modes infer automatically
+- The goal is maximum parity: the annotation API is identical in both modes; explicit annotations are the bridge for the one case (cross-module) where APT cannot match Maven
+- Show both the minimal (Maven inline, T${j}) and fully-explicit (APT or alpha) forms of the Drools template side by side
 
 ### CLAUDE.md non-obvious decisions table
 - Add: `@PermuteMethod` empty range = no-op (silent, not an error) — leaf-node mechanism for multi-join
 - Add: `typeArgList(from, to, style)` returns `""` when `from > to` (arity-1 parameter types)
-- Add: `strings={"max=N"}` must match `@Permute.to` — not validated automatically
+- Add: `@PermuteMethod.to` is optional — inferred as `@Permute.to - i`; explicit `to` + `strings={"max=N"}` is the APT workaround for cross-file bounds
+- Add: Both APT and Maven plugin do a two-pass scan: first pass builds complete generated class set + dependency graph, second pass generates in topological order. APT uses `RoundEnvironment.getElementsAnnotatedWith` + JavaParser; Maven plugin scans `src/main/permuplate/`. The one remaining APT gap is cross-module (separate `javac` invocations) — explicit annotations are the bridge.
 
 ---
 
@@ -379,9 +498,11 @@ G3 builds directly on G1 (for type parameter expansion on the class declaration)
 
 New test class `PermuteMethodTest`:
 
-- **Basic 2×2:** `@PermuteMethod(to="${max-i}")` with max=3 → `Join1Second` gets 2 overloads, `Join2Second` gets 1, `Join3Second` gets 0 (leaf)
-- **Full Drools chain `T${j}` naming:** `Join1Second`–`Join5Second` with correct overloads; `Join5Second` has no `join()`; `Join1First extends Join1Second` extends clause expanded correctly
-- **Full Drools chain `alpha(j)` naming:** same but with `alpha`/`typeArgList(..., 'alpha')`; requires explicit `@PermuteReturn` and `@PermuteExtends`
+- **Basic 2×2 (inferred to):** `@PermuteMethod(varName="j")` with `@Permute(to=3)` → `to` inferred as `3-i`; `Join1Second` gets 2 overloads, `Join2Second` gets 1, `Join3Second` gets 0 (leaf)
+- **Basic 2×2 (explicit to):** `@PermuteMethod(to="${max-i}")` with `strings={"max=3"}` → same result; explicit form for APT mode
+- **Inference / minimal form:** `@PermuteMethod` only — no `@PermuteReturn` or `@PermuteDeclr`; return type and parameter type both inferred correctly for all (i, j) combinations; `Join5Second` has no `join()`
+- **Full Drools chain `T${j}` naming (inferred):** `Join1Second`–`Join5Second` with correct overloads using minimal annotation form; `Join5Second` has no `join()`; `Join1First extends Join1Second` extends clause expanded correctly
+- **Full Drools chain `alpha(j)` naming (explicit):** same but with `alpha`/`typeArgList(..., 'alpha')`; requires explicit `@PermuteReturn` and `@PermuteExtends` — inference does not apply
 - **`typeArgList` unit:** `typeArgList(2, 4, "T")` → `"T2, T3, T4"`, `typeArgList(2, 2, "alpha")` → `"B"`, `typeArgList(3, 2, "T")` → `""` (empty range)
 - **Extends clause implicit expansion:** `Join1First<T1> extends Join1Second<T1>` → `Join3First<T1,T2,T3> extends Join3Second<T1,T2,T3>`
 - **`@PermuteExtends` explicit:** non-standard naming; confirms correct extends clause in each generated class

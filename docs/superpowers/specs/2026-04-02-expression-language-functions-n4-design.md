@@ -18,14 +18,15 @@ This forces users into the `T${j}` naming convention even when their domain conv
 
 ## Design
 
-Two built-in functions are registered in `EvaluationContext` and available in **every JEXL expression** throughout Permuplate:
+Three built-in functions are registered in `EvaluationContext` and available in **every JEXL expression** throughout Permuplate:
 
-| Function | Description | Range | Examples |
+| Function | Signature | Description | Range / Notes |
 |---|---|---|---|
-| `alpha(n)` | Integer → uppercase letter, 1-indexed | 1–26 | `alpha(1)` → `"A"`, `alpha(2)` → `"B"`, `alpha(26)` → `"Z"` |
-| `lower(n)` | Integer → lowercase letter, 1-indexed | 1–26 | `lower(1)` → `"a"`, `lower(2)` → `"b"`, `lower(26)` → `"z"` |
+| `alpha(n)` | `alpha(int) → String` | Integer → uppercase letter, 1-indexed | 1–26; `alpha(1)`→`"A"`, `alpha(26)`→`"Z"` |
+| `lower(n)` | `lower(int) → String` | Integer → lowercase letter, 1-indexed | 1–26; `lower(1)`→`"a"`, `lower(26)`→`"z"` |
+| `typeArgList(from, to, style)` | `typeArgList(int, int, String) → String` | Comma-separated type argument list | `from > to` → `""`; styles: `"T"`, `"alpha"`, `"lower"` |
 
-Functions are available as top-level names (no namespace prefix). Values outside 1–26 throw `IllegalArgumentException` at generation time with a clear message: `alpha(n): n must be between 1 and 26, got N`.
+Functions are available as top-level names (no namespace prefix). Values outside 1–26 throw `IllegalArgumentException` at generation time. `typeArgList` throws on unknown style.
 
 ### Availability
 
@@ -35,7 +36,9 @@ Available in all attributes evaluated by `EvaluationContext.evaluate()` and `Eva
 - `@PermuteDeclr.type`, `@PermuteDeclr.name`
 - `@PermuteParam.type`, `@PermuteParam.name`, `@PermuteParam.from`, `@PermuteParam.to`
 - `@PermuteTypeParam.name`, `@PermuteTypeParam.from`, `@PermuteTypeParam.to` (G1)
-- `@PermuteReturn.className`, `@PermuteReturn.typeArgName`, `@PermuteReturn.typeArgFrom`, `@PermuteReturn.typeArgTo` (G2)
+- `@PermuteReturn.className`, `@PermuteReturn.typeArgName`, `@PermuteReturn.typeArgFrom`, `@PermuteReturn.typeArgTo`, `@PermuteReturn.typeArgs` (G2/G4)
+- `@PermuteMethod.name`, `@PermuteMethod.to`, `@PermuteMethod.from` (G3/G4)
+- `@PermuteExtends` attributes (G3)
 
 ### Implementation
 
@@ -55,6 +58,22 @@ public static final class PermuplateStringFunctions {
             throw new IllegalArgumentException(
                 "lower(n): n must be between 1 and 26, got " + n);
         return String.valueOf((char) ('a' + n - 1));
+    }
+
+    public static String typeArgList(int from, int to, String style) {
+        if (from > to) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int k = from; k <= to; k++) {
+            if (k > from) sb.append(", ");
+            switch (style) {
+                case "T":     sb.append("T").append(k); break;
+                case "alpha": sb.append((char)('A' + k - 1)); break;
+                case "lower": sb.append((char)('a' + k - 1)); break;
+                default: throw new IllegalArgumentException(
+                    "typeArgList: unknown style \"" + style + "\" — use \"T\", \"alpha\", or \"lower\"");
+            }
+        }
+        return sb.toString();
     }
 }
 ```
@@ -144,6 +163,12 @@ New test class `ExpressionFunctionsTest`:
 - **`lower` in `@PermuteParam.name`:** `name="fact${lower(j)}"` → `facta`, `factb`, `factc`
 - **`alpha` in `@PermuteTypeParam.name`:** `Tuple1<A>` → `Tuple4<A, B, C, D>`
 - **`alpha` in `@PermuteReturn.typeArgName`:** return type type args `A, B, C` from `${alpha(j)}`
+- **`typeArgList` / "T" style:** `typeArgList(2, 4, "T")` → `"T2, T3, T4"`
+- **`typeArgList` / "alpha" style:** `typeArgList(2, 4, "alpha")` → `"B, C, D"`
+- **`typeArgList` / "lower" style:** `typeArgList(2, 4, "lower")` → `"b, c, d"`
+- **`typeArgList` / empty range:** `typeArgList(3, 2, "T")` → `""` (from > to)
+- **`typeArgList` in `@PermuteReturn.typeArgs`:** `typeArgs="DS, ${typeArgList(1, i, 'T')}"` → `"DS, T1"` for i=1, `"DS, T1, T2"` for i=2
+- **`typeArgList` unknown style:** `typeArgList(1, 3, "X")` → `IllegalArgumentException` at generation time
 - **Full Drools chain:** `Join1First<A>` → `Join5First<A, B, C, D, E>`; `Join5First` has no `join()`
 
 ---
@@ -151,16 +176,22 @@ New test class `ExpressionFunctionsTest`:
 ## Documentation
 
 ### `EvaluationContext` Javadoc
-- Document `PermuplateStringFunctions` with both functions: signature, parameter range, examples, and error condition
-- State that both functions are available in all string attributes throughout Permuplate
+- Document `PermuplateStringFunctions` with all three functions: signature, parameter range, examples, and error conditions
+- `typeArgList`: document all three styles with examples; document `from > to` → `""` behaviour; show in combination with `@PermuteReturn.typeArgs` for mixed fixed+growing type arg lists
+- State that all functions are available in all string attributes throughout Permuplate
 
 ### README
 - New subsection in the expression language / advanced section: **Built-in expression functions**
-- Table: `alpha(n)`, `lower(n)` — description and examples
-- Reference to the G2 Drools example as the canonical use case
+- Table: `alpha(n)`, `lower(n)`, `typeArgList(from, to, style)` — description and examples for all three
+- **Interaction with implicit inference (critical user guidance):** `alpha(j)` and `lower(j)` produce letter-based names (`A, B, C`) that do **not** trigger implicit return type inference (G2 Condition 2 requires the `T${j}` numeric convention). This does not mean `alpha(j)` doesn't work — it works fully with explicit `@PermuteReturn` and `@PermuteDeclr`. The tradeoff:
+  - `T${j}` naming → implicit inference fires → zero annotations beyond `@Permute` (inline mode)
+  - `alpha(j)` naming → inference does not fire → explicit `@PermuteReturn` + `@PermuteDeclr` required
+- Cross-reference to the G2 "Choosing your approach" table so users can see the full decision matrix in one place
+- Note that `alpha(j)` **can** be used in `@PermuteReturn.typeArgName`, `@PermuteTypeParam.name`, and all other string attributes — the restriction is only on *implicit* inference, not on expression function usage
 
 ### CLAUDE.md non-obvious decisions table
 - Add: `alpha(n)` and `lower(n)` are top-level JEXL functions (registered via empty-string namespace key); range 1–26; out-of-range throws at generation time, not validation time
+- Add: `alpha(j)` in type parameter names disables implicit return type and parameter inference (G2 Condition 2 requires `T${j}` numeric pattern); users must use explicit `@PermuteReturn` + `@PermuteDeclr` when using letter-based naming
 
 ---
 
@@ -168,7 +199,7 @@ New test class `ExpressionFunctionsTest`:
 
 | File | Change |
 |---|---|
-| `permuplate-core/src/main/java/.../EvaluationContext.java` | Add `PermuplateStringFunctions` class; register via JEXL `namespaces` |
-| `permuplate-tests/src/test/java/.../ExpressionFunctionsTest.java` | New test class |
+| `permuplate-core/src/main/java/.../EvaluationContext.java` | Add `PermuplateStringFunctions` class with `alpha`, `lower`, `typeArgList`; register via JEXL `namespaces` |
+| `permuplate-tests/src/test/java/.../ExpressionFunctionsTest.java` | New test class (covers all three functions) |
 | `README.md` | Built-in expression functions section |
 | `CLAUDE.md` | Non-obvious decisions entry |
