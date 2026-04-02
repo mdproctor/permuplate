@@ -106,6 +106,13 @@ public class InlineGenerator {
             // Skip methods that had explicit @PermuteReturn (they were just processed above)
             applyImplicitInference(generated, ctx, allGeneratedNames, explicitReturnMethods);
 
+            // Extends/implements clause expansion (Task 5)
+            int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
+            int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
+            if (templateEmbeddedNum >= 0 && currentEmbeddedNum >= 0) {
+                applyExtendsExpansion(generated, templateClassName, templateEmbeddedNum, currentEmbeddedNum);
+            }
+
             // Strip @Permute
             generated.getAnnotations().removeIf(a -> {
                 String n = a.getNameAsString();
@@ -380,6 +387,125 @@ public class InlineGenerator {
             end++;
         int num = Integer.parseInt(name.substring(start, end));
         return name.substring(0, start) + (num + offset) + name.substring(end);
+    }
+
+    /**
+     * Expands extends/implements clauses whose base class name carries the same
+     * first embedded number as the template class (e.g. {@code Join1Second} on template
+     * {@code Join1First}, both having embedded number {@code 1}).
+     *
+     * <p>
+     * Expansion rule (implicit): replace the embedded number in the extends base
+     * class name with {@code (currentEmbeddedNum + 1)}, and expand the type
+     * argument list to {@code T1, T2, ..., T(currentEmbeddedNum + 1)}.
+     *
+     * <p>
+     * The expansion fires only when the extends base class first embedded number
+     * equals the template class first embedded number. Classes whose name has no
+     * embedded number (e.g. {@code BaseStep}) are left unchanged.
+     *
+     * @param classDecl the generated class being processed
+     * @param templateName the name of the template class (e.g. "Join1First")
+     * @param templateEmbeddedNum the first embedded number of the template class (e.g. 1 for Join1First)
+     * @param currentEmbeddedNum the first embedded number of the generated class (e.g. 2 for Join2First)
+     */
+    private static void applyExtendsExpansion(ClassOrInterfaceDeclaration classDecl,
+            String templateName,
+            int templateEmbeddedNum,
+            int currentEmbeddedNum) {
+
+        String templateNamePrefix = prefixBeforeFirstDigit(templateName);
+        int newNum = currentEmbeddedNum + 1;
+
+        com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> extended = classDecl
+                .getExtendedTypes();
+        for (int idx = 0; idx < extended.size(); idx++) {
+            com.github.javaparser.ast.type.ClassOrInterfaceType ext = extended.get(idx);
+            String baseName = ext.getNameAsString();
+
+            // Guard: only expand if the base class shares the same prefix-before-digit
+            // as the template class. This prevents incorrectly expanding third-party
+            // classes (e.g. External1Lib) that happen to share the template's embedded digit.
+            if (!prefixBeforeFirstDigit(baseName).equals(templateNamePrefix))
+                continue;
+
+            // Only expand if extends base class has same first embedded number as the template
+            int extNum = firstEmbeddedNumber(baseName);
+            if (extNum < 0 || extNum != templateEmbeddedNum)
+                continue;
+
+            // The extends type args must be a T+number sequence (the growing tip pattern)
+            java.util.Optional<com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.Type>> typeArgsOpt = ext
+                    .getTypeArguments();
+            if (typeArgsOpt.isEmpty() || typeArgsOpt.get().isEmpty())
+                continue;
+
+            List<String> extArgNames = typeArgsOpt.get().stream()
+                    .map(com.github.javaparser.ast.type.Type::asString)
+                    .collect(java.util.stream.Collectors.toList());
+
+            // Verify the type args are all T+number vars (the growing tip pattern)
+            boolean allTNumber = extArgNames.stream().allMatch(InlineGenerator::isTNumberVar);
+            if (!allTNumber)
+                continue;
+
+            // Build new base class name: replace embedded number with newNum
+            String newBaseName = replaceFirstEmbeddedNumber(baseName, newNum);
+
+            // Build new type args: T1..T(newNum)
+            StringBuilder typeArgsSb = new StringBuilder();
+            for (int t = 1; t <= newNum; t++) {
+                if (t > 1)
+                    typeArgsSb.append(", ");
+                typeArgsSb.append("T").append(t);
+            }
+            String newExtStr = newBaseName + "<" + typeArgsSb + ">";
+            try {
+                extended.set(idx, StaticJavaParser.parseClassOrInterfaceType(newExtStr));
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /**
+     * Returns the substring of {@code name} up to (but not including) its first digit.
+     * E.g. {@code "Join1Second"} → {@code "Join"}, {@code "BaseStep"} → {@code "BaseStep"}.
+     */
+    private static String prefixBeforeFirstDigit(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i)))
+                return name.substring(0, i);
+        }
+        return name;
+    }
+
+    /** Returns the first contiguous run of digits in a name as an integer, or -1 if none. */
+    private static int firstEmbeddedNumber(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i))) {
+                int end = i;
+                while (end < name.length() && Character.isDigit(name.charAt(end)))
+                    end++;
+                try {
+                    return Integer.parseInt(name.substring(i, end));
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        return -1;
+    }
+
+    /** Replaces the first contiguous run of digits in {@code name} with {@code newNum}. */
+    private static String replaceFirstEmbeddedNumber(String name, int newNum) {
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i))) {
+                int end = i;
+                while (end < name.length() && Character.isDigit(name.charAt(end)))
+                    end++;
+                return name.substring(0, i) + newNum + name.substring(end);
+            }
+        }
+        return name; // no digits found — return unchanged
     }
 
     /**

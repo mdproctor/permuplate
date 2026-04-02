@@ -141,8 +141,10 @@ public class PermuteMethodTest {
 
     @Test
     public void testAptExplicitPermuteMethod() {
+        // Template is Apt0Second (not in generated set {Apt1Second, Apt2Second, Apt3Second})
+        // to avoid self-collision when writing the i=1 output file.
         var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.Apt1Second",
+                "io.quarkiverse.permuplate.example.Apt0Second",
                 """
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
@@ -150,21 +152,28 @@ public class PermuteMethodTest {
                         import io.quarkiverse.permuplate.PermuteReturn;
                         @Permute(varName="i", from=1, to=3, className="Apt${i}Second",
                                  strings={"max=3"})
-                        public class Apt1Second {
-                            @PermuteMethod(varName="j", from="1", to="${max - i}")
+                        public class Apt0Second {
+                            @PermuteMethod(varName="j", from="1", to="${max - i}", name="join${j}")
                             @PermuteReturn(className="Apt${i+j}First")
                             public Object join(Object src) { return null; }
                             public void execute() {}
                         }
                         """);
+        // Stub classes for the return types referenced in generated overloads
+        var apt2First = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.Apt2First",
+                "package io.quarkiverse.permuplate.example; public class Apt2First {}");
+        var apt3First = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.Apt3First",
+                "package io.quarkiverse.permuplate.example; public class Apt3First {}");
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new PermuteProcessor())
-                .compile(source);
+                .compile(source, apt2First, apt3First);
 
         assertThat(compilation).succeeded();
 
-        // Apt1Second: j=1..2 → 2 overloads returning Apt2First and Apt3First
+        // Apt1Second (i=1): j=1..2 → 2 overloads returning Apt2First and Apt3First
         String src1 = sourceOf(compilation
                 .generatedSourceFile("io.quarkiverse.permuplate.example.Apt1Second").orElseThrow());
         assertThat(src1).contains("Apt2First");
@@ -172,7 +181,7 @@ public class PermuteMethodTest {
         assertThat(src1).contains("execute()");
         assertThat(src1).doesNotContain("@PermuteMethod");
 
-        // Apt3Second: j=1..0 → 0 overloads (leaf)
+        // Apt3Second (i=3): j=1..0 → 0 overloads (leaf)
         String src3 = sourceOf(compilation
                 .generatedSourceFile("io.quarkiverse.permuplate.example.Apt3Second").orElseThrow());
         assertThat(src3).doesNotContain("join(");

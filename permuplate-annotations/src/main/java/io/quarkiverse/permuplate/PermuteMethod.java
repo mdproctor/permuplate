@@ -39,7 +39,7 @@ import java.lang.annotation.Target;
  * <pre>
  * {@code
  * &#64;PermuteMethod(varName="j", from="1", to="${max - i}")
- * @PermuteReturn(className="Join${i+j}First", ...)
+ * &#64;PermuteReturn(className="Join${i+j}First", ...)
  * public Object join(@PermuteDeclr(type="Join${j}First<...>") Object fromJ) { ... }
  * }
  * </pre>
