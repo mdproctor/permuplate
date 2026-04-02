@@ -214,7 +214,7 @@ Wait — `@Permute` on a method uses `className` for the generated **class**, no
 // → A, B, C, D, E instead of T1, T2, T3, T4, T5
 ```
 
-**Status:** Designed (see `docs/superpowers/specs/2026-04-02-expression-language-functions-n4-design.md`). This is the prerequisite that enables the Drools `A, B, C, D, E` naming pattern with G2's explicit `@PermuteReturn`. Without N4, users are constrained to the `T${j}` naming convention for implicit inference to work.
+**Status: Implemented** — see `docs/superpowers/specs/2026-04-02-expression-language-functions-n4-design.md`
 
 **Why this matters:** N4 is the direct motivator for why `@PermuteReturn` exists as an explicit mechanism rather than relying solely on implicit inference. The Drools use case requires `alpha(j)` naming; explicit `@PermuteReturn` with N4 functions reproduces the hand-written Drools pattern exactly.
 

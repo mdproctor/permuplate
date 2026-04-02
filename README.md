@@ -544,6 +544,32 @@ Note: the template class (`BiCallable1x1`) is named with values outside the gene
 
 ---
 
+## Built-in Expression Functions
+
+Permuplate provides built-in functions available in **every annotation string attribute** (`className`, `type`, `name`, `from`, `to`, etc.) via the `${...}` expression syntax.
+
+| Function | Description | Example |
+|---|---|---|
+| `alpha(n)` | Integer → uppercase letter, 1-indexed (1=A, 26=Z) | `${alpha(j)}` → `A`, `B`, `C` |
+| `lower(n)` | Integer → lowercase letter, 1-indexed (1=a, 26=z) | `${lower(j)}` → `a`, `b`, `c` |
+| `typeArgList(from, to, style)` | Comma-separated type argument list | `${typeArgList(1, i, 'T')}` → `T1, T2, T3` |
+
+**`typeArgList` styles:**
+
+| Style | Output (from=2, to=4) |
+|---|---|
+| `"T"` | `T2, T3, T4` |
+| `"alpha"` | `B, C, D` |
+| `"lower"` | `b, c, d` |
+
+When `from > to`, `typeArgList` returns an empty string — useful for the arity-1 case where no type arguments are needed.
+
+Values outside 1–26 for `alpha(n)` and `lower(n)` throw at generation time with a clear message (e.g., `alpha(n): n must be between 1 and 26, got 27`). `typeArgList` throws at generation time for unknown style values.
+
+**Choosing a naming convention:** Using `T${j}` style (e.g., `T1, T2, T3`) enables implicit return-type and parameter-type inference in Maven plugin inline mode. Using `alpha(j)` style (e.g., `A, B, C`) requires explicit `@PermuteReturn` and `@PermuteDeclr` annotations — but produces single-letter names matching conventions like the Drools DSL.
+
+---
+
 ## Compile-time error messages
 
 Permuplate validates your templates at compile time and reports precise, actionable errors — not raw exceptions. Errors are reported with annotation-attribute precision, so your IDE can navigate directly to the offending value.

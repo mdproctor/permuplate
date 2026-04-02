@@ -85,25 +85,35 @@ public class EvaluationContext {
     }
 
     /**
-     * Helper registered in every JEXL context as {@code __typeArgListStyleError}.
-     * Allows the {@code typeArgList} JEXL lambda to throw {@link IllegalArgumentException}
-     * for unknown styles, since JEXL3 has no native {@code throw} statement.
-     * The method accepts {@code String} so JEXL's uberspect can resolve it without
-     * autoboxing complications, and {@code safe(false)} ensures the exception propagates
+     * Helper registered in every JEXL context as {@code __throwHelper}.
+     * Allows JEXL lambdas to throw {@link IllegalArgumentException} for error conditions,
+     * since JEXL3 has no native {@code throw} statement.
+     * Methods accept {@code String}/{@code int} so JEXL's uberspect can resolve them without
+     * autoboxing complications, and {@code safe(false)} ensures exceptions propagate
      * rather than being silently swallowed.
+     * <ul>
+     * <li>{@link #throwFor(String)} — used by the {@code typeArgList} lambda for unknown styles</li>
+     * <li>{@link #throwOutOfRange(String, int)} — used by the {@code alpha} and {@code lower}
+     * lambdas for out-of-range n</li>
+     * </ul>
      */
-    public static final class TypeArgListStyleError {
+    public static final class JexlThrowHelper {
         public void throwFor(String style) {
             throw new IllegalArgumentException(
                     "typeArgList: unknown style \"" + style + "\" — use \"T\", \"alpha\", or \"lower\"");
         }
+
+        public void throwOutOfRange(String fn, int n) {
+            throw new IllegalArgumentException(
+                    fn + "(n): n must be between 1 and 26, got " + n);
+        }
     }
 
-    private static final TypeArgListStyleError TYPE_ARG_LIST_STYLE_ERROR = new TypeArgListStyleError();
+    private static final JexlThrowHelper JEXL_THROW_HELPER = new JexlThrowHelper();
 
     /**
      * JEXL engine configured with {@code safe(false)} and {@code UNRESTRICTED} permissions
-     * so that Java exceptions thrown by helper methods (e.g. {@link TypeArgListStyleError#throwFor})
+     * so that Java exceptions thrown by helper methods (e.g. {@link JexlThrowHelper#throwFor})
      * propagate as {@link JexlException} rather than being silently swallowed.
      */
     private static final JexlEngine JEXL = new JexlBuilder()
@@ -116,23 +126,26 @@ public class EvaluationContext {
      * JEXL lambda implementing {@code alpha(n)}: maps an integer (1–26) to the
      * corresponding uppercase letter. The lambda is implemented entirely in JEXL3 script
      * to avoid Java–JEXL type-dispatch issues with narrowed integer types.
+     * Out-of-range values call {@code __throwHelper.throwOutOfRange} to raise
+     * {@link IllegalArgumentException} — JEXL3 has no native {@code throw} statement.
      */
     private static final JexlScript JEXL_ALPHA = JEXL.createScript(
-            "function(n) { 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.substring(n - 1, n); }");
+            "function(n) { if (n < 1 || n > 26) { __throwHelper.throwOutOfRange('alpha', n); } 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.substring(n - 1, n); }");
 
     /**
      * JEXL lambda implementing {@code lower(n)}: maps an integer (1–26) to the
-     * corresponding lowercase letter.
+     * corresponding lowercase letter. Out-of-range values call
+     * {@code __throwHelper.throwOutOfRange} to raise {@link IllegalArgumentException}.
      */
     private static final JexlScript JEXL_LOWER = JEXL.createScript(
-            "function(n) { 'abcdefghijklmnopqrstuvwxyz'.substring(n - 1, n); }");
+            "function(n) { if (n < 1 || n > 26) { __throwHelper.throwOutOfRange('lower', n); } 'abcdefghijklmnopqrstuvwxyz'.substring(n - 1, n); }");
 
     /**
      * JEXL lambda implementing {@code typeArgList(from, to, style)}: produces a
      * comma-separated type argument list such as {@code "T2, T3, T4"}.
      *
      * <p>
-     * The {@code else} branch calls {@code __typeArgListStyleError.throwFor(style)} — a Java
+     * The {@code else} branch calls {@code __throwHelper.throwFor(style)} — a Java
      * helper registered in every JEXL context — because JEXL3 has no native {@code throw}
      * statement. With {@code safe(false)}, the {@link IllegalArgumentException} thrown by
      * that helper propagates as a {@link JexlException} rather than being silently swallowed.
@@ -147,10 +160,20 @@ public class EvaluationContext {
                     "    if (style == 'T') result = result + 'T' + k;" +
                     "    else if (style == 'alpha') result = result + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.substring(k - 1, k);" +
                     "    else if (style == 'lower') result = result + 'abcdefghijklmnopqrstuvwxyz'.substring(k - 1, k);" +
-                    "    else __typeArgListStyleError.throwFor(style);" +
+                    "    else __throwHelper.throwFor(style);" +
                     "  }" +
                     "  result;" +
                     "}");
+
+    /**
+     * Static map of all built-in JEXL functions and helpers, merged into every JEXL context.
+     * Built once at class-load time since all entries are static finals that never change.
+     */
+    private static final Map<String, Object> JEXL_FUNCTIONS = Map.of(
+            "alpha", JEXL_ALPHA,
+            "lower", JEXL_LOWER,
+            "typeArgList", JEXL_TYPE_ARG_LIST,
+            "__throwHelper", JEXL_THROW_HELPER);
 
     private final Map<String, Object> variables;
 
@@ -172,17 +195,15 @@ public class EvaluationContext {
     }
 
     /**
-     * Builds a JEXL MapContext from the current variables plus the three built-in functions
+     * Builds a JEXL MapContext from the current variables plus the built-in functions
      * ({@code alpha}, {@code lower}, {@code typeArgList}) pre-loaded as JEXL lambdas,
-     * and the {@code __typeArgListStyleError} helper used by the {@code typeArgList} lambda
-     * to raise {@link IllegalArgumentException} for unknown styles.
+     * and the {@code __throwHelper} used by those lambdas to raise
+     * {@link IllegalArgumentException} for error conditions (unknown style, out-of-range n).
+     * The static {@link #JEXL_FUNCTIONS} map is merged in once per call.
      */
     private MapContext buildJexlContext() {
         Map<String, Object> vars = new HashMap<>(variables);
-        vars.put("alpha", JEXL_ALPHA);
-        vars.put("lower", JEXL_LOWER);
-        vars.put("typeArgList", JEXL_TYPE_ARG_LIST);
-        vars.put("__typeArgListStyleError", TYPE_ARG_LIST_STYLE_ERROR);
+        vars.putAll(JEXL_FUNCTIONS);
         return new MapContext(vars);
     }
 

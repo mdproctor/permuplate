@@ -215,6 +215,30 @@ public class ExpressionFunctionsTest {
     }
 
     // -------------------------------------------------------------------------
+    // End-to-end: alpha out-of-range throws via JEXL path
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testAlphaOutOfRangeInJexlExpression() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.StepZ",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        // from=27: alpha(27) is out of range — should cause generation-time error
+                        @Permute(varName="i", from=27, to=27, className="Step${alpha(i)}")
+                        public class StepZ { }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("alpha");
+    }
+
+    // -------------------------------------------------------------------------
     // Deferred tests — require G1 (@PermuteTypeParam) and G2 (@PermuteReturn)
     // These will be added to this class once the relevant annotations are
     // implemented. Listed here so they are not forgotten:
