@@ -685,6 +685,10 @@ public class PermuteProcessor extends AbstractProcessor {
                     return n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod");
                 });
 
+                // Expand method-level @PermuteTypeParam with the (i,k) inner context
+                io.quarkiverse.permuplate.core.PermuteTypeParamTransformer
+                        .transformMethod(clone, innerCtx, processingEnv.getMessager(), element);
+
                 // Apply @PermuteReturn: evaluate return type (no boundary omission)
                 applyPermuteReturnSimple(clone, innerCtx, element);
 

@@ -224,6 +224,10 @@ public class InlineGenerator {
                 clone.getAnnotations()
                         .removeIf(a -> a.getNameAsString().equals(PM_SIMPLE) || a.getNameAsString().equals(PM_FQ));
 
+                // Expand method-level @PermuteTypeParam with the (i,k) inner context
+                io.quarkiverse.permuplate.core.PermuteTypeParamTransformer
+                        .transformMethod(clone, innerCtx, null, null);
+
                 // Handle explicit @PermuteReturn first; fall through to implicit expansion otherwise.
                 // Use a temporary wrapper class so applyPermuteReturn can operate on it.
                 ClassOrInterfaceDeclaration tmpClass = new ClassOrInterfaceDeclaration();

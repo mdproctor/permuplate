@@ -77,6 +77,87 @@ public class PermuteTypeParamTransformer {
         return expanded;
     }
 
+    /**
+     * Expands method-level type parameters annotated with {@code @PermuteTypeParam}.
+     * Used by {@code applyPermuteMethod()} in both InlineGenerator and PermuteProcessor
+     * to expand method type parameters with the inner {@code (i,k)} context.
+     *
+     * <p>
+     * This is the method-level equivalent of {@link #transform} for class-level type params.
+     * The {@code ctx} must contain the {@code @PermuteMethod} inner variable so expressions
+     * like {@code to="${k-1}"} evaluate correctly.
+     *
+     * <p>
+     * The sentinel type parameter (which had {@code @PermuteTypeParam}) is replaced by
+     * freshly constructed {@link TypeParameter} nodes with no annotations — the annotation
+     * disappears by construction.
+     *
+     * @param method the cloned method declaration (modified in-place)
+     * @param ctx the inner context containing both outer {@code i} and @PermuteMethod {@code k}
+     * @param messager for error reporting; {@code null} in Maven plugin mode
+     * @param element the annotated element; {@code null} in Maven plugin mode
+     * @return names of the sentinel type parameters that were expanded
+     */
+    public static Set<String> transformMethod(MethodDeclaration method,
+            EvaluationContext ctx,
+            Messager messager,
+            Element element) {
+
+        NodeList<TypeParameter> current = method.getTypeParameters();
+        NodeList<TypeParameter> result = new NodeList<>();
+        Set<String> expanded = new HashSet<>();
+
+        for (TypeParameter tp : current) {
+            Optional<NormalAnnotationExpr> ann = findTypeParamAnnotation(tp);
+            if (ann.isEmpty()) {
+                result.add(tp);
+                continue;
+            }
+
+            NormalAnnotationExpr normal = ann.get();
+            String varName = getAttr(normal, "varName");
+            String fromStr = getAttr(normal, "from");
+            String toStr = getAttr(normal, "to");
+            String nameTemplate = getAttr(normal, "name");
+            String sentinelName = tp.getNameAsString();
+
+            // R4: evaluate range
+            int fromVal, toVal;
+            try {
+                fromVal = ctx.evaluateInt(fromStr);
+                toVal = ctx.evaluateInt(toStr);
+            } catch (Exception e) {
+                if (messager != null)
+                    messager.printMessage(Diagnostic.Kind.ERROR,
+                            "@PermuteTypeParam: cannot evaluate range: " + e.getMessage(), element);
+                result.add(tp);
+                continue;
+            }
+            if (fromVal > toVal) {
+                if (messager != null)
+                    messager.printMessage(Diagnostic.Kind.ERROR,
+                            "@PermuteTypeParam has invalid range: from=" + fromVal
+                                    + " is greater than to=" + toVal,
+                            element);
+                result.add(tp);
+                continue;
+            }
+
+            // Expand: generate one TypeParameter per j value.
+            // Note: no R3 prefix check here — for method-level sentinels the placeholder
+            // name (e.g. "A") is arbitrary and need not match the generated names ("T1", "B", …).
+            expanded.add(sentinelName);
+            for (int j = fromVal; j <= toVal; j++) {
+                EvaluationContext innerCtx = ctx.withVariable(varName, j);
+                String newName = innerCtx.evaluate(nameTemplate);
+                result.add(buildTypeParam(newName, tp, sentinelName));
+            }
+        }
+
+        method.setTypeParameters(result);
+        return expanded;
+    }
+
     // -------------------------------------------------------------------------
     // Detection (dry run — finds which type params will expand for R1 check)
     // -------------------------------------------------------------------------
