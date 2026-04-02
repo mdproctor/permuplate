@@ -281,6 +281,11 @@ public class PermuteProcessor extends AbstractProcessor {
         // 5. @PermuteParam — expand parameter list + anchor expansion at call sites
         PermuteParamTransformer.transform(classDecl, ctx, processingEnv.getMessager());
 
+        // Note: @PermuteTypeParam annotations on TypeParameters are NOT in classDecl.getAnnotations()
+        // (which only contains class-level annotations). The PermuteTypeParamTransformer in step 1b
+        // replaces the sentinel TypeParameter with freshly constructed TypeParameters that carry
+        // no annotations — so @PermuteTypeParam disappears by construction. No explicit removal needed.
+
         // 6. Remove @Permute from the class
         classDecl.getAnnotations().removeIf(a -> {
             String name = a.getNameAsString();
