@@ -131,31 +131,19 @@ Note: `methodName` templating (N2) may still be useful for the `path2()`, `path3
 
 ### S1 — `@Permute(inline=true)` on interfaces not tested
 
-**Status:** Implemented and should work, but not explicitly tested.
-
-**The issue:** All existing `inline=true` examples use `class` templates (e.g., `Handlers.Handler1`). The Maven plugin's `InlineGenerator` works on `ClassOrInterfaceDeclaration` which covers both — but a test with an `interface` template has never been written.
-
-**Risk:** Low. The JavaParser AST handles `class` and `interface` uniformly. But there may be edge cases (e.g., interface methods are implicitly abstract, no constructor to rename, modifier handling may differ).
-
-**Action needed:** Add a test or build the RuleInterfaces example (see proposal doc) and confirm it generates correctly.
+**Status: Resolved** — `InlineGenerationTest.testInlineGenerationWithInterfaceTemplate()` verifies that interface templates (abstract methods, no body, no constructor) generate correctly. The JavaParser AST handles `class` and `interface` uniformly with no edge cases.
 
 ---
 
 ### S2 — Two `@Permute(inline=true)` templates in the same parent class
 
-**Status:** Theoretically supported but never tested.
-
-**The issue:** The Maven plugin scans the template file, finds all `@Permute`-annotated members, and processes each. If two nested interfaces in the same parent both have `@Permute(inline=true)`, does the plugin:
-- Process them sequentially and merge into one augmented parent? ✓ (expected)
-- Process them independently and produce two conflicting output files? ✗ (would be a bug)
-
-**Action needed:** Test with the RuleInterfaces example (two templates in one parent).
+**Status: Resolved** — `InlineGenerationTest.testTwoInterfaceTemplatesInSameParent()` verifies sequential processing: the second `InlineGenerator.generate()` call uses the output of the first as its parent CU, correctly merging both families into the same augmented parent. No conflicts.
 
 ---
 
 ### S3 — `PermuteMojo` still uses old `leadingLiteral` prefix check
 
-**Status:** Identified in project-health pass, not yet fixed.
+**Status: Resolved** — `PermuteMojo.generateTopLevel()` now uses `AnnotationStringAlgorithm.matches()` (full substring matching), consistent with the APT processor. Fixed in the N4 implementation cycle.
 
 **The issue:** `PermuteProcessor` (APT) now uses `AnnotationStringAlgorithm.matches()` for the `className` prefix check (full substring matching). `PermuteMojo` still uses the old `leadingLiteral` approach — extracting the text before the first `${` and checking `startsWith`. This means the validation is weaker and inconsistent between the two processing paths.
 
@@ -167,25 +155,13 @@ Note: `methodName` templating (N2) may still be useful for the `path2()`, `path3
 
 ### S4 — `@PermuteParam` with `to="${i}"` generates 0 params when `i=1`
 
-**Status:** Untested edge case.
-
-**The issue:** When using `@PermuteParam(from="1", to="${i}")` and the outer `@Permute` has `from=1`, the inner range is `[1, 1]` — one parameter. But if someone writes `from=0` on the outer loop and `to="${i}"` on the inner, the range would be `[1, 0]` — empty. The `from > to` check fires in the processor... but what does the inner loop do?
-
-**Action needed:** Add a degenerate test for `@PermuteParam` where `to` evaluates to a value less than `from`.
+**Status: Resolved** — `PermuteParamTest.testPermuteParamEmptyRangeRemovesSentinel()` confirms: when `from > to` (e.g. `from="1", to="0"`), the sentinel is removed and the method has 0 parameters. The processor does not error — empty inner range is valid.
 
 ---
 
 ### S5 — The remaining `@Ignore` test in `PrefixValidationTest`
 
-**Status:** Test correctly `@Ignored` but the underlying case is unresolved.
-
-**The issue:** `testAdjacentVariablesOnNonEmptyPrefixAreNotOrphan` validates correctly (no orphan errors) but then fails when JEXL tries to evaluate `${v1}`, `${v2}`, `${v3}` during generation — they are undeclared variables. The test demonstrates the correct validation behaviour but cannot run end-to-end.
-
-**Two possible fixes:**
-- Redesign the test to test validation in isolation (call `AnnotationStringAlgorithm.validate()` directly, not through the full compile-testing pipeline)
-- Declare `v1`, `v2`, `v3` as string constants via `strings = {"v1=prefix", "v2=", "v3=suffix"}` so JEXL can evaluate them
-
-**Action needed:** Redesign the test using one of the approaches above and remove `@Ignore`.
+**Status: Resolved** — `@Ignore` removed. Variables `v1`, `v2`, `v3` declared via `strings={"v1=my", "v2=", "v3=2"}` in `@Permute`, making them available to JEXL at generation time. The rename is a no-op (produces the same name as the sentinel) but compilation succeeds cleanly. 0 skipped tests.
 
 ---
 
@@ -317,11 +293,11 @@ public interface Condition1 {
 
 | # | Item | Type | Effort | Impact |
 |---|------|------|--------|--------|
-| 1 | S3 — Mojo uses old prefix check | Soft gap | Low | Consistency |
-| 2 | S5 — Redesign `@Ignore` test | Soft gap | Low | Test completeness |
-| 3 | N1+S1+S2 — Test inline=true on interfaces + two templates | New pattern + soft gaps | Medium (needs RuleInterfaces example) | Validates real use case |
-| 4 | N3 — Verify @PermuteParam on abstract interface method | New pattern | Low | Needed for N1 |
-| 5 | S4 — Degenerate test for empty @PermuteParam range | Soft gap | Low | Edge case safety |
+| 1 | S3 — Mojo uses old prefix check | **Resolved** | — | Fixed in N4 cycle |
+| 2 | S5 — Redesign `@Ignore` test | **Resolved** | — | `strings={"v1=my",...}` fix |
+| 3 | N1+S1+S2 — Test inline=true on interfaces + two templates | **Resolved** | — | `InlineGenerationTest` tests added |
+| 4 | N3 — Verify @PermuteParam on abstract interface method | **Resolved** | — | `PermuteParamTest` test added |
+| 5 | S4 — Degenerate test for empty @PermuteParam range | **Resolved** | — | `PermuteParamTest` test added |
 | 6 | N4 — Expression language functions | **Implemented** | Low | Prerequisite for G2/G3/G4 Drools examples |
 | 7 | ~~N2 — Method name templating~~ | **Resolved by G4** | — | `@PermuteMethod.name` covers this |
 | 8 | G1 — Generic type parameter arity | **Implemented** | Very high | — |
