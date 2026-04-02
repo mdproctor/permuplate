@@ -36,6 +36,7 @@ import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
 import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 
@@ -266,6 +267,13 @@ public class PermuteProcessor extends AbstractProcessor {
         // Constructor names must match the class name — rename them all to match.
         // JavaParser does not propagate class renames to constructors automatically.
         classDecl.getConstructors().forEach(ctor -> ctor.setName(newClassName));
+
+        // 1b. Expand class type parameters (@PermuteTypeParam — explicit and implicit)
+        // Note: @PermuteTypeParam is on TypeParameters (not the class annotation list).
+        // The transformer replaces each sentinel TypeParameter with j expanded TypeParameters
+        // that carry no annotations — so @PermuteTypeParam disappears by construction.
+        PermuteTypeParamTransformer.transform(classDecl, ctx,
+                processingEnv.getMessager(), typeElement);
 
         // 2, 3 & 4. @PermuteDeclr — fields, constructor params, then for-each vars
         PermuteDeclrTransformer.transform(classDecl, ctx, processingEnv.getMessager());

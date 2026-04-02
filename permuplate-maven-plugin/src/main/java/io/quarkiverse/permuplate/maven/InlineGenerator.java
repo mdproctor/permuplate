@@ -13,6 +13,7 @@ import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
 
 /**
  * Generates an augmented parent {@link CompilationUnit} containing all permuted
@@ -74,6 +75,7 @@ public class InlineGenerator {
             generated.getConstructors().forEach(ctor -> ctor.setName(newClassName));
 
             // Apply transformations (null messager — Maven plugin has no Messager)
+            PermuteTypeParamTransformer.transform(generated, ctx, null, null);
             PermuteDeclrTransformer.transform(generated, ctx, null);
             PermuteParamTransformer.transform(generated, ctx, null);
 
@@ -101,7 +103,8 @@ public class InlineGenerator {
         Set<String> PERMUPLATE_ANNOTATIONS = Set.of(
                 "Permute", "io.quarkiverse.permuplate.Permute",
                 "PermuteDeclr", "io.quarkiverse.permuplate.PermuteDeclr",
-                "PermuteParam", "io.quarkiverse.permuplate.PermuteParam");
+                "PermuteParam", "io.quarkiverse.permuplate.PermuteParam",
+                "PermuteTypeParam", "io.quarkiverse.permuplate.PermuteTypeParam");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
