@@ -278,6 +278,62 @@ public class PermuteReturnTest {
         assertThat(compilation).hadErrorContaining("invalid");
     }
 
+    // =========================================================================
+    // APT mode — explicit @PermuteReturn with alpha(j) naming (A, B, C)
+    // This is the canonical Drools-style use case: single-letter type params
+    // require explicit @PermuteReturn because inference only fires for T+number.
+    // =========================================================================
+
+    /**
+     * @PermuteTypeParam with alpha(j) naming for class type params, combined with
+     * @PermuteReturn using alpha(j) for type argument names. Demonstrates the
+     *                explicit APT path for Drools-style A,B,C conventions, including:
+     *                - Class type params: AlphaStep2&lt;A,B&gt; → AlphaStep3&lt;A,B,C&gt; → AlphaStep4&lt;A,B,C,D&gt;
+     *                - Return type: each step returns the next with one more letter type arg
+     *                - Boundary omission: last class (AlphaStep4) has next() omitted
+     */
+    @Test
+    public void testAptExplicitReturnTypeAlphaNaming() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.AlphaStep1",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteReturn;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        @Permute(varName="i", from=2, to=4, className="AlphaStep${i}")
+                        public class AlphaStep1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="${alpha(j)}") A> {
+                        @PermuteReturn(className="AlphaStep${i+1}")
+                            public Object next() { return null; }
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+
+        // AlphaStep2<A, B>: next() returns raw AlphaStep3
+        String src2 = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.AlphaStep2").orElseThrow());
+        assertThat(src2).contains("AlphaStep2<A, B>");
+        assertThat(src2).contains("AlphaStep3");
+        assertThat(src2).doesNotContain("@PermuteReturn");
+
+        // AlphaStep3<A, B, C>: next() returns raw AlphaStep4
+        String src3 = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.AlphaStep3").orElseThrow());
+        assertThat(src3).contains("AlphaStep3<A, B, C>");
+        assertThat(src3).contains("AlphaStep4");
+
+        // AlphaStep4<A, B, C, D>: next() omitted — AlphaStep5 not in generated set (boundary omission)
+        String src4 = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.AlphaStep4").orElseThrow());
+        assertThat(src4).contains("AlphaStep4<A, B, C, D>");
+        assertThat(src4).doesNotContain("next(");
+    }
+
     @Test
     public void testV6TypeArgsAndTypeArgVarNameBothSet() {
         var source = JavaFileObjects.forSourceString(

@@ -263,6 +263,75 @@ public class PermuteTypeParamTest {
     // Validation: R4 — from > to is invalid
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // Explicit @PermuteTypeParam — alpha(j) naming (A, B, C)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @PermuteTypeParam with alpha(j) naming produces single-letter type parameters
+     *                   (A, B, C) instead of T1, T2, T3. This is the canonical Drools-style convention.
+     *                   Note: alpha naming requires explicit annotations everywhere — it does NOT trigger
+     *                   implicit inference (which requires the T+number pattern).
+     */
+    @Test
+    public void testExplicitExpansionAlphaNaming() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.AlphaCondition1",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        @Permute(varName="i", from=3, to=3, className="AlphaCondition${i}")
+                        public interface AlphaCondition1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="${alpha(j)}") A> {
+                            boolean test(A fact);
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.AlphaCondition3")
+                .orElseThrow());
+        // Sentinel A expanded to A, B, C
+        assertThat(src).contains("AlphaCondition3<A, B, C>");
+        assertThat(src).doesNotContain("@PermuteTypeParam");
+        assertThat(src).doesNotContain("@Permute");
+    }
+
+    /**
+     * Alpha naming with bounds: A extends Comparable&lt;A&gt; propagates correctly to
+     * B extends Comparable&lt;B&gt;, C extends Comparable&lt;C&gt;.
+     */
+    @Test
+    public void testExplicitExpansionAlphaWithBounds() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.SortedAlpha1",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        @Permute(varName="i", from=3, to=3, className="SortedAlpha${i}")
+                        public interface SortedAlpha1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="${alpha(j)}") A extends Comparable<A>> {
+                            boolean test(A fact);
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.quarkiverse.permuplate.example.SortedAlpha3")
+                .orElseThrow());
+        assertThat(src).contains("A extends Comparable<A>");
+        assertThat(src).contains("B extends Comparable<B>");
+        assertThat(src).contains("C extends Comparable<C>");
+    }
+
     @Test
     public void testR4FromGreaterThanTo() {
         var source = JavaFileObjects.forSourceString(
