@@ -277,6 +277,20 @@ public interface Condition1 {
 
 ---
 
+### TODO-4 — Move example tests into example module (test-jar reuse)
+
+**Idea:** `ExampleTest` and `DogFoodingTest` currently live in `permuplate-tests/` but test templates from `permuplate-apt-examples/`. Tests should co-locate with what they test — `permuplate-apt-examples/src/test/java/`.
+
+**The reuse question:** `ExampleTest` depends on `ProcessorTestSupport` (in `permuplate-tests`). Current preference: **reuse via test-jar dependency** rather than copying helpers. Publish `permuplate-tests` as a Maven `test-jar`; `permuplate-apt-examples` depends on it via `<type>test-jar</type>`. If that becomes awkward, revisit copying the small subset of helpers actually needed.
+
+**Why it matters:** Tests in the module they test fail earlier in the build chain and give more precise signal on what broke.
+
+**Work involved:** Add `src/test/java/` to `permuplate-apt-examples`, add test dependencies + test-jar dep to pom.xml, move the two test classes, update `templateSource()` to look in `src/main/java/`, remove duplicate template copies from `permuplate-tests/`.
+
+**Status:** Deferred — reuse approach agreed, no urgency. Revisit when doing a module restructuring pass.
+
+---
+
 ### TODO-3 — `@PermuteDeclr` implicit on fields and for-each variables
 
 **Idea:** When a field's (or for-each variable's) type is a generated class whose numeric suffix matches the outer Permuplate variable value at the template base, infer `@PermuteDeclr` automatically. E.g., `Callable2 c2` in a `Join2` template (i=2) → infer `type="Callable${i}", name="c${i}"`. Only fires when type is in the generated set AND suffix matches — low false-positive risk.
