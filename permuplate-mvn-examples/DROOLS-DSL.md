@@ -178,11 +178,77 @@ join1First.join(existingJoin2First)   // Join2First satisfies Join2Second
 
 `JoinNSecond` acts as the **input contract** for pre-built N-arity structures. This is why `fn()` lives on First — you can only terminate when holding a fully-assembled structure.
 
-### Why Not Phase 1?
+### Phase 2 Status: Implemented
 
-G3 extends clause auto-expansion uses name-prefix + embedded numeric suffix detection (`"Join"` + `"2"` → sibling `"Join2Second"`). Alpha naming (`A, B, C`) has no numeric suffix — G3 cannot locate siblings. Until Permuplate gains alpha-aware G3 expansion, the First/Second split requires either `T${j}` naming (breaking Drools convention) or manual maintenance. Phase 1 defers this as accepted design debt.
+Phase 2 is complete. The First/Second split, END phantom type, and bi-linear join overloads are all live. The G3 alpha expansion blocker was resolved in Phase 11 (2026-04-04). The PermuteMojo multi-template chaining fix was implemented as part of Phase 2.
 
-**When Phase 2 is implemented:** The single `JoinNFirst` family will be split into separate Second and First families. The `join()` parameter type will change from `Function<DS, DataSource<?>>` to the typed `JoinNSecond` supertype. This is a breaking API change that will require test updates.
+---
+
+## Phase 2 Architecture: First/Second Split with END and Bi-Linear Joins
+
+### The END Phantom Type
+
+Every generated `JoinNFirst` and `JoinNSecond` carries `END` — the type of the outer
+builder context that `end()` returns to.
+
+- **Top-level rules** (created via `from()`): `END = Void`, `end()` returns null, never called.
+- **Nested scopes** (Phase 3 `not()`, `exists()`): `END = outer builder type`, `end()`
+  returns the outer builder at its original arity.
+
+**Arity trace through a nested scope (from real Drools pattern):**
+
+```
+.join(persons)         → Join2First<Void,DS,Params3,Person>         arity: 2
+.not()                 → Not2<Join2Second<Void,...>, DS, Params3, Person>
+    .join(misc)        → Join3First<Join2Second<Void,...>, ...>      arity: 3 (inside)
+    .join(libs)        → Join4First<Join2Second<Void,...>, ...>      arity: 4 (inside)
+.end()                 → Join2Second<Void,DS,Params3,Person>         arity: 2 (reset!)
+.fn((a,b,c) -> ...)    Consumer3<Context<DS>,Params3,Person>
+```
+
+The not-scope facts (misc, libs) are NOT added to the outer chain's arity — they only
+constrain which outer tuples are valid. This matches the Rete NegativeExistsNode pattern.
+END was added in Phase 2 (not Phase 3) to avoid a breaking API change later.
+
+### Bi-Linear Joins
+
+`JoinNFirst.join(JoinMSecond<Void,DS,...>)` joins two independent fact chains into a
+combined rule. The right chain executes independently against the same `ctx`; its matched
+tuples are cross-producted with the current chain's tuples. The right chain's internal
+filters apply only within the sub-network — they gate which of its tuples enter the
+cross-product, not which combined tuples pass overall.
+
+This models the Rete bi-linear beta node for **node sharing**: two rules that share a
+common sub-network (e.g., "adult persons with high-balance accounts") can reuse the same
+pre-built chain rather than computing it independently per rule.
+
+```java
+// Pre-build a sub-network: adult persons with high-balance accounts
+var personAccounts = builder.from("pa", ctx -> ctx.persons())
+        .join(ctx -> ctx.accounts())
+        .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0);
+
+// Two rules sharing the same sub-network (Rete node-sharing pattern)
+var rule1 = builder.from("orders", ctx -> ctx.orders())
+        .join(personAccounts)       // Join2Second accepted via JoinNFirst extends JoinNSecond
+        .fn((ctx, a, b, c) -> {});  // a: Order, b: Person, c: Account
+
+var rule2 = builder.from("products", ctx -> ctx.products())
+        .join(personAccounts)
+        .fn((ctx, a, b, c) -> {});  // a: Product, b: Person, c: Account
+```
+
+### Comparison with Real Drools (updated)
+
+| Feature | Real Drools | This Example |
+|---|---|---|
+| END phantom type | ✅ full support | ✅ added in Phase 2 |
+| First extends Second | ✅ | ✅ G3 auto-expands |
+| Typed `join(Function)` | ✅ | ✅ Phase 1.5 |
+| Single-fact `filter()` | ✅ | ✅ Phase 1.5 |
+| Bi-linear `join(JoinNSecond)` | ✅ partial (~3 overloads, 1 commented out) | ✅ complete (15 overloads) |
+| Boundary omission | ❌ manual | ✅ automatic |
+| `not()` / `exists()` scopes | ✅ | Phase 3 (infrastructure ready) |
 
 ---
 
@@ -214,12 +280,15 @@ Sequential join chain: `from → join → filter → fn`
 | **G2** Boundary omission | `Join6First` — leaf node, `join()` omitted since `Join7First` not in generated set |
 | **N4** `typeArgList()` | `filter()` and `fn()` parameter types — `Predicate${i+1}<DS, ${typeArgList(1,i,'alpha')}>` |
 
-### Phase 2 (future)
-Multi-step joins + First/Second split
+### Phase 2 (implemented)
+Multi-step bi-linear joins + First/Second split + END phantom type
 
-- G3 extends expansion — requires either `T${j}` naming or alpha-aware G3 improvement
-- `@PermuteMethod` with j>1 on `JoinNSecond` — overloads that accept `JoinNSecond` parameters
-- `@PermuteDeclr` on parameters for typed `join(JoinNSecond)` overloads
+| Feature | Used by |
+|---|---|
+| **G3** Extends clause auto-expansion (alpha branch) | `Join0First extends Join0Second<END, DS, A>` — G3 expands to `Join1First extends Join1Second<END, DS, A>`, `Join2First extends Join2Second<END, DS, A, B>`, etc. |
+| **G4** Method-level `@PermuteTypeParam` inside `@PermuteMethod` | `joinBilinear()` — expanding `<C>` to j new alpha-named method type params |
+| **END phantom type** | All generated classes — enables typed nested scopes (`not()`, `exists()`) in Phase 3 |
+| **PermuteMojo multi-template chaining** | `JoinBuilder.java` with two templates — output of `Join0Second` processing becomes input for `Join0First` |
 
 ### Phase 3+ (future)
 - `not()` / negation groups (`Not2`, `Group2` pattern)
@@ -273,7 +342,6 @@ If any arity behaves differently from the others in equivalent scenarios, that i
 | Limitation | Root cause | Workaround / Note |
 |---|---|---|
 | No First/Second split in Phase 1 | G3 extends expansion requires `T+number` suffix; alpha naming has no suffix | Single `JoinFirst` family; Phase 2 will retrofit the split |
-| `join()` return type is raw (no type args) | Next arity's type param not in scope | Raw return + reflective instantiation; arity-2+ lambdas require explicit casts |
 | `wrapPredicate` truncates facts to filter's arity | Filters registered at different arities share the same NaryPredicate/run() loop | `m.getParameterCount() - 1` gives the filter's fact count; extra facts are truncated |
 | `JoinNFirst` nested inside `JoinBuilder` | `inline=true` requires a container class | Use `var` in tests; qualified name `JoinBuilder.Join1First` when explicit |
 | `filter()` requires explicit `@PermuteReturn` | Self-return inference (TODO-2) not yet implemented | Explicit `@PermuteReturn(typeArgs=..., when="true")` |
@@ -293,27 +361,6 @@ return cast(Class.forName(nextName).getConstructor(RuleDefinition.class).newInst
 ```
 
 This is necessary because `rd.asNext()` (an unchecked cast of `RuleDefinition` to `JoinNFirst`) causes `ClassCastException` at runtime — the Java compiler inserts a `checkcast JoinNFirst` in the bytecode at every `invokevirtual` call site, and `RuleDefinition` does not extend `JoinNFirst`. Reflective instantiation creates a real `JoinNFirst` wrapping the same `RuleDefinition`.
-
-### Arity-2+ Type Safety Limitation
-
-After the first `join()` call, the chain **loses compile-time type parameters**. The reason: `@PermuteReturn(className="Join${i+1}First")` without `typeArgs` generates a raw return type (`Join2First` without generics). Since the next arity's type parameter (`B`, `C`, etc.) is not in scope in the template class, there is no way to generate a fully parameterized return type.
-
-**Practical consequence:** filter and fn lambdas at arity 2+ receive `Object`-typed parameters and require explicit casts:
-
-```java
-// Arity 1 — fully type-safe (from() returns Join1First<Ctx, Person>)
-var rule = builder.from("adults", ctx -> ctx.persons())
-        .filter((ctx, a) -> a.age() >= 18)   // a is Person — no cast needed
-        .fn((ctx, a) -> {});
-
-// Arity 2 — raw type after join() — explicit casts required
-var rule = builder.from("adult-accounts", ctx -> ctx.persons())
-        .join(ACCOUNTS)                        // pre-typed constant required
-        .filter((ctx, a, b) -> ((Person) a).age() >= 18 && ((Account) b).balance() > 500.0)
-        .fn((ctx, a, b) -> {});
-```
-
-This is a Phase 1 limitation. Phase 2's First/Second split and typed `join()` overloads will restore full type safety once Permuplate supports generating typed method bodies.
 
 ---
 
