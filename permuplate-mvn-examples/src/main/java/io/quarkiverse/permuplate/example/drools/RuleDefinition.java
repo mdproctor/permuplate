@@ -6,20 +6,23 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Captures the structure of a rule built via the DSL and executes it.
  *
  * <p>
- * All JoinFirst and JoinSecond generated classes hold a reference to a shared
- * RuleDefinition. Typed predicates and consumers are wrapped into internal
- * NaryPredicate/NaryConsumer representations via reflection — called once at
- * rule-build time, not on every run().
+ * Sources are represented as {@link TupleSource} entries — a unified abstraction
+ * over single-fact sources (each contributes one fact per step) and bi-linear
+ * sub-network sources (each contributes a tuple of N facts per step). This models
+ * the Rete bi-linear beta node pattern where a right-input sub-network executes
+ * independently and its matched tuples are cross-producted with the left chain.
  *
  * <p>
- * {@code asNext()} uses an unchecked cast: the fluent chain relies on Java's
- * type erasure so that the same RuleDefinition object satisfies any Join(N)First
- * declared return type. This is documented in DROOLS-DSL.md.
+ * The {@code accumulatedFacts} field tracks the total number of fact columns
+ * added so far. This is used by {@link #addFilter} to capture the correct
+ * registration position for single-fact filters — {@code sources.size()} is no
+ * longer correct since a bi-linear source is one entry but contributes N columns.
  */
 public class RuleDefinition<DS> {
 
@@ -33,8 +36,19 @@ public class RuleDefinition<DS> {
         void accept(Object ctx, Object[] facts);
     }
 
+    /**
+     * A source that produces fact-tuples given a context. Linear sources produce
+     * singleton-array tuples (one fact each). Bi-linear sources produce multi-element
+     * tuples from an independent sub-network execution.
+     */
+    @FunctionalInterface
+    interface TupleSource<DS> {
+        List<Object[]> tuples(DS ctx);
+    }
+
     private final String name;
-    private final List<Function<DS, DataSource<?>>> sources = new ArrayList<>();
+    private final List<TupleSource<DS>> sources = new ArrayList<>();
+    private int accumulatedFacts = 0;
     private final List<NaryPredicate> filters = new ArrayList<>();
     private NaryConsumer action;
     private final List<List<Object>> executions = new ArrayList<>();
@@ -47,63 +61,100 @@ public class RuleDefinition<DS> {
     // Builder methods — called by generated JoinFirst/Second classes
     // -------------------------------------------------------------------------
 
+    /**
+     * Adds a single-fact data source. Each element from the DataSource becomes
+     * a singleton-array tuple in the cross-product.
+     */
     public void addSource(Object sourceSupplier) {
         @SuppressWarnings("unchecked")
-        Function<DS, DataSource<?>> typed = (Function<DS, DataSource<?>>) sourceSupplier;
-        sources.add(typed);
+        Function<DS, DataSource<?>> fn = (Function<DS, DataSource<?>>) sourceSupplier;
+        sources.add(ctx -> fn.apply(ctx).asList().stream()
+                .map(f -> new Object[] { f })
+                .collect(Collectors.toList()));
+        accumulatedFacts += 1;
+    }
+
+    /**
+     * Adds a bi-linear sub-network source. The sub-network's RuleDefinition is executed
+     * independently against the same ctx; its matched tuples are cross-producted with
+     * the current chain's tuples. The sub-network's internal filters apply only within
+     * the sub-network — they gate which of its tuples enter the cross-product, not which
+     * combined tuples pass overall.
+     *
+     * <p>
+     * This models the Rete bi-linear beta node: the right-input sub-network executes
+     * as an independent unit. Facts are flattened for method calls (predicates and
+     * consumers see a flat Object[] array), matching the Rete convention of traversing
+     * the tuple tree when invoking lambdas.
+     */
+    public void addBilinearSource(RuleDefinition<DS> subNetwork) {
+        sources.add(ctx -> subNetwork.matchedTuples(ctx));
+        accumulatedFacts += subNetwork.factArity();
+    }
+
+    /**
+     * Returns the total number of fact columns this RuleDefinition contributes per
+     * matched tuple. Used by the parent chain when this RuleDefinition is used as a
+     * bi-linear source, so the parent can correctly track accumulatedFacts.
+     */
+    public int factArity() {
+        return accumulatedFacts;
     }
 
     public void addFilter(Object typedPredicate) {
-        // Capture the number of sources registered so far. This tells wrapPredicate
-        // which fact index corresponds to the "latest" fact for single-fact filters.
-        int registeredSourceCount = sources.size();
-        filters.add(wrapPredicate(typedPredicate, registeredSourceCount));
+        // Capture the accumulated fact count at registration time — not sources.size().
+        // A bi-linear source is one entry in sources but contributes N fact columns.
+        // This count tells wrapPredicate which index is the "latest" fact for
+        // single-fact (Predicate2) filters registered after a join.
+        int registeredFactCount = accumulatedFacts;
+        filters.add(wrapPredicate(typedPredicate, registeredFactCount));
     }
 
     public void setAction(Object typedConsumer) {
         this.action = wrapConsumer(typedConsumer);
     }
 
-    /**
-     * Returns this RuleDefinition as the next JoinFirst type in the chain.
-     * Uses an unchecked cast — safe because the fluent chain never stores the
-     * intermediate type; the JVM erases generics and the reference is valid.
-     */
-    @SuppressWarnings("unchecked")
-    public <T> T asNext() {
-        return (T) this;
-    }
-
     // -------------------------------------------------------------------------
     // Execution
     // -------------------------------------------------------------------------
 
+    /**
+     * Executes this rule against the given context, recording matched fact combinations.
+     */
     public RuleDefinition<DS> run(DS ctx) {
         executions.clear();
-        // Build cross-product of all sources
+        for (Object[] facts : matchedTuples(ctx)) {
+            if (action != null)
+                action.accept(ctx, facts);
+            executions.add(Arrays.asList(facts));
+        }
+        return this;
+    }
+
+    /**
+     * Executes sources and filters, returning the list of matched fact-tuple arrays.
+     * Called by {@link #run} and also by parent chains when this RuleDefinition is
+     * used as a bi-linear source via {@link #addBilinearSource}.
+     */
+    List<Object[]> matchedTuples(DS ctx) {
         List<Object[]> combinations = new ArrayList<>();
         combinations.add(new Object[0]);
-        for (Function<DS, DataSource<?>> supplier : sources) {
+
+        for (TupleSource<DS> source : sources) {
             List<Object[]> next = new ArrayList<>();
-            for (Object item : supplier.apply(ctx).asList()) {
+            for (Object[] tuple : source.tuples(ctx)) {
                 for (Object[] combo : combinations) {
-                    Object[] extended = Arrays.copyOf(combo, combo.length + 1);
-                    extended[combo.length] = item;
+                    Object[] extended = Arrays.copyOf(combo, combo.length + tuple.length);
+                    System.arraycopy(tuple, 0, extended, combo.length, tuple.length);
                     next.add(extended);
                 }
             }
             combinations = next;
         }
-        // Apply filters, then execute action for each matching combination
-        for (Object[] facts : combinations) {
-            if (filters.stream().allMatch(f -> f.test(ctx, facts))) {
-                if (action != null) {
-                    action.accept(ctx, facts);
-                }
-                executions.add(Arrays.asList(facts));
-            }
-        }
-        return this;
+
+        return combinations.stream()
+                .filter(facts -> filters.stream().allMatch(f -> f.test(ctx, facts)))
+                .collect(Collectors.toList());
     }
 
     // -------------------------------------------------------------------------
@@ -114,6 +165,7 @@ public class RuleDefinition<DS> {
         return name;
     }
 
+    /** Number of source entries (not fact columns — use factArity() for columns). */
     public int sourceCount() {
         return sources.size();
     }
@@ -142,20 +194,20 @@ public class RuleDefinition<DS> {
     // Reflection wrappers — called once at rule-build time
     // -------------------------------------------------------------------------
 
-    private static NaryPredicate wrapPredicate(Object typed, int registeredSourceCount) {
+    private static NaryPredicate wrapPredicate(Object typed, int registeredFactCount) {
         Method m = findMethod(typed, "test");
-        // m.getParameterCount() - 1 gives the number of fact parameters (excluding ctx).
         int factArity = m.getParameterCount() - 1;
         return (ctx, facts) -> {
             try {
                 Object[] trimmed;
-                if (factArity == 1 && registeredSourceCount > 1) {
-                    // Single-fact filter: the user wrote filter((ctx, b) -> ...) after joining
-                    // multiple sources. Pick the fact at the registered position (0-based index
-                    // = registeredSourceCount - 1), which is the latest-joined fact at registration.
-                    trimmed = new Object[] { facts[registeredSourceCount - 1] };
+                if (factArity == 1 && registeredFactCount > 1) {
+                    // Single-fact filter: pick the fact at the registered position.
+                    // registeredFactCount - 1 is the 0-based index of the latest fact
+                    // at the time this filter was registered via addFilter().
+                    trimmed = new Object[] { facts[registeredFactCount - 1] };
                 } else if (facts.length > factArity) {
-                    // Intermediate all-facts filter: truncate to the facts in scope when registered.
+                    // Multi-fact filter registered before all joins were added:
+                    // truncate to the facts that were in scope at registration time.
                     trimmed = Arrays.copyOf(facts, factArity);
                 } else {
                     trimmed = facts;
