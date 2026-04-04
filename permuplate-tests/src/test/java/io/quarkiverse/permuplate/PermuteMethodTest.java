@@ -335,4 +335,52 @@ public class PermuteMethodTest {
         assertThat(out).contains("path4");
         assertThat(out).contains("<B, C, D>");
     }
+
+    // =========================================================================
+    // @PermuteMethod ternary from expression — conditional method generation
+    // =========================================================================
+
+    /**
+     * A JEXL ternary expression in @PermuteMethod.from can suppress method generation
+     * for specific outer values of i. Here from="${i > 1 ? i : i+1}" with to="${i}"
+     * produces an empty range (from > to) at i=1 — the method is silently omitted —
+     * and a single-clone range at i≥2.
+     *
+     * <p>
+     * This is the mechanism used by filterLatest in JoinBuilder: at arity 1 the
+     * single-fact and all-facts filter have identical signatures, so the single-fact
+     * sentinel must be suppressed. At arity 2+ they are distinct overloads.
+     */
+    @Test
+    public void testTernaryFromExpressionSuppressesAtArity1() {
+        String parentSource = """
+                package com.example;
+                public class Selector {
+                    @io.quarkiverse.permuplate.Permute(varName = "i", from = 1, to = 3,
+                            className = "Sel${i}", inline = true, keepTemplate = false)
+                    public static class Sel0 {
+                        @io.quarkiverse.permuplate.PermuteMethod(
+                                varName = "x", from = "${i > 1 ? i : i+1}", to = "${i}",
+                                name = "extra")
+                        @io.quarkiverse.permuplate.PermuteReturn(
+                                className = "Sel${i}", when = "true")
+                        public Object extraSentinel(
+                                @io.quarkiverse.permuplate.PermuteDeclr(type = "String")
+                                Object param) { return this; }
+
+                        public Object regular() { return this; }
+                    }
+                }
+                """;
+        String src1 = generateInline(parentSource, "Sel0", "i", 1, 3, "Sel${i}", 1);
+        assertThat(src1).doesNotContain("extra(");
+        assertThat(src1).contains("regular()");
+
+        String src2 = generateInline(parentSource, "Sel0", "i", 1, 3, "Sel${i}", 2);
+        assertThat(src2).contains("Sel2 extra(String param)");
+        assertThat(src2).contains("regular()");
+
+        String src3 = generateInline(parentSource, "Sel0", "i", 1, 3, "Sel${i}", 3);
+        assertThat(src3).contains("Sel3 extra(String param)");
+    }
 }
