@@ -87,8 +87,8 @@ public class InlineGenerator {
             // Apply transformations (null messager — Maven plugin has no Messager)
             PermuteTypeParamTransformer.transform(generated, ctx, null, null);
 
-            // Capture post-G1 type parameter names for extends expansion (used in Task 5)
-            Set<String> postG1TypeParams = new java.util.LinkedHashSet<>();
+            // Capture post-G1 type parameter names for extends expansion
+            List<String> postG1TypeParams = new ArrayList<>();
             generated.getTypeParameters().forEach(tp -> postG1TypeParams.add(tp.getNameAsString()));
 
             // @PermuteMethod: generate overloads with (i,j) context — before other transforms
@@ -106,11 +106,12 @@ public class InlineGenerator {
             // Skip methods that had explicit @PermuteReturn (they were just processed above)
             applyImplicitInference(generated, ctx, allGeneratedNames, explicitReturnMethods);
 
-            // Extends/implements clause expansion (Task 5)
+            // Extends/implements clause expansion (same-N formula)
             int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
             int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
             if (templateEmbeddedNum >= 0 && currentEmbeddedNum >= 0) {
-                applyExtendsExpansion(generated, templateClassName, templateEmbeddedNum, currentEmbeddedNum);
+                applyExtendsExpansion(generated, templateClassName, templateEmbeddedNum, currentEmbeddedNum,
+                        postG1TypeParams);
             }
 
             // Strip @Permute
@@ -394,32 +395,33 @@ public class InlineGenerator {
     }
 
     /**
-     * Expands extends/implements clauses whose base class name carries the same
-     * first embedded number as the template class (e.g. {@code Join1Second} on template
-     * {@code Join1First}, both having embedded number {@code 1}).
+     * Expands the extends/implements clause of a generated class to match the current arity.
      *
      * <p>
-     * Expansion rule (implicit): replace the embedded number in the extends base
-     * class name with {@code (currentEmbeddedNum + 1)}, and expand the type
-     * argument list to {@code T1, T2, ..., T(currentEmbeddedNum + 1)}.
+     * Fires only when both the template class name and the generated class name contain
+     * an embedded number (the arity discriminator). Only expands extends base classes that
+     * share the same name prefix and the template's embedded number.
      *
      * <p>
-     * The expansion fires only when the extends base class first embedded number
-     * equals the template class first embedded number. Classes whose name has no
-     * embedded number (e.g. {@code BaseStep}) are left unchanged.
+     * Two detection branches:
+     * <ol>
+     * <li>All-T+number type args → hardcodes T1..T(newNum) (existing T+number behaviour)</li>
+     * <li>Extends type args are a prefix of postG1TypeParams → uses full postG1TypeParams
+     * list (alpha naming support; requires {@code @PermuteTypeParam} to have fired)</li>
+     * </ol>
      *
-     * @param classDecl the generated class being processed
-     * @param templateName the name of the template class (e.g. "Join1First")
-     * @param templateEmbeddedNum the first embedded number of the template class (e.g. 1 for Join1First)
-     * @param currentEmbeddedNum the first embedded number of the generated class (e.g. 2 for Join2First)
+     * <p>
+     * Formula: {@code newNum = currentEmbeddedNum} — produces same-N extends
+     * (Join2First extends Join2Second, not forward-reference Join3Second).
      */
     private static void applyExtendsExpansion(ClassOrInterfaceDeclaration classDecl,
             String templateName,
             int templateEmbeddedNum,
-            int currentEmbeddedNum) {
+            int currentEmbeddedNum,
+            List<String> postG1TypeParams) {
 
         String templateNamePrefix = prefixBeforeFirstDigit(templateName);
-        int newNum = currentEmbeddedNum + 1;
+        int newNum = currentEmbeddedNum; // same-N: Join2First → extends Join2Second
 
         com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> extended = classDecl
                 .getExtendedTypes();
@@ -438,7 +440,6 @@ public class InlineGenerator {
             if (extNum < 0 || extNum != templateEmbeddedNum)
                 continue;
 
-            // The extends type args must be a T+number sequence (the growing tip pattern)
             java.util.Optional<com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.Type>> typeArgsOpt = ext
                     .getTypeArguments();
             if (typeArgsOpt.isEmpty() || typeArgsOpt.get().isEmpty())
@@ -448,22 +449,29 @@ public class InlineGenerator {
                     .map(com.github.javaparser.ast.type.Type::asString)
                     .collect(java.util.stream.Collectors.toList());
 
-            // Verify the type args are all T+number vars (the growing tip pattern)
+            // Determine new type args via one of two detection branches.
+            List<String> newTypeArgNames;
             boolean allTNumber = extArgNames.stream().allMatch(InlineGenerator::isTNumberVar);
-            if (!allTNumber)
-                continue;
+            if (allTNumber) {
+                // T+number case: build T1..T(newNum) from scratch
+                newTypeArgNames = new ArrayList<>();
+                for (int t = 1; t <= newNum; t++)
+                    newTypeArgNames.add("T" + t);
+            } else {
+                // Alpha case: extends type args must be a prefix of postG1TypeParams.
+                // This fires when @PermuteTypeParam has already expanded the class type
+                // params (postG1TypeParams is longer than the template-level extends args).
+                boolean isPrefix = extArgNames.size() <= postG1TypeParams.size()
+                        && java.util.stream.IntStream.range(0, extArgNames.size())
+                                .allMatch(k -> extArgNames.get(k).equals(postG1TypeParams.get(k)));
+                if (!isPrefix)
+                    continue;
+                newTypeArgNames = postG1TypeParams;
+            }
 
             // Build new base class name: replace embedded number with newNum
             String newBaseName = replaceFirstEmbeddedNumber(baseName, newNum);
-
-            // Build new type args: T1..T(newNum)
-            StringBuilder typeArgsSb = new StringBuilder();
-            for (int t = 1; t <= newNum; t++) {
-                if (t > 1)
-                    typeArgsSb.append(", ");
-                typeArgsSb.append("T").append(t);
-            }
-            String newExtStr = newBaseName + "<" + typeArgsSb + ">";
+            String newExtStr = newBaseName + "<" + String.join(", ", newTypeArgNames) + ">";
             try {
                 extended.set(idx, StaticJavaParser.parseClassOrInterfaceType(newExtStr));
             } catch (Exception ignored) {
