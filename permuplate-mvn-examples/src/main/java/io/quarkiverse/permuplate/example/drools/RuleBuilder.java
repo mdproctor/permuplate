@@ -5,6 +5,11 @@ import java.util.function.Function;
 /**
  * Entry point for the Drools RuleBuilder DSL approximation.
  *
+ * <p>{@code from()} creates the initial {@code Join1First<Void, DS, A>}. The {@code Void}
+ * END type means no outer scope exists — {@code end()} on top-level chains returns null
+ * and is never called. When nested scopes ({@code not()}, {@code exists()}) arrive in
+ * Phase 3, they will capture the outer builder type as END and restore it via {@code end()}.
+ *
  * <pre>{@code
  * RuleBuilder<Ctx> builder = new RuleBuilder<>();
  * RuleDefinition<Ctx> rule = builder.from("adults", ctx -> ctx.persons())
@@ -17,15 +22,12 @@ public class RuleBuilder<DS> {
 
     /**
      * Starts building a rule with its first fact source.
-     *
-     * @param name rule name (recorded in RuleDefinition for test assertions)
-     * @param firstSource function from DS context to the first DataSource
-     * @return Join1First — the start of the fluent chain
+     * Returns {@code Join1First<Void, DS, A>} — Void indicates no outer scope.
      */
-    public <A> JoinBuilder.Join1First<DS, A> from(String name,
+    public <A> JoinBuilder.Join1First<Void, DS, A> from(String name,
             Function<DS, DataSource<A>> firstSource) {
         RuleDefinition<DS> rd = new RuleDefinition<>(name);
         rd.addSource(firstSource);
-        return new JoinBuilder.Join1First<>(rd);
+        return new JoinBuilder.Join1First<>(null, rd);
     }
 }
