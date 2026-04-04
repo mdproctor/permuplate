@@ -141,9 +141,14 @@ public class RuleDefinition<DS> {
 
     private static NaryPredicate wrapPredicate(Object typed) {
         Method m = findMethod(typed, "test");
+        // m.getParameterCount() - 1 excludes ctx, giving the number of facts this predicate checks.
+        // An intermediate filter registered at arity k checks only the first k facts even when
+        // the final cross-product has more facts. Arrays.copyOf truncates to the expected arity.
+        int factArity = m.getParameterCount() - 1;
         return (ctx, facts) -> {
             try {
-                Object[] args = buildArgs(ctx, facts);
+                Object[] trimmed = facts.length > factArity ? Arrays.copyOf(facts, factArity) : facts;
+                Object[] args = buildArgs(ctx, trimmed);
                 return (Boolean) m.invoke(typed, args);
             } catch (ReflectiveOperationException e) {
                 throw new RuntimeException("Predicate invocation failed", e);

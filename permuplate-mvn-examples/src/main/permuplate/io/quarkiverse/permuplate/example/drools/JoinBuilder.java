@@ -39,15 +39,31 @@ public class JoinBuilder {
             this.rd = rd;
         }
 
+        @SuppressWarnings("unchecked")
+        private static <T> T cast(Object o) {
+            return (T) o;
+        }
+
         /**
          * Advances the arity by one fact type. Boundary omission removes this method
          * from Join6First — when i=6, Join7First is not in the generated set so the
          * method is silently omitted (leaf node).
+         *
+         * <p>Uses reflection to instantiate the next JoinFirst class by deriving its
+         * name from the current class name (e.g. "Join1First" -> "Join2First").
+         * This avoids the broken asNext() unchecked-cast pattern.
          */
         @PermuteReturn(className = "Join${i+1}First")
         public Object join(java.util.function.Function<DS, DataSource<?>> source) {
             rd.addSource(source);
-            return rd.asNext();
+            String cn = getClass().getSimpleName();
+            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
+            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
+            try {
+                return cast(Class.forName(nextName).getConstructor(RuleDefinition.class).newInstance(rd));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate " + nextName, e);
+            }
         }
 
         /**
