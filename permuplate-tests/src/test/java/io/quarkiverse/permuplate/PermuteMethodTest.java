@@ -100,8 +100,7 @@ public class PermuteMethodTest {
 
     @Test
     public void testExtendsClauseImplicitExpansion() {
-        // Join1First<T1> extends Join1Second<T1>
-        // At i=2: Join3First<T1,T2,T3> extends Join3Second<T1,T2,T3>
+        // Same-N: JoinNFirst extends JoinNSecond with N type args (not forward-reference)
         String template = """
                 package com.example;
                 public class Parent {
@@ -111,13 +110,22 @@ public class PermuteMethodTest {
                 }
                 """;
 
-        String out2 = generateInline(template, "Join1First", "i", 1, 4, "Join${i}First", 2);
-        assertThat(out2).contains("extends Join3Second");
-        assertThat(out2).contains("T1, T2, T3");
-
+        // forI=1: Join1First<T1> extends Join1Second<T1>
         String out1 = generateInline(template, "Join1First", "i", 1, 4, "Join${i}First", 1);
-        assertThat(out1).contains("extends Join2Second");
-        assertThat(out1).contains("T1, T2");
+        assertThat(out1).contains("extends Join1Second");
+        assertThat(out1).contains("T1");
+        assertThat(out1).doesNotContain("T2");
+
+        // forI=2: Join2First<T1, T2> extends Join2Second<T1, T2>
+        String out2 = generateInline(template, "Join1First", "i", 1, 4, "Join${i}First", 2);
+        assertThat(out2).contains("extends Join2Second");
+        assertThat(out2).contains("T1, T2");
+        assertThat(out2).doesNotContain("T3");
+
+        // forI=3: Join3First<T1, T2, T3> extends Join3Second<T1, T2, T3>
+        String out3 = generateInline(template, "Join1First", "i", 1, 4, "Join${i}First", 3);
+        assertThat(out3).contains("extends Join3Second");
+        assertThat(out3).contains("T1, T2, T3");
     }
 
     @Test
@@ -133,6 +141,72 @@ public class PermuteMethodTest {
 
         String out1 = generateInline(template, "Step1", "i", 1, 3, "Step${i}", 1);
         assertThat(out1).contains("extends BaseStep<T1>");
+    }
+
+    @Test
+    public void testExtendsClauseAlphaNaming() {
+        // Join0First<DS, A> extends Join0Second<DS, A> with @PermuteTypeParam alpha naming.
+        // G1 (@PermuteTypeParam) expands the class type params first (A → A,B,C,...).
+        // G3 fires when (a) the parent class shares the same name prefix + embedded number,
+        // and (b) the extends clause type args are a prefix of postG1TypeParams [DS, A, B, ...].
+        //
+        // i=1: Join1First<DS, A>        extends Join1Second<DS, A>
+        // i=2: Join2First<DS, A, B>     extends Join2Second<DS, A, B>
+        // i=3: Join3First<DS, A, B, C>  extends Join3Second<DS, A, B, C>
+        String template = """
+                package com.example;
+                public class Parent {
+                    public static class Join0First<DS,
+                            @io.quarkiverse.permuplate.PermuteTypeParam(
+                                varName="k", from="1", to="${i}", name="${alpha(k)}") A>
+                            extends Join0Second<DS, A> {
+                        public void filter() {}
+                    }
+                }
+                """;
+
+        String out1 = generateInline(template, "Join0First", "i", 1, 3, "Join${i}First", 1);
+        assertThat(out1).contains("Join1First<DS, A>");
+        assertThat(out1).contains("extends Join1Second<DS, A>");
+        assertThat(out1).doesNotContain("B"); // i=1 has no expansion — A is the only fact param
+
+        String out2 = generateInline(template, "Join0First", "i", 1, 3, "Join${i}First", 2);
+        assertThat(out2).contains("Join2First<DS, A, B>");
+        assertThat(out2).contains("extends Join2Second<DS, A, B>");
+
+        String out3 = generateInline(template, "Join0First", "i", 1, 3, "Join${i}First", 3);
+        assertThat(out3).contains("Join3First<DS, A, B, C>");
+        assertThat(out3).contains("extends Join3Second<DS, A, B, C>");
+    }
+
+    @Test
+    public void testExtendsClauseAlphaNamingNoFixedPrefix() {
+        // Alpha expanding type params with no fixed prefix (template: <A> extends Sibling<A>).
+        // At i=1 extArgNames == postG1TypeParams ([A] == [A]) — full match, not strict prefix.
+        // The isPrefix check uses <= so this passes; class name still gets renumbered.
+        //
+        // i=1: Step1First<A>     extends Step1Second<A>
+        // i=2: Step2First<A, B>  extends Step2Second<A, B>
+        String template = """
+                package com.example;
+                public class Parent {
+                    public static class Step0First<
+                            @io.quarkiverse.permuplate.PermuteTypeParam(
+                                varName="k", from="1", to="${i}", name="${alpha(k)}") A>
+                            extends Step0Second<A> {
+                        public void action() {}
+                    }
+                }
+                """;
+
+        String out1 = generateInline(template, "Step0First", "i", 1, 2, "Step${i}First", 1);
+        assertThat(out1).contains("Step1First<A>");
+        assertThat(out1).contains("extends Step1Second<A>");
+        assertThat(out1).doesNotContain("B");
+
+        String out2 = generateInline(template, "Step0First", "i", 1, 2, "Step${i}First", 2);
+        assertThat(out2).contains("Step2First<A, B>");
+        assertThat(out2).contains("extends Step2Second<A, B>");
     }
 
     // =========================================================================
