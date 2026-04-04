@@ -263,6 +263,28 @@ public class PermuteTypeParamTest {
     // Validation: R4 — from > to is invalid
     // -------------------------------------------------------------------------
 
+    @Test
+    public void testR4FromGreaterThanTo() {
+        var source = JavaFileObjects.forSourceString(
+                "io.quarkiverse.permuplate.example.BadRange1",
+                """
+                        package io.quarkiverse.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        @Permute(varName="i", from=3, to=3, className="BadRange${i}")
+                        public interface BadRange1<@PermuteTypeParam(varName="j", from="5", to="2", name="T${j}") T1> {
+                            boolean test(T1 fact);
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("invalid range");
+    }
+
     // -------------------------------------------------------------------------
     // Explicit @PermuteTypeParam — alpha(j) naming (A, B, C)
     // -------------------------------------------------------------------------
@@ -332,25 +354,178 @@ public class PermuteTypeParamTest {
         assertThat(src).contains("C extends Comparable<C>");
     }
 
+    // -------------------------------------------------------------------------
+    // Standalone method-level @PermuteTypeParam (not on @PermuteMethod)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @PermuteTypeParam on a non-@PermuteMethod method renames the type parameter
+     *                   declaration AND propagates the rename into parameter types that reference it.
+     *                   Here B is renamed to T2 (i=2) and T3 (i=3); List&lt;B&gt; propagates to List&lt;T2&gt;/List&lt;T3&gt;.
+     */
     @Test
-    public void testR4FromGreaterThanTo() {
-        var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.BadRange1",
+    public void testStandaloneMethodTypeParamRenameAndPropagate() {
+        var source = JavaFileObjects.forSourceString("io.example.Gatherer1",
                 """
-                        package io.quarkiverse.permuplate.example;
+                        package io.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="BadRange${i}")
-                        public interface BadRange1<@PermuteTypeParam(varName="j", from="5", to="2", name="T${j}") T1> {
-                            boolean test(T1 fact);
+                        @Permute(varName = "i", from = 2, to = 3, className = "Gatherer${i}")
+                        public class Gatherer1 {
+                            @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "T${m}")
+                            public <B> void collect(java.util.List<B> items) {}
                         }
                         """);
-
         Compilation compilation = Compiler.javac()
                 .withProcessors(new PermuteProcessor())
                 .compile(source);
+        assertThat(compilation).succeeded();
 
-        assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("invalid range");
+        String src2 = sourceOf(compilation.generatedSourceFile("io.example.Gatherer2").orElseThrow());
+        assertThat(src2).contains("<T2> void collect(java.util.List<T2> items)");
+
+        String src3 = sourceOf(compilation.generatedSourceFile("io.example.Gatherer3").orElseThrow());
+        assertThat(src3).contains("<T3> void collect(java.util.List<T3> items)");
+    }
+
+    /**
+     * Propagation works when the type parameter appears nested multiple levels deep
+     * in the parameter type — e.g. Function&lt;Object, List&lt;B&gt;&gt; where B is two levels deep.
+     */
+    @Test
+    public void testPropagationIntoNestedGeneric() {
+        var source = JavaFileObjects.forSourceString("io.example.Fetcher1",
+                """
+                        package io.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        @Permute(varName = "i", from = 2, to = 3, className = "Fetcher${i}")
+                        public class Fetcher1 {
+                            @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "T${m}")
+                            public <B> void fetch(
+                                    java.util.function.Function<Object, java.util.List<B>> supplier) {}
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+
+        String src2 = sourceOf(compilation.generatedSourceFile("io.example.Fetcher2").orElseThrow());
+        assertThat(src2).contains("java.util.function.Function<Object, java.util.List<T2>>");
+    }
+
+    /**
+     * @PermuteDeclr on a parameter takes explicit precedence over propagated renames.
+     *               The first param (no @PermuteDeclr) receives the propagated rename:
+     *               B → T2, so {@code List<B>} becomes {@code List<T2>}.
+     *               The second param (@PermuteDeclr) uses its explicit type expression
+     *               {@code Map<String, T${i}>}, which produces {@code Map<String, T2>} —
+     *               clearly different from what propagation would give ({@code List<T2>}).
+     *               This ensures the test cannot pass if @PermuteDeclr is silently ignored.
+     */
+    @Test
+    public void testPermuteDeclrOverridesPropagation() {
+        var source = JavaFileObjects.forSourceString("io.example.Dual1",
+                """
+                        package io.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteDeclr;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        @Permute(varName = "i", from = 2, to = 3, className = "Dual${i}")
+                        public class Dual1 {
+                            @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "T${m}")
+                            public <B> void handle(
+                                    java.util.List<B> propagated,
+                                    @PermuteDeclr(type = "java.util.Map<String, T${i}>") Object explicit) {}
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+
+        String src2 = sourceOf(compilation.generatedSourceFile("io.example.Dual2").orElseThrow());
+        // Propagated rename: B → T2 applied to List<B> → List<T2>
+        assertThat(src2).contains("java.util.List<T2> propagated");
+        // Explicit @PermuteDeclr wins: Map<String, T2> — NOT List<T2>
+        assertThat(src2).contains("java.util.Map<String, T2> explicit");
+    }
+
+    /**
+     * @PermuteMethod methods must be skipped by Step 5. They are processed later in
+     *                applyPermuteMethod() with the inner (i,j) context; double-processing would corrupt
+     *                the output. Verifies standalone method IS processed while @PermuteMethod method is not.
+     */
+    @Test
+    public void testPermuteMethodGuardPreventsDoubleProcessing() {
+        var source = JavaFileObjects.forSourceString("io.example.Guarded1",
+                """
+                        package io.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteMethod;
+                        import io.quarkiverse.permuplate.PermuteReturn;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        @Permute(varName = "i", from = 2, to = 2, className = "Guarded${i}")
+                        public class Guarded1 {
+                            @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "X${m}")
+                            public <B> void standalone(java.util.List<B> items) {}
+                            @PermuteMethod(varName = "j", from = "1", to = "1")
+                            @PermuteReturn(className = "Guarded${i}", when = "true")
+                            public Object overloaded() { return this; }
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+
+        String src = sourceOf(compilation.generatedSourceFile("io.example.Guarded2").orElseThrow());
+        assertThat(src).contains("<X2> void standalone(java.util.List<X2> items)");
+        // @PermuteReturn(className="Guarded${i}") changes the return type via applyPermuteReturnSimple.
+        // Step 5 skips this method (it has @PermuteMethod, no @PermuteTypeParam) — no double-processing.
+        assertThat(src).contains("Guarded2 overloaded()");
+    }
+
+    /**
+     * Full end-to-end APT test of the typed join() pattern:
+     * class-level @PermuteTypeParam (expanding) + method-level @PermuteTypeParam
+     * (single-value, standalone) + @PermuteReturn with boundary omission at the leaf.
+     */
+    @Test
+    public void testTypedJoinPatternEndToEnd() {
+        var source = JavaFileObjects.forSourceString("io.example.Chain0",
+                """
+                        package io.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteReturn;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        @Permute(varName = "i", from = 1, to = 3, className = "Chain${i}")
+                        public class Chain0<
+                                @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "T${k}") T1> {
+                            @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "T${m}")
+                            @PermuteReturn(className = "Chain${i+1}",
+                                           typeArgs = "typeArgList(1, i+1, 'T')")
+                            public <B> Object join(
+                                    java.util.function.Function<Object, java.util.List<B>> source) {
+                                return null;
+                            }
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+
+        String src1 = sourceOf(compilation.generatedSourceFile("io.example.Chain1").orElseThrow());
+        assertThat(src1).contains("public <T2> Chain2<T1, T2> join(" +
+                "java.util.function.Function<Object, java.util.List<T2>> source)");
+
+        String src2 = sourceOf(compilation.generatedSourceFile("io.example.Chain2").orElseThrow());
+        assertThat(src2).contains("public <T3> Chain3<T1, T2, T3> join(" +
+                "java.util.function.Function<Object, java.util.List<T3>> source)");
+
+        String src3 = sourceOf(compilation.generatedSourceFile("io.example.Chain3").orElseThrow());
+        assertThat(src3).doesNotContain("join(");
     }
 }

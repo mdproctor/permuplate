@@ -1,6 +1,9 @@
 package io.quarkiverse.permuplate.core;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -74,6 +77,103 @@ public class PermuteTypeParamTransformer {
         // Expand implicit (from @PermuteParam with T${j} type referencing a class type param)
         expanded.addAll(expandImplicit(classDecl, ctx, expanded));
 
+        // Step 5: process @PermuteTypeParam placed directly on a method (ElementType.METHOD placement).
+        // This is the "standalone" usage: @PermuteTypeParam on a non-@PermuteMethod method renames
+        // the method's type parameter and propagates the rename into parameter types.
+        //
+        // @PermuteMethod methods are guarded here — they are processed in applyPermuteMethod()
+        // with the combined (i,j) context. Processing them here (outer context only) would
+        // evaluate expressions like "${j}" with j undefined, corrupting output.
+        //
+        // Convention: one method-level @PermuteTypeParam annotation applies to the first
+        // unannotated type parameter in the method's type parameter list.
+        for (MethodDeclaration method : new ArrayList<>(classDecl.getMethods())) {
+            if (isPermuteMethodAnnotated(method))
+                continue;
+            if (method.getTypeParameters().isEmpty())
+                continue;
+
+            Optional<NormalAnnotationExpr> methodAnn = method.getAnnotations().stream()
+                    .filter(a -> (a.getNameAsString().equals(ANNOTATION_SIMPLE)
+                            || a.getNameAsString().equals(ANNOTATION_FQ))
+                            && a instanceof NormalAnnotationExpr)
+                    .map(a -> (NormalAnnotationExpr) a)
+                    .findFirst();
+            if (methodAnn.isEmpty())
+                continue;
+
+            NormalAnnotationExpr ann = methodAnn.get();
+            String varName = getAttr(ann, "varName");
+            String fromStr = getAttr(ann, "from");
+            String toStr = getAttr(ann, "to");
+            String nameTemplate = getAttr(ann, "name");
+            if (varName == null || fromStr == null || toStr == null || nameTemplate == null)
+                continue;
+
+            int fromVal, toVal;
+            try {
+                fromVal = ctx.evaluateInt(fromStr);
+                toVal = ctx.evaluateInt(toStr);
+            } catch (Exception e) {
+                if (messager != null)
+                    messager.printMessage(Diagnostic.Kind.ERROR,
+                            "@PermuteTypeParam on method: cannot evaluate range: " + e.getMessage(),
+                            element);
+                continue;
+            }
+            if (fromVal > toVal)
+                continue; // empty range — method silently skipped
+
+            // Find the first type parameter (the sentinel) to rename
+            TypeParameter sentinel = method.getTypeParameters().get(0);
+            String sentinelName = sentinel.getNameAsString();
+
+            // Expand the sentinel into one or more type parameters
+            NodeList<TypeParameter> current = method.getTypeParameters();
+            NodeList<TypeParameter> result = new NodeList<>();
+            Map<String, String> step5Renames = new LinkedHashMap<>();
+
+            // Expand the sentinel
+            for (int j = fromVal; j <= toVal; j++) {
+                EvaluationContext innerCtx = ctx.withVariable(varName, j);
+                String newName = innerCtx.evaluate(nameTemplate);
+                result.add(buildTypeParam(newName, sentinel, sentinelName));
+                if (fromVal == toVal) {
+                    step5Renames.put(sentinelName, newName);
+                }
+            }
+            // Add any remaining type params after the sentinel
+            for (int i = 1; i < current.size(); i++) {
+                result.add(current.get(i));
+            }
+            method.setTypeParameters(result);
+
+            // Remove the method-level @PermuteTypeParam annotation (it's been consumed)
+            method.getAnnotations().removeIf(a -> a.getNameAsString().equals(ANNOTATION_SIMPLE)
+                    || a.getNameAsString().equals(ANNOTATION_FQ));
+
+            // Propagate single-value renames into parameter types and the return type
+            for (Map.Entry<String, String> entry : step5Renames.entrySet()) {
+                String oldName = entry.getKey();
+                String newName = entry.getValue();
+                for (Parameter param : method.getParameters()) {
+                    if (hasPermuteDeclrAnnotation(param))
+                        continue;
+                    String paramType = param.getTypeAsString();
+                    String updated = replaceTypeIdentifier(paramType, oldName, newName);
+                    if (!updated.equals(paramType)) {
+                        param.setType(StaticJavaParser.parseType(updated));
+                    }
+                }
+                // Also propagate into the return type
+                String returnType = method.getTypeAsString();
+                String updatedReturn = replaceTypeIdentifier(returnType, oldName, newName);
+                if (!updatedReturn.equals(returnType)) {
+                    method.setType(StaticJavaParser.parseType(updatedReturn));
+                }
+            }
+        }
+
         return expanded;
     }
 
@@ -106,6 +206,10 @@ public class PermuteTypeParamTransformer {
         NodeList<TypeParameter> current = method.getTypeParameters();
         NodeList<TypeParameter> result = new NodeList<>();
         Set<String> expanded = new HashSet<>();
+        // Maps sentinel name → new name for single-value expansions (from == to).
+        // Multi-value expansions (from < to) expand one sentinel to N names — no single
+        // target to propagate — so they are excluded.
+        Map<String, String> singleValueRenames = new LinkedHashMap<>();
 
         for (TypeParameter tp : current) {
             Optional<NormalAnnotationExpr> ann = findTypeParamAnnotation(tp);
@@ -146,15 +250,40 @@ public class PermuteTypeParamTransformer {
             // Expand: generate one TypeParameter per j value.
             // Note: no R3 prefix check here — for method-level sentinels the placeholder
             // name (e.g. "A") is arbitrary and need not match the generated names ("T1", "B", …).
+            //
+            // Note: propagation is intentionally skipped for multi-value expansions (fromVal < toVal).
+            // When a sentinel expands to N type parameters (e.g., A → P1, P2, P3), there is no single
+            // rename target for parameter types referencing A. Callers that expand to multiple names
+            // must use @PermuteDeclr explicitly on any parameters that reference the sentinel.
             expanded.add(sentinelName);
             for (int j = fromVal; j <= toVal; j++) {
                 EvaluationContext innerCtx = ctx.withVariable(varName, j);
                 String newName = innerCtx.evaluate(nameTemplate);
+                if (fromVal == toVal) {
+                    singleValueRenames.put(sentinelName, newName);
+                }
                 result.add(buildTypeParam(newName, tp, sentinelName));
             }
         }
 
         method.setTypeParameters(result);
+
+        // Propagate single-value renames into parameter types.
+        // @PermuteDeclr-annotated parameters are skipped — explicit annotation wins.
+        for (Map.Entry<String, String> entry : singleValueRenames.entrySet()) {
+            String oldName = entry.getKey();
+            String newName = entry.getValue();
+            for (Parameter param : method.getParameters()) {
+                if (hasPermuteDeclrAnnotation(param))
+                    continue;
+                String current2 = param.getTypeAsString();
+                String updated = replaceTypeIdentifier(current2, oldName, newName);
+                if (!updated.equals(current2)) {
+                    param.setType(StaticJavaParser.parseType(updated));
+                }
+            }
+        }
+
         return expanded;
     }
 
@@ -408,7 +537,7 @@ public class PermuteTypeParamTransformer {
         TypeParameter newTp = new TypeParameter(newName);
         NodeList<ClassOrInterfaceType> newBounds = new NodeList<>();
         for (ClassOrInterfaceType bound : sentinel.getTypeBound()) {
-            String boundStr = bound.toString().replace(sentinelName, newName);
+            String boundStr = replaceTypeIdentifier(bound.toString(), sentinelName, newName);
             newBounds.add(StaticJavaParser.parseClassOrInterfaceType(boundStr));
         }
         newTp.setTypeBound(newBounds);
@@ -461,5 +590,60 @@ public class PermuteTypeParamTransformer {
             }
         }
         return null;
+    }
+
+    /**
+     * Replaces occurrences of {@code oldName} with {@code newName} in a Java type string,
+     * respecting word boundaries so that "B" does not match inside "Boolean" or "Builder".
+     * Used by propagation to rename type parameter references in parameter type strings.
+     */
+    private static String replaceTypeIdentifier(String type, String oldName, String newName) {
+        StringBuilder sb = new StringBuilder();
+        int idx = 0;
+        while (idx < type.length()) {
+            int found = type.indexOf(oldName, idx);
+            if (found < 0) {
+                sb.append(type.substring(idx));
+                break;
+            }
+            boolean before = found == 0 || !Character.isJavaIdentifierPart(type.charAt(found - 1));
+            int end = found + oldName.length();
+            boolean after = end >= type.length() || !Character.isJavaIdentifierPart(type.charAt(end));
+            if (before && after) {
+                sb.append(type, idx, found);
+                sb.append(newName);
+                idx = end;
+            } else {
+                sb.append(type.charAt(found));
+                idx = found + 1;
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Returns true if the parameter carries a {@code @PermuteDeclr} annotation.
+     * Used during propagation: explicit {@code @PermuteDeclr} takes precedence over
+     * the automatic rename propagated from a {@code @PermuteTypeParam} expansion.
+     */
+    private static boolean hasPermuteDeclrAnnotation(Parameter param) {
+        return param.getAnnotations().stream().anyMatch(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteDeclr") || n.equals("io.quarkiverse.permuplate.PermuteDeclr");
+        });
+    }
+
+    /**
+     * Returns true if the method carries a {@code @PermuteMethod} annotation.
+     * Used in Step 5 of {@link #transform} to guard against double-processing:
+     * {@code @PermuteMethod} methods are handled later in {@code applyPermuteMethod()}
+     * with the inner {@code (i,j)} context, so processing them here (outer context only)
+     * would produce incorrect output.
+     */
+    private static boolean isPermuteMethodAnnotated(MethodDeclaration method) {
+        return method.getAnnotations().stream().anyMatch(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod");
+        });
     }
 }
