@@ -5,7 +5,8 @@ import java.util.function.Function;
 /**
  * Entry point for the Drools RuleBuilder DSL approximation.
  *
- * <p>{@code from()} creates the initial {@code Join1First<Void, DS, A>}. The {@code Void}
+ * <p>
+ * {@code from()} creates the initial {@code Join1First<Void, DS, A>}. The {@code Void}
  * END type means no outer scope exists — {@code end()} on top-level chains returns null
  * and is never called. When nested scopes ({@code not()}, {@code exists()}) arrive in
  * Phase 3, they will capture the outer builder type as END and restore it via {@code end()}.
