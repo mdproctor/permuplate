@@ -54,7 +54,10 @@ public class RuleDefinition<DS> {
     }
 
     public void addFilter(Object typedPredicate) {
-        filters.add(wrapPredicate(typedPredicate));
+        // Capture the number of sources registered so far. This tells wrapPredicate
+        // which fact index corresponds to the "latest" fact for single-fact filters.
+        int registeredSourceCount = sources.size();
+        filters.add(wrapPredicate(typedPredicate, registeredSourceCount));
     }
 
     public void setAction(Object typedConsumer) {
@@ -139,15 +142,24 @@ public class RuleDefinition<DS> {
     // Reflection wrappers — called once at rule-build time
     // -------------------------------------------------------------------------
 
-    private static NaryPredicate wrapPredicate(Object typed) {
+    private static NaryPredicate wrapPredicate(Object typed, int registeredSourceCount) {
         Method m = findMethod(typed, "test");
-        // m.getParameterCount() - 1 excludes ctx, giving the number of facts this predicate checks.
-        // An intermediate filter registered at arity k checks only the first k facts even when
-        // the final cross-product has more facts. Arrays.copyOf truncates to the expected arity.
+        // m.getParameterCount() - 1 gives the number of fact parameters (excluding ctx).
         int factArity = m.getParameterCount() - 1;
         return (ctx, facts) -> {
             try {
-                Object[] trimmed = facts.length > factArity ? Arrays.copyOf(facts, factArity) : facts;
+                Object[] trimmed;
+                if (factArity == 1 && registeredSourceCount > 1) {
+                    // Single-fact filter: the user wrote filter((ctx, b) -> ...) after joining
+                    // multiple sources. Pick the fact at the registered position (0-based index
+                    // = registeredSourceCount - 1), which is the latest-joined fact at registration.
+                    trimmed = new Object[] { facts[registeredSourceCount - 1] };
+                } else if (facts.length > factArity) {
+                    // Intermediate all-facts filter: truncate to the facts in scope when registered.
+                    trimmed = Arrays.copyOf(facts, factArity);
+                } else {
+                    trimmed = facts;
+                }
                 Object[] args = buildArgs(ctx, trimmed);
                 return (Boolean) m.invoke(typed, args);
             } catch (ReflectiveOperationException e) {

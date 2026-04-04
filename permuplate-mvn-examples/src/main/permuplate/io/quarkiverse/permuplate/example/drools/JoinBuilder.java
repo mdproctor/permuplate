@@ -2,6 +2,7 @@ package io.quarkiverse.permuplate.example.drools;
 
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
+import io.quarkiverse.permuplate.PermuteMethod;
 import io.quarkiverse.permuplate.PermuteReturn;
 import io.quarkiverse.permuplate.PermuteTypeParam;
 
@@ -45,16 +46,24 @@ public class JoinBuilder {
         }
 
         /**
-         * Advances the arity by one fact type. Boundary omission removes this method
-         * from Join6First — when i=6, Join7First is not in the generated set so the
-         * method is silently omitted (leaf node).
+         * Advances the arity by one fact type. The new source type {@code B} is captured
+         * as a method type parameter and flows into both the parameter type and the
+         * return type — giving a fully typed chain at every arity.
          *
-         * <p>Uses reflection to instantiate the next JoinFirst class by deriving its
-         * name from the current class name (e.g. "Join1First" -> "Join2First").
-         * This avoids the broken asNext() unchecked-cast pattern.
+         * <p>{@code @PermuteTypeParam} renames {@code <B>} to the next alpha letter per arity
+         * (B at i=1, C at i=2, …). Propagation automatically renames {@code B} in
+         * {@code DataSource<B>} alongside the declaration — no {@code @PermuteDeclr} needed.
+         *
+         * <p>Boundary omission removes this method from Join6First — Join7First is not
+         * in the generated set so {@code @PermuteReturn} silently omits join() there.
+         *
+         * <p>Uses reflection to instantiate the next JoinFirst class by name — necessary
+         * because method bodies are not transformed by Permuplate.
          */
-        @PermuteReturn(className = "Join${i+1}First")
-        public Object join(java.util.function.Function<DS, DataSource<?>> source) {
+        @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "${alpha(m)}")
+        @PermuteReturn(className = "Join${i+1}First",
+                       typeArgs = "'DS, ' + typeArgList(1, i+1, 'alpha')")
+        public <B> Object join(java.util.function.Function<DS, DataSource<B>> source) {
             rd.addSource(source);
             String cn = getClass().getSimpleName();
             int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
@@ -76,6 +85,40 @@ public class JoinBuilder {
                        when = "true")
         public Object filter(
                 @PermuteDeclr(type = "Predicate${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
+                Object predicate) {
+            rd.addFilter(predicate);
+            return this;
+        }
+
+        /**
+         * Single-fact filter — applies a predicate to the most recently joined fact only.
+         * Complement to {@code filter(PredicateN+1)} which tests all accumulated facts.
+         *
+         * <p>In the generated output this method is named {@code filter} (via
+         * {@code @PermuteMethod name="filter"}), overloading the all-facts variant.
+         * The sentinel is named {@code filterLatest} to avoid a duplicate method error
+         * in the template — both sentinels have {@code Object} parameter type here;
+         * after generation they have distinct types and are valid Java overloads.
+         *
+         * <p>Suppressed at arity 1 via the JEXL ternary: {@code from="${i > 1 ? i : i+1}"}
+         * produces an empty range at i=1 (from > to), silently omitting the method.
+         * At arity 1, {@code filter(Predicate2<DS,A>)} from the all-facts overload already
+         * covers both roles — a second copy would be a compile error.
+         *
+         * <p>Generated signatures:
+         * <ul>
+         *   <li>i=1 — omitted</li>
+         *   <li>i=2 — {@code filter(Predicate2<DS, B> predicate)}</li>
+         *   <li>i=3 — {@code filter(Predicate2<DS, C> predicate)}</li>
+         *   <li>i=6 — {@code filter(Predicate2<DS, F> predicate)}</li>
+         * </ul>
+         */
+        @PermuteMethod(varName = "x", from = "${i > 1 ? i : i+1}", to = "${i}", name = "filter")
+        @PermuteReturn(className = "Join${i}First",
+                       typeArgs = "'DS, ' + typeArgList(1, i, 'alpha')",
+                       when = "true")
+        public Object filterLatest(
+                @PermuteDeclr(type = "Predicate2<DS, ${alpha(i)}>")
                 Object predicate) {
             rd.addFilter(predicate);
             return this;

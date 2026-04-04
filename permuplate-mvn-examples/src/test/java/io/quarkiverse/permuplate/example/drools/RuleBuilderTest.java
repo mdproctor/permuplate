@@ -2,8 +2,6 @@ package io.quarkiverse.permuplate.example.drools;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import java.util.function.Function;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -11,15 +9,6 @@ public class RuleBuilderTest {
 
     private RuleBuilder<Ctx> builder;
     private Ctx ctx;
-
-    // Pre-typed source functions — used for join() args to avoid raw-type inference issues
-    // (join() parameters are erased to Function<Object, DataSource<?>> in raw context,
-    // so lambdas like `c -> c.accounts()` won't compile; pre-typed variables do)
-    private static final Function<Ctx, DataSource<?>> PERSONS = c -> c.persons();
-    private static final Function<Ctx, DataSource<?>> ACCOUNTS = c -> c.accounts();
-    private static final Function<Ctx, DataSource<?>> ORDERS = c -> c.orders();
-    private static final Function<Ctx, DataSource<?>> PRODUCTS = c -> c.products();
-    private static final Function<Ctx, DataSource<?>> TRANSACTIONS = c -> c.transactions();
 
     @Before
     public void setUp() {
@@ -83,11 +72,9 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity2CrossProductNoFilter() {
-        // join() returns raw Join2First via asNext() unchecked cast; use var + pre-typed source
         var rule = builder.from("all-pairs", ctx -> ctx.persons())
-                .join(ACCOUNTS)
+                .join(ctx -> ctx.accounts())
                 .fn((ctx, a, b) -> {
                 });
 
@@ -97,12 +84,10 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity2FilterOnBothFacts() {
-        // In raw context, fact params are Object; use explicit casts in the lambda
         var rule = builder.from("adult-high-balance", ctx -> ctx.persons())
-                .join(ACCOUNTS)
-                .filter((ctx, a, b) -> ((Person) a).age() >= 18 && ((Account) b).balance() > 500.0)
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0)
                 .fn((ctx, a, b) -> {
                 });
 
@@ -114,13 +99,12 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity2MultipleFilters() {
         // Chained .filter().filter() — verifies filterCount=2 is structurally recorded
         var rule = builder.from("two-filters", ctx -> ctx.persons())
-                .join(ACCOUNTS)
-                .filter((ctx, a, b) -> ((Person) a).age() >= 18)
-                .filter((ctx, a, b) -> ((Account) b).balance() > 500.0)
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, a, b) -> a.age() >= 18)
+                .filter((ctx, a, b) -> b.balance() > 500.0)
                 .fn((ctx, a, b) -> {
                 });
 
@@ -132,10 +116,9 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity2CapturedFactsDistinguishByType() {
         var rule = builder.from("typed", ctx -> ctx.persons())
-                .join(ACCOUNTS)
+                .join(ctx -> ctx.accounts())
                 .fn((ctx, a, b) -> {
                 });
 
@@ -146,12 +129,11 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity3ThreeFacts() {
         // Unfiltered three-way cross-product: 2×2×2 = 8 combinations
         var rule = builder.from("three-facts", ctx -> ctx.persons())
-                .join(ACCOUNTS)
-                .join(ORDERS)
+                .join(ctx -> ctx.accounts())
+                .join(ctx -> ctx.orders())
                 .fn((ctx, a, b, c) -> {
                 });
 
@@ -164,13 +146,12 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity3IntermediateFilter() {
         var rule = builder.from("filtered-triple", ctx -> ctx.persons())
-                .join(ACCOUNTS)
-                .filter((ctx, a, b) -> ((Person) a).age() >= 18 && ((Account) b).balance() > 500.0)
-                .join(ORDERS)
-                .filter((ctx, a, b, c) -> ((Order) c).amount() > 100.0)
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0)
+                .join(ctx -> ctx.orders())
+                .filter((ctx, a, b, c) -> c.amount() > 100.0)
                 .fn((ctx, a, b, c) -> {
                 });
 
@@ -186,12 +167,11 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity4AllTypesDistinct() {
         var rule = builder.from("four-facts", ctx -> ctx.persons())
-                .join(ACCOUNTS)
-                .join(ORDERS)
-                .join(PRODUCTS)
+                .join(ctx -> ctx.accounts())
+                .join(ctx -> ctx.orders())
+                .join(ctx -> ctx.products())
                 .fn((ctx, a, b, c, d) -> {
                 });
 
@@ -205,13 +185,12 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity5AllTypesDistinct() {
         var rule = builder.from("five-facts", ctx -> ctx.persons())
-                .join(ACCOUNTS)
-                .join(ORDERS)
-                .join(PRODUCTS)
-                .join(TRANSACTIONS)
+                .join(ctx -> ctx.accounts())
+                .join(ctx -> ctx.orders())
+                .join(ctx -> ctx.products())
+                .join(ctx -> ctx.transactions())
                 .fn((ctx, a, b, c, d, e) -> {
                 });
 
@@ -222,18 +201,19 @@ public class RuleBuilderTest {
     }
 
     @Test
-    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity6LeafNodeCompiles() {
         var rule = builder.from("six-facts", ctx -> ctx.persons())
-                .join(ACCOUNTS)
-                .join(ORDERS)
-                .join(PRODUCTS)
-                .join(TRANSACTIONS)
-                .join(PERSONS)
+                .join(ctx -> ctx.accounts())
+                .join(ctx -> ctx.orders())
+                .join(ctx -> ctx.products())
+                .join(ctx -> ctx.transactions())
+                .join(ctx -> ctx.persons())
                 .fn((ctx, a, b, c, d, e, f) -> {
                 });
 
         assertThat(rule.sourceCount()).isEqualTo(6);
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(64); // 2^6 = 64 combinations
     }
 
     @Test
@@ -259,5 +239,100 @@ public class RuleBuilderTest {
         assertThat(rule.executionCount()).isEqualTo(2);
         assertThat(rule.capturedFacts(0)).containsExactly(new Person("Alice", 30));
         assertThat(rule.capturedFacts(1)).containsExactly(new Person("Bob", 17));
+    }
+
+    // =========================================================================
+    // Typed join() — fully typed chain without casts or pre-typed constants
+    // =========================================================================
+
+    @Test
+    public void testArity2FullyTyped() {
+        // Compile-time proof: the typed join() chain resolves B=Account from the lambda.
+        // a is Person, b is Account — the compiler enforces types, no casts needed.
+        // Runtime behaviour is equivalent to testArity2FilterOnBothFacts.
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0)
+                .fn((ctx, a, b) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(rule.capturedFact(0, 0)).isEqualTo(new Person("Alice", 30));
+        assertThat(rule.capturedFact(0, 1)).isEqualTo(new Account("ACC1", 1000.0));
+    }
+
+    @Test
+    public void testArity3FullyTyped() {
+        // Compile-time proof: three-way join resolves A=Person, B=Account, C=Order.
+        // Runtime behaviour is equivalent to testArity3IntermediateFilter (single combined filter).
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .join(ctx -> ctx.accounts())
+                .join(ctx -> ctx.orders())
+                .filter((ctx, a, b, c) -> a.age() >= 18 && b.balance() > 500.0 && c.amount() > 100.0)
+                .fn((ctx, a, b, c) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(rule.capturedFact(0, 0)).isEqualTo(new Person("Alice", 30));
+        assertThat(rule.capturedFact(0, 1)).isEqualTo(new Account("ACC1", 1000.0));
+        assertThat(rule.capturedFact(0, 2)).isEqualTo(new Order("ORD1", 150.0));
+    }
+
+    // =========================================================================
+    // Dual filter() — single-fact and all-facts overloads
+    // =========================================================================
+
+    @Test
+    public void testArity2SingleFactFilter() {
+        // filter(Predicate2<DS, Account>) — tests only the most recently joined fact.
+        // 2 persons × 1 high-balance account = 2 executions (person not filtered here).
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, b) -> b.balance() > 500.0)
+                .fn((ctx, a, b) -> {
+                });
+
+        assertThat(rule.filterCount()).isEqualTo(1);
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(2); // Alice+ACC1, Bob+ACC1
+    }
+
+    @Test
+    public void testArity2BothFilterTypesChained() {
+        // Chain single-fact filter (on Account) then cross-fact filter (Person + Account).
+        // Only Alice(30) + ACC1(1000) satisfies both.
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, b) -> b.balance() > 500.0)
+                .filter((ctx, a, b) -> a.age() >= 18)
+                .fn((ctx, a, b) -> {
+                });
+
+        assertThat(rule.filterCount()).isEqualTo(2);
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(rule.capturedFact(0, 0)).isEqualTo(new Person("Alice", 30));
+        assertThat(rule.capturedFact(0, 1)).isEqualTo(new Account("ACC1", 1000.0));
+    }
+
+    @Test
+    public void testArity3SingleFactFilterOnLatestFact() {
+        // After joining persons + accounts + orders, single-fact filter tests only Order.
+        // 2 persons × 2 accounts × 1 qualifying order (ORD1 amount>100) = 4 combos.
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .join(ctx -> ctx.accounts())
+                .join(ctx -> ctx.orders())
+                .filter((ctx, c) -> c.amount() > 100.0)
+                .fn((ctx, a, b, c) -> {
+                });
+
+        assertThat(rule.filterCount()).isEqualTo(1);
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(4);
+        assertThat(rule.capturedFact(0, 2)).isInstanceOf(Order.class);
     }
 }
