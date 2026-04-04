@@ -121,8 +121,36 @@ public class PermuteMojo extends AbstractMojo {
             if (templateDirectory.exists()) {
                 getLog().info("Permuplate: scanning " + templateDirectory + " for inline templates");
                 SourceScanner.ScanResult templateScan = SourceScanner.scan(templateDirectory);
+
+                // Group inline templates by source file. Multiple inline templates in the same
+                // parent must be chained: output CU of each call becomes input of the next.
+                // Declaration order is preserved by SourceScanner.findAll() (depth-first).
+                java.util.Map<java.nio.file.Path, java.util.List<SourceScanner.AnnotatedType>> inlineByFile = new java.util.LinkedHashMap<>();
+
                 for (SourceScanner.AnnotatedType entry : templateScan.types()) {
-                    processType(entry);
+                    PermuteConfig config;
+                    try {
+                        config = AnnotationReader.readPermute(entry.permuteAnn());
+                    } catch (AnnotationReader.MojoAnnotationException e) {
+                        throw new MojoExecutionException(entry.sourceFile() + ": " + e.getMessage(), e);
+                    }
+                    boolean isNested = entry.classDecl().isNestedType();
+                    if (config.inline && !isNested) {
+                        throw new MojoExecutionException(entry.sourceFile() +
+                                ": @Permute inline=true is only valid on nested static classes");
+                    }
+                    validateConfig(config, entry.sourceFile().toString());
+                    if (config.inline) {
+                        inlineByFile.computeIfAbsent(entry.sourceFile(),
+                                k -> new java.util.ArrayList<>()).add(entry);
+                    } else {
+                        generateTopLevel(entry, config);
+                    }
+                }
+
+                for (java.util.Map.Entry<java.nio.file.Path, java.util.List<SourceScanner.AnnotatedType>> fileGroup : inlineByFile
+                        .entrySet()) {
+                    generateInlineGroup(fileGroup.getKey(), fileGroup.getValue());
                 }
             }
         } catch (MojoExecutionException e) {
@@ -146,14 +174,16 @@ public class PermuteMojo extends AbstractMojo {
             throw new MojoExecutionException(entry.sourceFile() +
                     ": @Permute inline=true is only valid on nested static classes");
         }
+        if (config.inline) {
+            throw new MojoExecutionException(entry.sourceFile() +
+                    ": @Permute inline=true templates must be placed in the templateDirectory" +
+                    " (default: src/main/permuplate/), not sourceDirectory." +
+                    " Move this file to src/main/permuplate/ and remove it from src/main/java/.");
+        }
 
         validateConfig(config, entry.sourceFile().toString());
 
-        if (config.inline) {
-            generateInline(entry, config);
-        } else {
-            generateTopLevel(entry, config);
-        }
+        generateTopLevel(entry, config);
     }
 
     private void validateConfig(PermuteConfig config, String location) throws MojoExecutionException {
@@ -261,6 +291,64 @@ public class PermuteMojo extends AbstractMojo {
                 : packageName + "." + parentClassName;
         writeGeneratedFile(qualifiedName, outputCu.toString());
         getLog().info("Permuplate: generated inline classes in " + qualifiedName);
+    }
+
+    /**
+     * Processes all inline templates from a single parent file in declaration order,
+     * chaining InlineGenerator calls so the output CU of each becomes the input of
+     * the next. Writes the final combined output once.
+     *
+     * <p>
+     * This is required when a parent file has multiple @Permute(inline=true) templates.
+     * Without chaining, each call would write independently, overwriting the previous output.
+     */
+    private void generateInlineGroup(java.nio.file.Path sourceFile,
+            java.util.List<SourceScanner.AnnotatedType> entries) throws Exception {
+        if (entries.isEmpty())
+            return;
+
+        com.github.javaparser.ast.CompilationUnit currentCu = entries.get(0).cu();
+
+        for (SourceScanner.AnnotatedType entry : entries) {
+            String templateName = entry.classDecl().getNameAsString();
+
+            // Find the template in the CURRENT CU — may be output of a previous call.
+            ClassOrInterfaceDeclaration currentTemplate = currentCu.findFirst(
+                    ClassOrInterfaceDeclaration.class,
+                    c -> c.getNameAsString().equals(templateName))
+                    .orElseThrow(() -> new MojoExecutionException(sourceFile +
+                            ": cannot find template class '" + templateName + "' in current CU"));
+
+            // Re-read @Permute config from the template in the current CU.
+            com.github.javaparser.ast.expr.AnnotationExpr permuteAnn = currentTemplate.getAnnotations().stream()
+                    .filter(a -> a.getNameAsString().equals("Permute")
+                            || a.getNameAsString().equals("io.quarkiverse.permuplate.Permute"))
+                    .findFirst()
+                    .orElseThrow(() -> new MojoExecutionException(sourceFile +
+                            ": @Permute annotation missing on '" + templateName + "'"));
+
+            PermuteConfig config;
+            try {
+                config = AnnotationReader.readPermute(permuteAnn);
+            } catch (AnnotationReader.MojoAnnotationException e) {
+                throw new MojoExecutionException(sourceFile + ": " + e.getMessage(), e);
+            }
+            java.util.List<java.util.Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
+            currentCu = InlineGenerator.generate(currentCu, currentTemplate, config, allCombinations);
+        }
+
+        // Write the final combined output once.
+        ClassOrInterfaceDeclaration topLevel = currentCu.findFirst(
+                ClassOrInterfaceDeclaration.class, c -> !c.isNestedType())
+                .orElseThrow(() -> new MojoExecutionException(
+                        sourceFile + ": cannot find top-level class in output"));
+        String parentClassName = topLevel.getNameAsString();
+        String packageName = currentCu.getPackageDeclaration()
+                .map(p -> p.getNameAsString()).orElse("");
+        String qualifiedName = packageName.isEmpty() ? parentClassName
+                : packageName + "." + parentClassName;
+        writeGeneratedFile(qualifiedName, currentCu.toString());
+        getLog().info("Permuplate: generated inline group in " + qualifiedName);
     }
 
     private void processMethod(SourceScanner.AnnotatedMethod entry) throws Exception {
