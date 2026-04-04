@@ -79,6 +79,8 @@ This is not a problem — it shows the explicit path clearly and the templates r
 
 **Rule:** when evolving this example, keep using single-letter type parameter names (`${alpha(j)}`) to stay consistent with Drools. Do not switch to `T${j}` — that would diverge from the Drools convention this example is designed to approximate.
 
+**Future idea:** provide a second variant of the DSL using `T${j}` naming to demonstrate the zero-annotation implicit inference path side-by-side with the alpha explicit path. Both would produce the same runtime behaviour, showing the Permuplate trade-off between naming convention and annotation burden.
+
 ---
 
 ## What Permuplate Features Each Phase Exercises
