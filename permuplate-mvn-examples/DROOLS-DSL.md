@@ -69,15 +69,15 @@ Users hold `JoinNFirst`. They never explicitly hold a bare `JoinNSecond` in norm
 
 ---
 
-## Naming Convention: Why `T${j}` not `A, B, C`
+## Naming Convention: `A, B, C, D` — Matching Drools Conventions
 
-This example uses `T1, T2, T3,...` (the `T${j}` convention) throughout. This is a deliberate choice:
+This example uses single-letter type parameter names (`A, B, C, D, E, F`) throughout — exactly as the real Drools codebase does. This is a deliberate choice to keep the example faithful to Drools and make the eventual migration as direct as possible.
 
-**`T${j}` enables zero-annotation implicit inference.** Permuplate's Maven plugin can automatically infer return types, parameter types, and type parameter expansions when names follow the `T+number` pattern. No `@PermuteReturn`, no `@PermuteDeclr` — just `@Permute` and `@PermuteMethod`.
+**Implication:** single-letter names disable Permuplate's implicit inference, which requires the `T+number` pattern (T1, T2, T3) to identify the growing type parameter tip. As a result, this example uses **explicit annotations throughout** — `@PermuteTypeParam(name="${alpha(j)}")`, `@PermuteReturn`, `@PermuteDeclr` — rather than relying on zero-annotation inference.
 
-The original Drools code uses `A, B, C, D, E` (single-letter names). That naming convention requires explicit `@PermuteReturn` and `@PermuteDeclr` annotations throughout because the processor cannot identify the growing tip from letter names. For a hand-maintained template that will evolve over time, the T${j} implicit path is significantly easier to maintain.
+This is not a problem — it shows the explicit path clearly and the templates remain readable and maintainable. The alpha functions (`alpha(j)` → A, B, C...) and `typeArgList(..., "alpha")` handle the naming. The implicit path (T${j} convention) is validated separately in `PermuteReturnTest` and `PermuteTypeParamTest`.
 
-**Rule:** when evolving this example, prefer `T${j}` naming to keep the templates annotation-minimal. If alpha naming is genuinely required for some reason, document why.
+**Rule:** when evolving this example, keep using single-letter type parameter names (`${alpha(j)}`) to stay consistent with Drools. Do not switch to `T${j}` — that would diverge from the Drools convention this example is designed to approximate.
 
 ---
 
@@ -88,9 +88,8 @@ Sequential join chain: `from → join → filter → fn`
 
 | Feature | Used by |
 |---|---|
-| **G1** `@PermuteTypeParam` (implicit) | `Consumer1`, `Predicate1` — type params expand with `@PermuteParam` |
-| **G2** `@PermuteReturn` (implicit) | `JoinNSecond.join()` — return type inferred from T${j} convention |
-| **G2** `@PermuteReturn` (explicit) | `JoinNFirst.filter()` — self-return; `fn()` — fixed RuleDefinition return |
+| **G1** `@PermuteTypeParam` (explicit, alpha) | `Consumer1`, `Predicate1`, `JoinNSecond`, `JoinNFirst` — `name="${alpha(j)}"` |
+| **G2** `@PermuteReturn` (explicit) | All return types — alpha naming disables implicit inference; `join()`, `filter()`, `fn()` all use explicit `@PermuteReturn` |
 | **G2** Boundary omission | `Join6Second` — leaf node, no `join()` methods generated |
 | **G3** `@PermuteMethod` | `JoinNSecond` — multiple `join()` overloads (Phase 1: `to` inferred, but just 1 overload per class for sequential chain) |
 | **G3** Extends expansion | `JoinNFirst extends JoinNSecond` — extends clause auto-expanded per arity |
@@ -157,7 +156,7 @@ If any arity behaves differently from the others in equivalent scenarios, that i
 |---|---|---|
 | `filter()` requires explicit `@PermuteReturn` | Self-return inference (TODO-2) not yet implemented | Explicit `@PermuteReturn(typeArgs="DS, ${typeArgList(1,i,'T')}")` |
 | `fn()` requires explicit `@PermuteReturn(when="true")` | `RuleDefinition` not in the generated set — boundary omission would wrongly omit it | `when="true"` overrides boundary check |
-| Alpha naming (`A,B,C`) not used | Would disable implicit inference, requiring explicit annotations everywhere | Use `T${j}` convention; alpha is tested separately in `PermuteReturnTest` |
+| All return types require explicit `@PermuteReturn` | Alpha naming (`A,B,C`) disables implicit inference — deliberate to match Drools conventions | `@PermuteReturn` + `@PermuteDeclr` throughout; implicit path tested in `PermuteReturnTest` |
 | Maximum arity is 6 | Practical limit for the example | Change `to=6` on all templates to extend; tests should scale automatically |
 
 ---
