@@ -115,6 +115,24 @@ public class RuleBuilderTest {
 
     @Test
     @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void testArity2MultipleFilters() {
+        // Chained .filter().filter() — verifies filterCount=2 is structurally recorded
+        var rule = builder.from("two-filters", ctx -> ctx.persons())
+                .join(ACCOUNTS)
+                .filter((ctx, a, b) -> ((Person) a).age() >= 18)
+                .filter((ctx, a, b) -> ((Account) b).balance() > 500.0)
+                .fn((ctx, a, b) -> {
+                });
+
+        assertThat(rule.filterCount()).isEqualTo(2);
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(rule.capturedFact(0, 0)).isEqualTo(new Person("Alice", 30));
+        assertThat(rule.capturedFact(0, 1)).isEqualTo(new Account("ACC1", 1000.0));
+    }
+
+    @Test
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public void testArity2CapturedFactsDistinguishByType() {
         var rule = builder.from("typed", ctx -> ctx.persons())
                 .join(ACCOUNTS)
@@ -125,6 +143,24 @@ public class RuleBuilderTest {
 
         assertThat(rule.capturedFact(0, 0)).isInstanceOf(Person.class);
         assertThat(rule.capturedFact(0, 1)).isInstanceOf(Account.class);
+    }
+
+    @Test
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    public void testArity3ThreeFacts() {
+        // Unfiltered three-way cross-product: 2×2×2 = 8 combinations
+        var rule = builder.from("three-facts", ctx -> ctx.persons())
+                .join(ACCOUNTS)
+                .join(ORDERS)
+                .fn((ctx, a, b, c) -> {
+                });
+
+        assertThat(rule.sourceCount()).isEqualTo(3);
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(8);
+        assertThat(rule.capturedFact(0, 0)).isInstanceOf(Person.class);
+        assertThat(rule.capturedFact(0, 1)).isInstanceOf(Account.class);
+        assertThat(rule.capturedFact(0, 2)).isInstanceOf(Order.class);
     }
 
     @Test
