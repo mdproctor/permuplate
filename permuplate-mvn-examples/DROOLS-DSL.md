@@ -68,6 +68,100 @@ var rule = builder.from("name", ctx -> ctx.persons())
 
 ---
 
+## Typed join() — Method-Level @PermuteTypeParam with Propagation
+
+`join()` uses `@PermuteTypeParam` on its own type parameter `<B>` to rename it to the next alpha letter per arity. The rename automatically propagates into the parameter type `DataSource<B>` — no `@PermuteDeclr` needed.
+
+```java
+// Template:
+@PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "${alpha(m)}")
+@PermuteReturn(className = "Join${i+1}First", typeArgs = "'DS, ' + typeArgList(1, i+1, 'alpha')")
+public <B> Object join(java.util.function.Function<DS, DataSource<B>> source) { ... }
+
+// Generated at i=1 (Join1First<DS, A>):
+public <B> Join2First<DS, A, B> join(Function<DS, DataSource<B>> source)
+
+// Generated at i=2 (Join2First<DS, A, B>):
+public <C> Join3First<DS, A, B, C> join(Function<DS, DataSource<C>> source)
+```
+
+This matches the real Drools pattern exactly. No pre-typed constants, no `@SuppressWarnings`, no explicit casts at call sites.
+
+### Before and After
+
+```java
+// Before (Phase 1) — raw types, constants, casts
+private static final Function<Ctx, DataSource<?>> ACCOUNTS = c -> c.accounts();
+
+@SuppressWarnings({"unchecked", "rawtypes"})
+var rule = builder.from("adults", ctx -> ctx.persons())
+        .join(ACCOUNTS)                      // pre-typed constant required
+        .filter((ctx, a, b) -> ((Person) a).age() >= 18 && ((Account) b).balance() > 500.0)
+        .fn((ctx, a, b) -> {});
+
+// After — fully typed, inline lambdas, no casts
+var rule = builder.from("adults", ctx -> ctx.persons())
+        .join(ctx -> ctx.accounts())          // B inferred as Account
+        .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0)  // a: Person, b: Account
+        .fn((ctx, a, b) -> {});
+```
+
+## Dual filter() Overloads
+
+Every `JoinNFirst` at arity N≥2 has two `filter()` overloads, matching real Drools ergonomics:
+
+- **Single-fact** — tests only the most recently joined fact:
+  `filter(Predicate2<DS, alpha(N)> predicate)` — ergonomic for post-join checks on one fact
+- **All-facts** — tests all accumulated facts:
+  `filter(Predicate${N+1}<DS, A, B, …> predicate)` — cross-fact comparisons
+
+`Join1First` has only the all-facts overload (which IS the single-fact overload at arity 1 — same signature).
+
+### The Arity-1 Suppression Mechanism
+
+At arity 1, both overloads would have `filter(Predicate2<DS, A>)` — identical. Java rejects duplicates. The template uses a `@PermuteMethod` JEXL ternary in `from` to suppress the single-fact sentinel when i=1:
+
+```java
+// from="${i > 1 ? i : i+1}" produces from=2, to=1 at i=1 → empty range → method omitted.
+// At i=2+: from=i, to=i → one clone per arity.
+@PermuteMethod(varName = "x", from = "${i > 1 ? i : i+1}", to = "${i}", name = "filter")
+public Object filterLatest(@PermuteDeclr(type = "Predicate2<DS, ${alpha(i)}>") Object p) { ... }
+```
+
+The inner variable `x` is a loop counter only; annotations use the outer `i`. Sentinel named `filterLatest`; `name="filter"` renames the output.
+
+### Usage
+
+```java
+// All-facts filter — cross-fact comparison
+.filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0)
+
+// Single-fact filter — just the latest joined fact
+.join(ctx -> ctx.accounts())
+.filter((ctx, b) -> b.balance() > 500.0)   // b is Account only
+
+// Chained — single-fact then cross-fact
+.filter((ctx, b) -> b.balance() > 500.0)   // Account passes this
+.filter((ctx, a, b) -> a.age() >= 18)       // both facts needed here
+```
+
+## Comparison with Real Drools RuleBuilder
+
+Studied at `droolsvol2/src/main/java/org/drools/core/RuleBuilder.java`:
+
+| Feature | Real Drools | This Example |
+|---|---|---|
+| Typed `join(Function<DS, DataSource<C>>)` | ✅ `<C> Join2First<...,B,C> join(...)` | ✅ identical pattern |
+| Single-fact `filter(Predicate2<DS, C>)` | ✅ per arity | ✅ per arity (arity 2+) |
+| All-facts `filter(PredicateN+1<DS,...>)` | ✅ per arity | ✅ per arity |
+| First extends Second hierarchy | ✅ | Phase 2 |
+| `join(Join2Second)` multi-step | ✅ | Phase 2 |
+| `not()` scoped negation | ✅ | Phase 3+ |
+| Boundary omission (leaf node) | ❌ manually written | ✅ automatic via `@PermuteReturn` |
+| Extend to arity 10 | Requires editing N classes | Change `to=6` → `to=10` |
+
+---
+
 ## Phase 2 Design Intent: First / Second Split (Future)
 
 The real Drools codebase uses a **two-family design** that Phase 2 of this example will eventually implement:
@@ -179,7 +273,6 @@ If any arity behaves differently from the others in equivalent scenarios, that i
 | Limitation | Root cause | Workaround / Note |
 |---|---|---|
 | No First/Second split in Phase 1 | G3 extends expansion requires `T+number` suffix; alpha naming has no suffix | Single `JoinFirst` family; Phase 2 will retrofit the split |
-| `join()` parameter is `Function<DS, DataSource<?>>` not typed | Next arity's type param not in scope in template | Wildcard allows lambda target inference at arity 1; arity 2+ needs pre-typed constants |
 | `join()` return type is raw (no type args) | Next arity's type param not in scope | Raw return + reflective instantiation; arity-2+ lambdas require explicit casts |
 | `wrapPredicate` truncates facts to filter's arity | Filters registered at different arities share the same NaryPredicate/run() loop | `m.getParameterCount() - 1` gives the filter's fact count; extra facts are truncated |
 | `JoinNFirst` nested inside `JoinBuilder` | `inline=true` requires a container class | Use `var` in tests; qualified name `JoinBuilder.Join1First` when explicit |
