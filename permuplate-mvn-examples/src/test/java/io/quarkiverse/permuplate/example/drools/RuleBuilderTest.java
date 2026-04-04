@@ -335,4 +335,95 @@ public class RuleBuilderTest {
         assertThat(rule.executionCount()).isEqualTo(4);
         assertThat(rule.capturedFact(0, 2)).isInstanceOf(Order.class);
     }
+
+    // =========================================================================
+    // Bi-linear joins — pre-built sub-networks joined into another chain
+    // =========================================================================
+
+    @Test
+    public void testJoin2FirstSatisfiesJoin2SecondAtCompileTime() {
+        // Structural: Join2First<Void,Ctx,Person,Account> IS-A Join2Second<Void,Ctx,Person,Account>.
+        // This test only compiles if the extends relation is correct.
+        // If Join2First does not extend Join2Second, this assignment fails at compile time.
+        JoinBuilder.Join2Second<Void, Ctx, Person, Account> asSecond = builder.from("persons", ctx -> ctx.persons())
+                .join(ctx -> ctx.accounts());
+        assertThat(asSecond).isNotNull();
+    }
+
+    @Test
+    public void testBilinearJoin1Plus2Gives3Facts() {
+        // Pre-build a 2-fact sub-network: only adult persons with high-balance accounts.
+        var personAccounts = builder.from("pa", ctx -> ctx.persons())
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0);
+
+        // Bi-linear join: orders (1 fact) x personAccounts (2 facts) -> 3-fact rule.
+        // personAccounts' internal filter gates its own tuples; only Alice+ACC1 qualifies.
+        var rule = builder.from("orders", ctx -> ctx.orders())
+                .join(personAccounts)
+                .fn((ctx, a, b, c) -> {
+                });
+
+        assertThat(rule.sourceCount()).isEqualTo(2); // 1 linear + 1 bi-linear = 2 entries
+        rule.run(ctx);
+
+        // 2 orders x 1 qualifying (Alice+ACC1) = 2 matches
+        assertThat(rule.executionCount()).isEqualTo(2);
+        assertThat(rule.capturedFact(0, 0)).isInstanceOf(Order.class);
+        assertThat(rule.capturedFact(0, 1)).isEqualTo(new Person("Alice", 30));
+        assertThat(rule.capturedFact(0, 2)).isEqualTo(new Account("ACC1", 1000.0));
+    }
+
+    @Test
+    public void testBilinearSubnetworkFiltersApplyIndependently() {
+        // The right chain's filter (balance > 500) applies within the sub-network only.
+        // It gates which Account tuples enter the cross-product -- it does NOT re-run
+        // against the combined (Person, Account) tuple. Result: both persons are joined
+        // with only ACC1, giving 2 matches (not 1).
+        var highBalanceAccounts = builder.from("acc", ctx -> ctx.accounts())
+                .filter((ctx, a) -> a.balance() > 500.0); // only ACC1 passes
+
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .join(highBalanceAccounts)
+                .fn((ctx, a, b) -> {
+                });
+
+        rule.run(ctx);
+
+        // 2 persons x 1 qualifying account = 2 combinations
+        assertThat(rule.executionCount()).isEqualTo(2);
+        assertThat(rule.capturedFact(0, 1)).isEqualTo(new Account("ACC1", 1000.0));
+        assertThat(rule.capturedFact(1, 1)).isEqualTo(new Account("ACC1", 1000.0));
+    }
+
+    @Test
+    public void testBilinearNodeSharingTwoRulesReuseSameSubnetwork() {
+        // Two rules share the same pre-built personAccounts sub-network.
+        // This is the core Rete node-sharing pattern: in a real Rete network,
+        // both rules would share the same beta memory for the personAccounts sub-network.
+        var personAccounts = builder.from("pa", ctx -> ctx.persons())
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0);
+
+        var rule1 = builder.from("orders", ctx -> ctx.orders())
+                .join(personAccounts)
+                .fn((ctx, a, b, c) -> {
+                });
+
+        var rule2 = builder.from("products", ctx -> ctx.products())
+                .join(personAccounts)
+                .fn((ctx, a, b, c) -> {
+                });
+
+        rule1.run(ctx);
+        rule2.run(ctx);
+
+        // Both rules: N facts x 1 qualifying personAccounts tuple (Alice+ACC1)
+        assertThat(rule1.executionCount()).isEqualTo(2); // 2 orders x 1 pair
+        assertThat(rule2.executionCount()).isEqualTo(2); // 2 products x 1 pair
+
+        // Both rules see Person and Account from the shared sub-network
+        assertThat(rule1.capturedFact(0, 1)).isEqualTo(new Person("Alice", 30));
+        assertThat(rule2.capturedFact(0, 1)).isEqualTo(new Person("Alice", 30));
+    }
 }
