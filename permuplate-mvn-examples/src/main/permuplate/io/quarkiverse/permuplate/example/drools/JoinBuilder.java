@@ -45,7 +45,7 @@ public class JoinBuilder {
          * method is silently omitted (leaf node).
          */
         @PermuteReturn(className = "Join${i+1}First")
-        public Object join(Object source) {
+        public Object join(java.util.function.Function<DS, DataSource<?>> source) {
             rd.addSource(source);
             return rd.asNext();
         }

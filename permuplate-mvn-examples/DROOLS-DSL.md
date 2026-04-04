@@ -24,48 +24,71 @@ Rather than modifying the Drools codebase directly as the first experiment, this
 The DSL builds a rule by fluent chaining. Each step accumulates one more fact type into the rule's type signature:
 
 ```java
-RuleDefinition rule = builder.rule("age-comparison")
-        .from(ctx -> ctx.persons())                          // 1 fact: Person
-        .join(ctx -> ctx.colleagues())                       // 2 facts: Person, Person
+RuleDefinition<Ctx> rule = builder.from("age-comparison", ctx -> ctx.persons())
+        .join(ctx -> ctx.persons())                          // 2 facts: Person, Person
         .filter((ctx, p1, p2) -> p1.age() > p2.age())       // still 2 facts
         .filter((ctx, p1, p2) -> p2.age() > 18)             // still 2 facts
         .fn((ctx, p1, p2) -> System.out.println("match"));  // terminal: produces RuleDefinition
 ```
 
-The type parameter list grows with each `join()`: `Join1First<DS,T1>` → `Join2First<DS,T1,T2>` → `Join3First<DS,T1,T2,T3>`. The compiler enforces that your lambda signatures match the accumulated fact types exactly.
+The type parameter list grows with each `join()`: `Join1First<DS,A>` → `Join2First<DS,A,B>` → `Join3First<DS,A,B,C>`. The compiler enforces that your lambda signatures match the accumulated fact types exactly.
 
 ---
 
-## The First / Second Split — The Key Design Decision
+## Phase 1 Architecture: Single JoinFirst Family
 
-This is the most important and subtle aspect of the DSL design. Every arity level has **two classes**:
+Phase 1 uses a **single class family** — `Join1First` through `Join6First` — generated from one template (`Join0First` inside `JoinBuilder.java`). Each `JoinNFirst` holds all three operations:
 
-- **`JoinNSecond<DS, T1,...,TN>`** — the "gateway" class. Its job is to accept operations that **advance the arity** — specifically `join()`.
-- **`JoinNFirst<DS, T1,...,TN> extends JoinNSecond<DS, T1,...,TN>`** — the "full" class. Its job is to hold all operations that **preserve the arity** — `filter()`, and terminal operations like `fn()`.
+- `join(source)` — advances to `Join(N+1)First` (omitted from `Join6First` via boundary omission — the leaf node)
+- `filter(predicate)` — arity-preserving; returns `this` (same `JoinNFirst`)
+- `fn(consumer)` — terminal; returns `RuleDefinition<DS>`
 
-### Why split them?
+This is a pragmatic choice for Phase 1 given current Permuplate constraints (see "Phase 2 Design Intent" below).
 
-**Type-safe API guidance.** The user always holds a `JoinNFirst`. Because `First extends Second`, they can call both arity-preserving and arity-advancing operations. But the *parameter type* of multi-step join overloads (Phase 2) accepts `JoinNSecond` — not `JoinNFirst`. This means:
+### The Leaf Node
+
+`Join6First` has no `join()` method — `@PermuteReturn` boundary omission silently removes it when `Join7First` is not in the generated set. `filter()` and `fn()` are still present: you can refine and terminate at arity 6.
+
+### Container Class Pattern (inline=true)
+
+The `JoinFirst` family lives inside a container class `JoinBuilder.java` and is generated with `inline=true`. This is required because `@PermuteReturn` boundary omission only works in InlineGenerator (inline mode) — the APT top-level generator does not support it. As a result, the generated classes are nested inside `JoinBuilder`:
+
+- `JoinBuilder.Join1First<DS, A>`
+- `JoinBuilder.Join2First<DS, A, B>`
+- ...
+- `JoinBuilder.Join6First<DS, A, B, C, D, E, F>`
+
+When using `var` in tests, the qualified name is transparent:
 
 ```java
-// Phase 2 multi-step join:
-join1First.join(existingJoin2First)   // OK: Join2First satisfies Join2Second
+var rule = builder.from("name", ctx -> ctx.persons())
+        .join(ctx -> ctx.accounts())
+        .fn((ctx, a, b) -> {});
 ```
 
-`JoinNSecond` acts as the **input contract** for pre-built N-arity structures. `JoinNFirst` is the **output** of every chain step. The split ensures:
+---
 
-- You can always filter repeatedly (stay on First, same type)
-- You can always advance arity via join() (move from First to (N+1)First)
-- Pre-built structures can be used as join inputs via the Second supertype
-- `fn()` is on First — you can only terminate when holding a fully-assembled structure
+## Phase 2 Design Intent: First / Second Split (Future)
 
-### What the user never sees directly
+The real Drools codebase uses a **two-family design** that Phase 2 of this example will eventually implement:
 
-Users hold `JoinNFirst`. They never explicitly hold a bare `JoinNSecond` in normal usage. Second is an implementation detail of the inheritance hierarchy and the Phase 2 multi-step join parameter types. But its presence is what makes the design extensible.
+- **`JoinNSecond<DS, T1,...,TN>`** — the "gateway" class, accepting only arity-advancing operations (`join()`).
+- **`JoinNFirst<DS, T1,...,TN> extends JoinNSecond`** — the "full" class with all operations.
 
-### The leaf node
+The split enables multi-step joins in Phase 2:
 
-`Join6Second` has no `join()` methods — `@PermuteMethod` with inferred `to = @Permute.to - i = 6 - 6 = 0` produces an empty range, silently generating zero overloads. This is automatic and correct: you cannot join beyond 6 facts. `Join6First` still has `filter()` and `fn()` — you can still refine and terminate at arity 6.
+```java
+// Phase 2 multi-step join — join(Join2First) via Second supertype:
+join1First.join(existingJoin2First)   // Join2First satisfies Join2Second
+```
+
+`JoinNSecond` acts as the **input contract** for pre-built N-arity structures. This is why `fn()` lives on First — you can only terminate when holding a fully-assembled structure.
+
+### Why Not Phase 1?
+
+G3 extends clause auto-expansion uses name-prefix + embedded numeric suffix detection (`"Join"` + `"2"` → sibling `"Join2Second"`). Alpha naming (`A, B, C`) has no numeric suffix — G3 cannot locate siblings. Until Permuplate gains alpha-aware G3 expansion, the First/Second split requires either `T${j}` naming (breaking Drools convention) or manual maintenance. Phase 1 defers this as accepted design debt.
+
+**When Phase 2 is implemented:** The single `JoinNFirst` family will be split into separate Second and First families. The `join()` parameter type will change from `Function<DS, DataSource<?>>` to the typed `JoinNSecond` supertype. This is a breaking API change that will require test updates.
 
 ---
 
@@ -87,23 +110,22 @@ This is not a problem — it shows the explicit path clearly and the templates r
 
 ## What Permuplate Features Each Phase Exercises
 
-### Phase 1 (implemented here)
+### Phase 1 (implemented)
 Sequential join chain: `from → join → filter → fn`
 
 | Feature | Used by |
 |---|---|
-| **G1** `@PermuteTypeParam` (explicit, alpha) | `Consumer1`, `Predicate1`, `JoinNSecond`, `JoinNFirst` — `name="${alpha(j)}"` |
+| **G1** `@PermuteTypeParam` (explicit, alpha) | `Consumer1`, `Predicate1`, `Join0First` — `name="${alpha(k)}"` |
 | **G2** `@PermuteReturn` (explicit) | All return types — alpha naming disables implicit inference; `join()`, `filter()`, `fn()` all use explicit `@PermuteReturn` |
-| **G2** Boundary omission | `Join6Second` — leaf node, no `join()` methods generated |
-| **G3** `@PermuteMethod` | `JoinNSecond` — multiple `join()` overloads (Phase 1: `to` inferred, but just 1 overload per class for sequential chain) |
-| **G3** Extends expansion | `JoinNFirst extends JoinNSecond` — extends clause auto-expanded per arity |
-| **N4** `typeArgList()` | `filter()` and `fn()` parameter types — `Predicate${i+1}<DS, ${typeArgList(1,i,'T')}>` |
+| **G2** Boundary omission | `Join6First` — leaf node, `join()` omitted since `Join7First` not in generated set |
+| **N4** `typeArgList()` | `filter()` and `fn()` parameter types — `Predicate${i+1}<DS, ${typeArgList(1,i,'alpha')}>` |
 
 ### Phase 2 (future)
-Multi-step joins: `join(Join2First)` to add 2+ facts at once
+Multi-step joins + First/Second split
 
+- G3 extends expansion — requires either `T${j}` naming or alpha-aware G3 improvement
 - `@PermuteMethod` with j>1 on `JoinNSecond` — overloads that accept `JoinNSecond` parameters
-- `@PermuteDeclr` on parameters for the parameter types
+- `@PermuteDeclr` on parameters for typed `join(JoinNSecond)` overloads
 
 ### Phase 3+ (future)
 - `not()` / negation groups (`Not2`, `Group2` pattern)
@@ -127,8 +149,6 @@ assertThat(rule.sourceCount()).isEqualTo(2);
 assertThat(rule.filterCount()).isEqualTo(1);
 
 // Behavioural assertion
-ctx.persons().add(new Person("Alice", 30));
-ctx.colleagues().add(new Person("Bob", 25));
 rule.run(ctx);
 assertThat(rule.executionCount()).isEqualTo(1);
 assertThat(rule.capturedFact(0, 0)).isEqualTo(new Person("Alice", 30));
@@ -146,7 +166,7 @@ The key assertion this example makes about Permuplate: **every generated arity b
 - Arity 1 (from → fn directly)
 - Arity 2 (one join)
 - Arity 3 (two joins)
-- Arity 6 (maximum — leaf node tests that no join() exists)
+- Arity 6 (maximum — leaf node confirms no join() exists at compile time)
 - Multiple filters at the same arity level
 - Filter predicates that reject some combinations
 
@@ -156,12 +176,27 @@ If any arity behaves differently from the others in equivalent scenarios, that i
 
 ## Known Limitations and Deferred Items
 
-| Limitation | Root cause | Workaround |
+| Limitation | Root cause | Workaround / Note |
 |---|---|---|
-| `filter()` requires explicit `@PermuteReturn` | Self-return inference (TODO-2) not yet implemented | Explicit `@PermuteReturn(typeArgs="DS, ${typeArgList(1,i,'T')}")` |
-| `fn()` requires explicit `@PermuteReturn(when="true")` | `RuleDefinition` not in the generated set — boundary omission would wrongly omit it | `when="true"` overrides boundary check |
-| All return types require explicit `@PermuteReturn` | Alpha naming (`A,B,C`) disables implicit inference — deliberate to match Drools conventions | `@PermuteReturn` + `@PermuteDeclr` throughout; implicit path tested in `PermuteReturnTest` |
+| No First/Second split in Phase 1 | G3 extends expansion requires `T+number` suffix; alpha naming has no suffix | Single `JoinFirst` family; Phase 2 will retrofit the split |
+| `join()` parameter is `Function<DS, DataSource<?>>` not typed | Next arity's type param not in scope in template | Wildcard allows lambda target inference; Phase 2 will type this correctly |
+| `join()` return type is raw (no type args) | Next arity's type param not in scope | Raw return + `rd.asNext()` unchecked cast; type safety relies on fluent chain |
+| `JoinNFirst` nested inside `JoinBuilder` | `inline=true` requires a container class | Use `var` in tests; qualified name `JoinBuilder.Join1First` when explicit |
+| `filter()` requires explicit `@PermuteReturn` | Self-return inference (TODO-2) not yet implemented | Explicit `@PermuteReturn(typeArgs=..., when="true")` |
+| `fn()` requires explicit `@PermuteReturn(when="true")` | `RuleDefinition` not in the generated set | `when="true"` overrides boundary check |
+| All return types require explicit `@PermuteReturn` | Alpha naming disables implicit inference — deliberate | `@PermuteReturn` + `@PermuteDeclr` throughout; implicit path tested in `PermuteReturnTest` |
 | Maximum arity is 6 | Practical limit for the example | Change `to=6` on all templates to extend; tests should scale automatically |
+
+### The Unchecked Cast Pattern
+
+`join()` uses `rd.asNext()` — a single unchecked cast method on `RuleDefinition`:
+
+```java
+@SuppressWarnings("unchecked")
+public <T> T asNext() { return (T) this; }
+```
+
+This is safe because Java's type erasure means the cast is not checked at runtime. The fluent chain never stores the intermediate type in a variable — it is always immediately chained. Compiler warnings are suppressed at the call site in the template.
 
 ---
 
@@ -169,17 +204,17 @@ If any arity behaves differently from the others in equivalent scenarios, that i
 
 When adding Phase 2 (multi-step joins) or Phase 3 features:
 
-1. **Add to the template, not by hand.** If you're adding a new method to `JoinNSecond`, it goes in the `Join0Second` template. Permuplate generates the rest.
+1. **Add to the template, not by hand.** New methods on the JoinFirst family go in `Join0First` inside `JoinBuilder.java`. Permuplate generates the rest.
 
 2. **Prefer implicit over explicit.** Before adding `@PermuteReturn`, check if the return type uses `T${j}` convention — if so, inference fires automatically.
 
 3. **Write the test first.** Add a failing test in `RuleBuilderTest` that demonstrates the new DSL usage, then evolve the templates to make it pass.
 
-4. **Check the leaf node.** Any new method on `JoinNSecond` that uses `@PermuteMethod` must verify that `Join6Second` correctly gets zero overloads (empty range, leaf).
+4. **Check the leaf node.** Any new method on `Join0First` with `@PermuteReturn` pointing to `Join${i+1}First` must verify that `Join6First` correctly omits it (boundary omission).
 
 5. **Run the full permutation matrix.** Tests should cover arities 1–6 for any new method, not just the typical 2–3 case.
 
-6. **Validate in permuplate-tests first.** If a new Permuplate feature is needed, add a focused test in `permuplate-tests/` (as we did for alpha naming) before relying on it here.
+6. **Validate in permuplate-tests first.** If a new Permuplate feature is needed, add a focused test in `permuplate-tests/` before relying on it here.
 
 ---
 
