@@ -27,6 +27,7 @@ import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
 import io.quarkiverse.permuplate.core.PermuteVarConfig;
 import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
@@ -216,6 +217,7 @@ public class PermuteMojo extends AbstractMojo {
             classDecl.setName(newClassName);
             classDecl.getConstructors().forEach(ctor -> ctor.setName(newClassName));
 
+            PermuteTypeParamTransformer.transform(classDecl, ctx, null, null);
             PermuteDeclrTransformer.transform(classDecl, ctx, null);
             PermuteParamTransformer.transform(classDecl, ctx, null);
 
