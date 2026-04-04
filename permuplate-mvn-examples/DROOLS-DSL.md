@@ -179,24 +179,48 @@ If any arity behaves differently from the others in equivalent scenarios, that i
 | Limitation | Root cause | Workaround / Note |
 |---|---|---|
 | No First/Second split in Phase 1 | G3 extends expansion requires `T+number` suffix; alpha naming has no suffix | Single `JoinFirst` family; Phase 2 will retrofit the split |
-| `join()` parameter is `Function<DS, DataSource<?>>` not typed | Next arity's type param not in scope in template | Wildcard allows lambda target inference; Phase 2 will type this correctly |
-| `join()` return type is raw (no type args) | Next arity's type param not in scope | Raw return + `rd.asNext()` unchecked cast; type safety relies on fluent chain |
+| `join()` parameter is `Function<DS, DataSource<?>>` not typed | Next arity's type param not in scope in template | Wildcard allows lambda target inference at arity 1; arity 2+ needs pre-typed constants |
+| `join()` return type is raw (no type args) | Next arity's type param not in scope | Raw return + reflective instantiation; arity-2+ lambdas require explicit casts |
+| `wrapPredicate` truncates facts to filter's arity | Filters registered at different arities share the same NaryPredicate/run() loop | `m.getParameterCount() - 1` gives the filter's fact count; extra facts are truncated |
 | `JoinNFirst` nested inside `JoinBuilder` | `inline=true` requires a container class | Use `var` in tests; qualified name `JoinBuilder.Join1First` when explicit |
 | `filter()` requires explicit `@PermuteReturn` | Self-return inference (TODO-2) not yet implemented | Explicit `@PermuteReturn(typeArgs=..., when="true")` |
 | `fn()` requires explicit `@PermuteReturn(when="true")` | `RuleDefinition` not in the generated set | `when="true"` overrides boundary check |
 | All return types require explicit `@PermuteReturn` | Alpha naming disables implicit inference — deliberate | `@PermuteReturn` + `@PermuteDeclr` throughout; implicit path tested in `PermuteReturnTest` |
 | Maximum arity is 6 | Practical limit for the example | Change `to=6` on all templates to extend; tests should scale automatically |
 
-### The Unchecked Cast Pattern
+### The `join()` Instantiation Pattern
 
-`join()` uses `rd.asNext()` — a single unchecked cast method on `RuleDefinition`:
+`join()` creates the next `JoinNFirst` instance reflectively, deriving the target class name from the current class:
 
 ```java
-@SuppressWarnings("unchecked")
-public <T> T asNext() { return (T) this; }
+String cn = getClass().getSimpleName();           // e.g. "Join1First"
+int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
+String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
+return cast(Class.forName(nextName).getConstructor(RuleDefinition.class).newInstance(rd));
 ```
 
-This is safe because Java's type erasure means the cast is not checked at runtime. The fluent chain never stores the intermediate type in a variable — it is always immediately chained. Compiler warnings are suppressed at the call site in the template.
+This is necessary because `rd.asNext()` (an unchecked cast of `RuleDefinition` to `JoinNFirst`) causes `ClassCastException` at runtime — the Java compiler inserts a `checkcast JoinNFirst` in the bytecode at every `invokevirtual` call site, and `RuleDefinition` does not extend `JoinNFirst`. Reflective instantiation creates a real `JoinNFirst` wrapping the same `RuleDefinition`.
+
+### Arity-2+ Type Safety Limitation
+
+After the first `join()` call, the chain **loses compile-time type parameters**. The reason: `@PermuteReturn(className="Join${i+1}First")` without `typeArgs` generates a raw return type (`Join2First` without generics). Since the next arity's type parameter (`B`, `C`, etc.) is not in scope in the template class, there is no way to generate a fully parameterized return type.
+
+**Practical consequence:** filter and fn lambdas at arity 2+ receive `Object`-typed parameters and require explicit casts:
+
+```java
+// Arity 1 — fully type-safe (from() returns Join1First<Ctx, Person>)
+var rule = builder.from("adults", ctx -> ctx.persons())
+        .filter((ctx, a) -> a.age() >= 18)   // a is Person — no cast needed
+        .fn((ctx, a) -> {});
+
+// Arity 2 — raw type after join() — explicit casts required
+var rule = builder.from("adult-accounts", ctx -> ctx.persons())
+        .join(ACCOUNTS)                        // pre-typed constant required
+        .filter((ctx, a, b) -> ((Person) a).age() >= 18 && ((Account) b).balance() > 500.0)
+        .fn((ctx, a, b) -> {});
+```
+
+This is a Phase 1 limitation. Phase 2's First/Second split and typed `join()` overloads will restore full type safety once Permuplate supports generating typed method bodies.
 
 ---
 
