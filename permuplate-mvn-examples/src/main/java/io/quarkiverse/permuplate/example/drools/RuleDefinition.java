@@ -54,6 +54,8 @@ public class RuleDefinition<DS> {
     private final List<List<Object>> executions = new ArrayList<>();
     private final List<RuleDefinition<DS>> negations = new ArrayList<>();
     private final List<RuleDefinition<DS>> existences = new ArrayList<>();
+    private int ooPathRootIndex = -1;
+    private final List<OOPathStep> ooPathSteps = new ArrayList<>();
 
     public RuleDefinition(String name) {
         this.name = name;
@@ -135,22 +137,13 @@ public class RuleDefinition<DS> {
     }
 
     /**
-     * Registers a completed OOPath pipeline for traversal. The pipeline consists of
-     * a sequence of OOPathStep entries that progressively navigate from a root fact
-     * through a chain of nested objects, filtering at each step.
-     *
-     * <p>
-     * The rootIndex identifies which source fact the OOPath traversal starts from.
-     * The steps list contains all accumulated traversal and filter operations,
-     * accumulated by the PathN builders.
-     *
-     * <p>
-     * Called by {@code PathN.path()} when building is complete (i.e. when a terminal
-     * PathN is reached and the final pipeline is ready to be registered).
+     * Registers an OOPath traversal pipeline. Called by RuleOOPathBuilder.Path2.path()
+     * when the chain completes. rootIndex is the 0-based index of the root fact
+     * (= factArity()-1 at the time pathN() was called).
      */
     public void addOOPathPipeline(int rootIndex, List<OOPathStep> steps) {
-        // Future implementation: add steps to the rule for OOPath execution
-        // For now, this is a stub that accepts the pipeline for API completeness
+        this.ooPathRootIndex = rootIndex;
+        this.ooPathSteps.addAll(steps);
     }
 
     // -------------------------------------------------------------------------
@@ -191,7 +184,7 @@ public class RuleDefinition<DS> {
             combinations = next;
         }
 
-        return combinations.stream()
+        List<Object[]> filtered = combinations.stream()
                 .filter(facts -> filters.stream().allMatch(f -> f.test(ctx, facts)))
                 // not() constraint: outer tuple valid only if scope produces ZERO matches.
                 // Scope evaluates independently against ctx (sandbox simplification —
@@ -202,6 +195,63 @@ public class RuleDefinition<DS> {
                 .filter(facts -> existences.stream()
                         .allMatch(ex -> !ex.matchedTuples(ctx).isEmpty()))
                 .collect(Collectors.toList());
+        return applyOOPath(filtered, ctx);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object[]> applyOOPath(List<Object[]> combinations, DS ctx) {
+        if (ooPathRootIndex < 0)
+            return combinations;
+        List<Object[]> expanded = new ArrayList<>();
+        for (Object[] facts : combinations) {
+            Object rootFact = facts[ooPathRootIndex];
+            BaseTuple emptyTuple = createEmptyTuple(ooPathSteps.size() + 1);
+            emptyTuple.set(0, rootFact);
+            PathContext<BaseTuple> pathCtx = new PathContext<>(emptyTuple);
+            for (BaseTuple t : executePipeline(rootFact, pathCtx, 0)) {
+                Object[] extended = Arrays.copyOf(facts, facts.length + 1);
+                extended[facts.length] = t;
+                expanded.add(extended);
+            }
+        }
+        return expanded;
+    }
+
+    private List<BaseTuple> executePipeline(Object currentFact,
+            PathContext<BaseTuple> pathCtx, int stepIndex) {
+        if (stepIndex >= ooPathSteps.size()) {
+            // Copy the tuple — pathCtx tuple is shared/mutable across sibling branches
+            return java.util.Collections.singletonList(copyTuple(pathCtx.getTuple()));
+        }
+        OOPathStep step = ooPathSteps.get(stepIndex);
+        List<BaseTuple> results = new ArrayList<>();
+        for (Object child : step.traversal.apply(pathCtx, currentFact)) {
+            if (step.filter.test(pathCtx, child)) {
+                pathCtx.getTuple().set(stepIndex + 1, child);
+                results.addAll(executePipeline(child, pathCtx, stepIndex + 1));
+            }
+        }
+        return results;
+    }
+
+    private BaseTuple copyTuple(BaseTuple source) {
+        BaseTuple copy = createEmptyTuple(source.size());
+        for (int i = 0; i < source.size(); i++) {
+            copy.set(i, source.get(i));
+        }
+        return copy;
+    }
+
+    private BaseTuple createEmptyTuple(int size) {
+        return switch (size) {
+            case 1 -> new BaseTuple.Tuple1<>();
+            case 2 -> new BaseTuple.Tuple2<>();
+            case 3 -> new BaseTuple.Tuple3<>();
+            case 4 -> new BaseTuple.Tuple4<>();
+            case 5 -> new BaseTuple.Tuple5<>();
+            case 6 -> new BaseTuple.Tuple6<>();
+            default -> throw new IllegalArgumentException("OOPath depth " + size + " exceeds maximum of 6");
+        };
     }
 
     // -------------------------------------------------------------------------
