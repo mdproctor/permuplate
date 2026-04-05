@@ -134,6 +134,25 @@ public class RuleDefinition<DS> {
         existences.add(existsScope);
     }
 
+    /**
+     * Registers a completed OOPath pipeline for traversal. The pipeline consists of
+     * a sequence of OOPathStep entries that progressively navigate from a root fact
+     * through a chain of nested objects, filtering at each step.
+     *
+     * <p>
+     * The rootIndex identifies which source fact the OOPath traversal starts from.
+     * The steps list contains all accumulated traversal and filter operations,
+     * accumulated by the PathN builders.
+     *
+     * <p>
+     * Called by {@code PathN.path()} when building is complete (i.e. when a terminal
+     * PathN is reached and the final pipeline is ready to be registered).
+     */
+    public void addOOPathPipeline(int rootIndex, List<OOPathStep> steps) {
+        // Future implementation: add steps to the rule for OOPath execution
+        // For now, this is a stub that accepts the pipeline for API completeness
+    }
+
     // -------------------------------------------------------------------------
     // Execution
     // -------------------------------------------------------------------------
