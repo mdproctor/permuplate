@@ -189,6 +189,83 @@ public class JoinBuilder {
         }
 
         /**
+         * Starts a 2-element OOPath traversal (root + 1 step → Tuple2).
+         * Traversal starts from the last accumulated fact (alpha(i)).
+         * Call {@code .path(fn, pred)} to provide the traversal step and complete the chain.
+         * Suppressed on Join6Second (when="i < 6") — no Join7First exists.
+         */
+        @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "${alpha(m)}")
+        @PermuteReturn(
+                className = "RuleOOPathBuilder.Path2",
+                typeArgs = "'Join' + (i+1) + 'First<END, DS, ' + typeArgList(1, i, 'alpha') + ', BaseTuple.Tuple2<' + typeArgList(i, i+1, 'alpha') + '>>, BaseTuple.Tuple1<' + alpha(i) + '>, ' + typeArgList(i, i+1, 'alpha')",
+                when = "i < 6")
+        @SuppressWarnings("unchecked")
+        public <B> Object path2() {
+            java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
+            return new RuleOOPathBuilder.Path2(this, rd, steps, rd.factArity() - 1);
+        }
+
+        /**
+         * Starts a 3-element OOPath traversal (root + 2 steps → Tuple3).
+         * Call {@code .path(fn,pred).path(fn,pred)} to complete the chain.
+         */
+        @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+2}", name = "${alpha(m)}")
+        @PermuteReturn(
+                className = "RuleOOPathBuilder.Path3",
+                typeArgs = "'Join' + (i+1) + 'First<END, DS, ' + typeArgList(1, i, 'alpha') + ', BaseTuple.Tuple3<' + typeArgList(i, i+2, 'alpha') + '>>, BaseTuple.Tuple2<' + typeArgList(i, i+1, 'alpha') + '>, ' + typeArgList(i, i+2, 'alpha')",
+                when = "i < 6")
+        @SuppressWarnings("unchecked")
+        public <B> Object path3() {
+            java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
+            return new RuleOOPathBuilder.Path3(this, rd, steps, rd.factArity() - 1);
+        }
+
+        /**
+         * Starts a 4-element OOPath traversal (root + 3 steps → Tuple4).
+         * Call {@code .path(fn,pred)} three times to complete the chain.
+         */
+        @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+3}", name = "${alpha(m)}")
+        @PermuteReturn(
+                className = "RuleOOPathBuilder.Path4",
+                typeArgs = "'Join' + (i+1) + 'First<END, DS, ' + typeArgList(1, i, 'alpha') + ', BaseTuple.Tuple4<' + typeArgList(i, i+3, 'alpha') + '>>, BaseTuple.Tuple3<' + typeArgList(i, i+2, 'alpha') + '>, ' + typeArgList(i, i+3, 'alpha')",
+                when = "i < 6")
+        @SuppressWarnings("unchecked")
+        public <B> Object path4() {
+            java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
+            return new RuleOOPathBuilder.Path4(this, rd, steps, rd.factArity() - 1);
+        }
+
+        /**
+         * Starts a 5-element OOPath traversal (root + 4 steps → Tuple5).
+         * Call {@code .path(fn,pred)} four times to complete the chain.
+         */
+        @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+4}", name = "${alpha(m)}")
+        @PermuteReturn(
+                className = "RuleOOPathBuilder.Path5",
+                typeArgs = "'Join' + (i+1) + 'First<END, DS, ' + typeArgList(1, i, 'alpha') + ', BaseTuple.Tuple5<' + typeArgList(i, i+4, 'alpha') + '>>, BaseTuple.Tuple4<' + typeArgList(i, i+3, 'alpha') + '>, ' + typeArgList(i, i+4, 'alpha')",
+                when = "i < 6")
+        @SuppressWarnings("unchecked")
+        public <B> Object path5() {
+            java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
+            return new RuleOOPathBuilder.Path5(this, rd, steps, rd.factArity() - 1);
+        }
+
+        /**
+         * Starts a 6-element OOPath traversal (root + 5 steps → Tuple6).
+         * Call {@code .path(fn,pred)} five times to complete the chain.
+         */
+        @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+5}", name = "${alpha(m)}")
+        @PermuteReturn(
+                className = "RuleOOPathBuilder.Path6",
+                typeArgs = "'Join' + (i+1) + 'First<END, DS, ' + typeArgList(1, i, 'alpha') + ', BaseTuple.Tuple6<' + typeArgList(i, i+5, 'alpha') + '>>, BaseTuple.Tuple5<' + typeArgList(i, i+4, 'alpha') + '>, ' + typeArgList(i, i+5, 'alpha')",
+                when = "i < 6")
+        @SuppressWarnings("unchecked")
+        public <B> Object path6() {
+            java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
+            return new RuleOOPathBuilder.Path6(this, rd, steps, rd.factArity() - 1);
+        }
+
+        /**
          * Terminal operation. {@code when="true"} prevents boundary omission —
          * RuleDefinition is not in the generated set.
          *
