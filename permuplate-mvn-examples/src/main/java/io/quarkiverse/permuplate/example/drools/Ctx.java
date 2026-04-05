@@ -5,5 +5,6 @@ public record Ctx(
         DataSource<Account> accounts,
         DataSource<Order> orders,
         DataSource<Product> products,
-        DataSource<Transaction> transactions) {
+        DataSource<Transaction> transactions,
+        DataSource<Library> libraries) {
 }
