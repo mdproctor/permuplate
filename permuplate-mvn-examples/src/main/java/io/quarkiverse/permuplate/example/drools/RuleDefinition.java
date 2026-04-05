@@ -52,6 +52,8 @@ public class RuleDefinition<DS> {
     private final List<NaryPredicate> filters = new ArrayList<>();
     private NaryConsumer action;
     private final List<List<Object>> executions = new ArrayList<>();
+    private final List<RuleDefinition<DS>> negations = new ArrayList<>();
+    private final List<RuleDefinition<DS>> existences = new ArrayList<>();
 
     public RuleDefinition(String name) {
         this.name = name;
@@ -114,6 +116,24 @@ public class RuleDefinition<DS> {
         this.action = wrapConsumer(typedConsumer);
     }
 
+    /**
+     * Registers a negation sub-network. During {@link #matchedTuples}, outer tuples
+     * are excluded if this sub-network produces ANY matching result (zero-match required).
+     * Called by {@code JoinNSecond.not()} before returning the NegationScope.
+     */
+    public void addNegation(RuleDefinition<DS> notScope) {
+        negations.add(notScope);
+    }
+
+    /**
+     * Registers an existence sub-network. During {@link #matchedTuples}, outer tuples
+     * are excluded if this sub-network produces ZERO matching results (at-least-one required).
+     * Called by {@code JoinNSecond.exists()} before returning the ExistenceScope.
+     */
+    public void addExistence(RuleDefinition<DS> existsScope) {
+        existences.add(existsScope);
+    }
+
     // -------------------------------------------------------------------------
     // Execution
     // -------------------------------------------------------------------------
@@ -154,6 +174,14 @@ public class RuleDefinition<DS> {
 
         return combinations.stream()
                 .filter(facts -> filters.stream().allMatch(f -> f.test(ctx, facts)))
+                // not() constraint: outer tuple valid only if scope produces ZERO matches.
+                // Scope evaluates independently against ctx (sandbox simplification —
+                // full Drools tracks per-outer-tuple via beta memory).
+                .filter(facts -> negations.stream()
+                        .allMatch(neg -> neg.matchedTuples(ctx).isEmpty()))
+                // exists() constraint: outer tuple valid only if scope produces AT LEAST ONE match.
+                .filter(facts -> existences.stream()
+                        .allMatch(ex -> !ex.matchedTuples(ctx).isEmpty()))
                 .collect(Collectors.toList());
     }
 
