@@ -46,7 +46,7 @@ These rules are wired into both the annotation processor (as compile errors at t
 
 ## Thinking About IDE Support
 
-At this point in the project, there was a real temptation to build an IntelliJ plugin. The `permuplate-ide-support` module was there. The algorithm was there. The IDE plugin would use it to:
+At this point in the project, I seriously considered building an IntelliJ plugin. The `permuplate-ide-support` module was there. The algorithm was there. The IDE plugin would use it to:
 
 - Validate annotation strings in real time (show errors as you type)
 - Highlight renamed elements (yellow warning when a rename won't propagate to annotation strings)
@@ -64,7 +64,7 @@ The `permuplate-ide-support` module stands as the foundation for that future wor
 
 Working through the Drools gap analysis, one pattern kept appearing: the need to express **type parameter names** that follow a naming convention. The Drools codebase uses single-letter names: `A`, `B`, `C`, `D`, `E`, `F`. RxJava uses `T1`, `T2`, `T3`. These are human-readable and conventional; the annotation strings needed a way to generate them.
 
-The solution was a small library of built-in JEXL functions — what I called N4 in the gap analysis:
+We built a small library of built-in JEXL functions — what I called N4 in the gap analysis:
 
 - `alpha(n)` → `A` when n=1, `B` when n=2, ..., `Z` when n=26
 - `lower(n)` → `a`, `b`, ..., `z` (lowercase version)
@@ -95,7 +95,7 @@ One edge case that turned out to matter: `typeArgList(from, to, style)` when `fr
 
 Implementing `alpha(n)` was straightforward in concept but had a non-obvious failure mode that took a debugging session to find.
 
-My first approach was registering the functions as a namespace class via `JexlBuilder.namespaces`:
+The first approach was registering the functions as a namespace class via `JexlBuilder.namespaces`:
 
 ```java
 // Intended approach — does NOT work
@@ -130,7 +130,7 @@ By the time the N4 functions were in place, the test suite had grown to cover th
 - `OrphanVariableTest` — focused tests for the substring matching algorithm
 - `ExpressionFunctionsTest` — `alpha()`, `lower()`, `typeArgList()` including edge cases
 
-The pattern: write a failing test first, implement the minimum to make it pass, repeat. This approach meant that when bugs appeared (and they did), the fix was always accompanied by a test that would catch any regression. By the time the expression functions were stable, I had a high degree of confidence in the evaluation path.
+We kept to the same discipline throughout: write a failing test first, implement the minimum to pass it, repeat. When bugs appeared (and they did), the fix was always accompanied by a test that would catch any regression. By the time the expression functions were stable, I had a high degree of confidence in the evaluation path.
 
 The test suite was now around 80 tests. The real complexity was still ahead.
 

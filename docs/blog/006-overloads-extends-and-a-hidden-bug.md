@@ -118,7 +118,8 @@ The existing test didn't catch it because the test was also wrong:
 
 The test asserted `contains("extends Join3Second")` at `forI=2` — which is the forward-reference output. The assertion was checking that the bug produced the expected buggy output, and passing. The comment on the test claimed the generated class was "Join3First" when it was actually "Join2First".
 
-This bug lived in the codebase for the entire duration of G3's development. It was only discovered when we tried to implement the Drools Phase 2 First/Second split and realized that `Join2First extends Join3Second` is semantically wrong — `Join2First` should extend its peer `Join2Second`, not the next-arity class.
+
+This bug lived in the codebase for the entire duration of G3's development. Claude caught it when we started wiring the First/Second split — `Join2First extends Join3Second` is semantically wrong; each JoinFirst should extend its peer, not the next-arity class.
 
 The fix was a one-character change: `currentEmbeddedNum + 1` → `currentEmbeddedNum`. Then the existing test had to be updated to assert the correct behavior, and `doesNotContain` assertions were added to guard against the forward-reference regression.
 
@@ -139,7 +140,7 @@ if (!allTNumber) continue;
 
 `isTNumberVar` returns true for `T1`, `T2`, `T23` — anything matching `T` followed by digits. For alpha naming, the extends clause has `<DS, A>` — neither `DS` nor `A` passes the check. The expansion is silently skipped. No error. The extends clause stays as the template wrote it.
 
-The code even had a `postG1TypeParams` variable captured just above the call to `applyExtendsExpansion`:
+Then Claude spotted something: the code already had a `postG1TypeParams` variable captured just above the call to `applyExtendsExpansion`:
 
 ```java
 // Capture post-G1 type parameter names for extends expansion (used in Task 5)

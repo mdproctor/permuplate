@@ -10,7 +10,7 @@ There's a specific kind of anxiety that comes when you've built a tool and it's 
 
 The Drools RuleBuilder DSL was always the motivation for Permuplate. A self-contained approximation of it — using only Permuplate annotations, Java records, and a test suite — would be the proof of concept that the whole project needed.
 
-The plan was straightforward. Build a fluent chain:
+Build a fluent chain:
 
 ```java
 var rule = builder.from("adults", ctx -> ctx.persons())
@@ -22,8 +22,6 @@ assertThat(rule.capturedFact(0, 0)).isEqualTo(new Person("Alice", 30));
 ```
 
 The chain advances through arity levels. At arity 1 (after `.from()`), you hold a `Join1First<Ctx, Person>`. After `.join()`, you hold a `Join2First<Ctx, Person, Account>`. The type system enforces correctness at each step.
-
-Reality had other ideas.
 
 ---
 
@@ -37,7 +35,7 @@ This was a real constraint. The Drools DSL uses single-letter type parameter nam
 
 The decision: implement Phase 1 as a single `JoinFirst` family with no `Second` split. Defer the split to Phase 2 once G3 was fixed to handle alpha naming. This was the right call — it let us validate the full DSL chain first, with the architectural refinement coming later.
 
-The second pivot was about the container class. `@PermuteReturn` boundary omission only works in InlineGenerator (inline mode). The plan had specified `inline=false` top-level templates, but that path doesn't support boundary omission — the leaf node (`Join6First` with no `join()` method) is the whole point. So the templates went `inline=true` inside a `JoinBuilder` container class.
+The second pivot was about the container class. `@PermuteReturn` boundary omission only works in InlineGenerator (inline mode). The plan had specified `inline=false` top-level templates, but that path doesn't support boundary omission — the leaf node (`Join6First` with no `join()` method) is the whole point. So we switched to `inline=true` inside a `JoinBuilder` container class.
 
 The consequence: generated classes are `JoinBuilder.Join1First`, `JoinBuilder.Join2First`, etc. — qualified names rather than top-level. In practice this doesn't matter — `var` handles the inference, and explicit type declarations are rare.
 
@@ -79,7 +77,7 @@ static NaryPredicate wrapPredicate(Object typed) {
 
 ## The Runtime Bugs
 
-Two bugs appeared when the tests ran for the first time. Both were instructive.
+Claude came back from the first test run with two failures. Both were instructive.
 
 **Bug 1: `rd.asNext()` causes `ClassCastException`.**
 

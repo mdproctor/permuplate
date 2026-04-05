@@ -20,7 +20,7 @@ If the generated classes need to be nested inside an existing class, APT can't d
 
 ## The Maven Plugin Approach
 
-The solution was to build a Maven plugin that runs at `generate-sources` — before compilation — and can read and rewrite source files directly.
+We built a Maven plugin to run at `generate-sources` — before compilation — giving us read-write access to source files directly.
 
 The flow:
 1. Maven plugin reads `src/main/permuplate/` (a non-compiled source directory for templates)
@@ -52,7 +52,7 @@ Two important attributes on `@Permute` control which mode is expected:
 
 Building the Maven plugin forced a refactoring that I should have done earlier: extracting the transformation logic into `permuplate-core`.
 
-Before this, the APT processor contained the transformer classes (`PermuteDeclrTransformer`, `PermuteParamTransformer`). When I needed the same logic in the Maven plugin, I had two options: duplicate the code, or extract it. Duplication would have been a maintenance nightmare — any bug fix in one would need to be applied to the other. So I extracted.
+Before this, the APT processor contained the transformer classes (`PermuteDeclrTransformer`, `PermuteParamTransformer`). When we needed the same logic in the Maven plugin, the options were: duplicate the code, or extract it. Duplication would have been a maintenance nightmare — any bug fix in one would need to be applied to the other. So we extracted.
 
 The module layout after this refactor:
 
@@ -75,7 +75,7 @@ The pipeline, in order:
 
 1. Rename the generated nested class
 2. Run `PermuteTypeParamTransformer` (G1 — expanding class type parameters)
-3. Capture post-G1 type parameter names (`postG1TypeParams` — we'll see why this matters later)
+3. Capture post-G1 type parameter names (`postG1TypeParams` — relevant to extends expansion, as we'll see in G3)
 4. Run `applyPermuteMethod()` (G3 — generate method overloads)
 5. Run `PermuteDeclrTransformer` and `PermuteParamTransformer`
 6. Run `applyPermuteReturn()` (G2 — explicit return type narrowing)

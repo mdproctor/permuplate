@@ -88,11 +88,11 @@ That was the starting point. It was, in retrospect, quite modest compared to whe
 
 Two decisions shaped everything that followed: the AST manipulation library and the expression evaluator.
 
-For AST manipulation, I chose **JavaParser**. It's a mature, actively maintained Java AST library with clean read-write APIs. You can parse a `.java` file, navigate the AST, modify nodes, and print the result back to source text. Critically, it works without a classpath — you can parse the template file without needing to resolve all its dependencies. This matters because the template might reference classes that don't exist yet (the classes being generated).
+For AST manipulation, we went with **JavaParser**. It's a mature, actively maintained Java AST library with clean read-write APIs. You can parse a `.java` file, navigate the AST, modify nodes, and print the result back to source text. Critically, it works without a classpath — you can parse the template file without needing to resolve all its dependencies. This matters because the template might reference classes that don't exist yet (the classes being generated).
 
-For expression evaluation in `${...}` placeholders, I chose **Apache Commons JEXL3**. It's a lightweight expression language that evaluates things like `"Join${i+1}"` with `i=3` to `"Join4"`. Clean, embeddable, no heavy dependencies. Later I'd discover a significant limitation in how it handles primitive types — but that came later.
+For expression evaluation in `${...}` placeholders, we picked **Apache Commons JEXL3**. It's a lightweight expression language that evaluates things like `"Join${i+1}"` with `i=3` to `"Join4"`. Clean, embeddable, no heavy dependencies. Later we'd discover a significant limitation in how it handles primitive types — but that came later.
 
-The first working version parsed the template source using `StaticJavaParser.parse()`, found the template class declaration, cloned it for each value of `i`, renamed it by evaluating the `className` expression via JEXL, and wrote the result. About 200 lines of Java. It worked on the first example.
+The first working version we put together parsed the template source using `StaticJavaParser.parse()`, found the template class declaration, cloned it for each value of `i`, renamed it by evaluating the `className` expression via JEXL, and wrote the result. About 200 lines of Java. It worked on the first example.
 
 That was the moment I knew this was going to be worth building properly.
 

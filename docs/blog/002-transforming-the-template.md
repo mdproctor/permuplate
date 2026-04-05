@@ -6,7 +6,7 @@
 
 ## The Gap Between "Clone" and "Transform"
 
-Once the basic cloning worked — parse template, copy class, rename it — I had to think carefully about what actual transformation means in this context.
+Once we had basic cloning working — parse template, copy class, rename it — the question was what actual transformation means in this context.
 
 The Drools `Join2` class looks something like this:
 
@@ -126,7 +126,7 @@ One constraint: the template class name must not collide with any generated clas
 
 ## The Test Story
 
-By this point, Permuplate had a test suite using **Google's compile-testing library**. Each test compiles a Java source string in-process with the annotation processor attached and asserts on the generated source content:
+By this point, we'd built a test suite using **Google's compile-testing library**. Each test compiles a Java source string in-process with the annotation processor attached and asserts on the generated source content:
 
 ```java
 Compilation compilation = Compiler.javac()
