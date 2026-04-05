@@ -31,11 +31,9 @@ public class NegationScope<OUTER, DS> {
     }
 
     /**
-     * Adds a data source to the negation sub-network. Takes {@code Object} to accept
-     * both {@code Function<DS, DataSource<?>>} lambdas and pre-built {@code JoinNFirst}
-     * instances (bi-linear scope source). {@link RuleDefinition#addSource} handles casting.
+     * Adds a data source to the negation sub-network.
      */
-    public NegationScope<OUTER, DS> join(Object source) {
+    public NegationScope<OUTER, DS> join(java.util.function.Function<DS, DataSource<?>> source) {
         notRd.addSource(source);
         return this;
     }

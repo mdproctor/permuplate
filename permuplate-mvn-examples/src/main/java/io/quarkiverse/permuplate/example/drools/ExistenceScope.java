@@ -30,7 +30,7 @@ public class ExistenceScope<OUTER, DS> {
     /**
      * Adds a data source to the existence sub-network.
      */
-    public ExistenceScope<OUTER, DS> join(Object source) {
+    public ExistenceScope<OUTER, DS> join(java.util.function.Function<DS, DataSource<?>> source) {
         existsRd.addSource(source);
         return this;
     }

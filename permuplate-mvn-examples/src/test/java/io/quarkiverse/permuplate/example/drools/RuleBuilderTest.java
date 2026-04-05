@@ -438,7 +438,7 @@ public class RuleBuilderTest {
         // Since the scope finds ACC1 globally, ALL outer person tuples are blocked.
         var rule = builder.from("persons", ctx -> ctx.persons())
                 .not()
-                .join((Object) (java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
+                .join(ctx -> ctx.accounts())
                 .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 500.0)
                 .end()
                 .fn((ctx, a) -> {
@@ -452,7 +452,7 @@ public class RuleBuilderTest {
     public void testNotScopePassesAllWhenScopeIsEmpty() {
         var rule = builder.from("persons", ctx -> ctx.persons())
                 .not()
-                .join((Object) (java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
+                .join(ctx -> ctx.accounts())
                 .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 10000.0)
                 .end()
                 .fn((ctx, a) -> {
@@ -466,7 +466,7 @@ public class RuleBuilderTest {
     public void testExistsScopePassesAllWhenScopeHasMatch() {
         var rule = builder.from("persons", ctx -> ctx.persons())
                 .exists()
-                .join((Object) (java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
+                .join(ctx -> ctx.accounts())
                 .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 500.0)
                 .end()
                 .fn((ctx, a) -> {
