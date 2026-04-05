@@ -187,6 +187,22 @@ public class JoinBuilder {
             rd.addExistence(existsRd);
             return new ExistenceScope<>(this, existsRd);
         }
+
+        /**
+         * Terminal operation. {@code when="true"} prevents boundary omission —
+         * RuleDefinition is not in the generated set.
+         *
+         * <p>Placed on Join0Second so that after {@code not()...end()} or
+         * {@code exists()...end()} (which return JoinNSecond), the fluent chain
+         * can call {@code fn()} directly. Join0First inherits this via extends.
+         */
+        @PermuteReturn(className = "RuleDefinition", typeArgs = "'DS'", when = "true")
+        public Object fn(
+                @PermuteDeclr(type = "Consumer${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
+                Object action) {
+            rd.setAction(action);
+            return rd;
+        }
     }
 
     /**
@@ -196,9 +212,8 @@ public class JoinBuilder {
      * detects "Join" prefix + embedded number 0 + alpha prefix match, expanding to
      * {@code Join1Second<END, DS, A>}, {@code Join2Second<END, DS, A, B>}, etc.
      *
-     * <p>Holds {@code filter()} (single-fact and all-facts overloads) and the terminal
-     * {@code fn()}. All inherited from the template; inherited {@code join()} overloads
-     * come from Second via extends.
+     * <p>Holds {@code filter()} (single-fact and all-facts overloads). All inherited from
+     * the template; inherited {@code join()} and {@code fn()} come from Second via extends.
      */
     @Permute(varName = "i", from = 1, to = 6, className = "Join${i}First",
              inline = true, keepTemplate = false)
@@ -242,16 +257,5 @@ public class JoinBuilder {
             return this;
         }
 
-        /**
-         * Terminal operation. {@code when="true"} prevents boundary omission —
-         * RuleDefinition is not in the generated set.
-         */
-        @PermuteReturn(className = "RuleDefinition", typeArgs = "'DS'", when = "true")
-        public Object fn(
-                @PermuteDeclr(type = "Consumer${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
-                Object action) {
-            rd.setAction(action);
-            return rd;
-        }
     }
 }

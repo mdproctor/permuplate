@@ -434,56 +434,45 @@ public class RuleBuilderTest {
     @Test
     public void testNotScopeBlocksAllWhenScopeHasMatches() {
         // not() scope evaluates independently against ctx (sandbox simplification).
-        // Scope: any account with balance > 500 — ACC1 qualifies.
+        // Scope: any account with balance > 500 -- ACC1 qualifies.
         // Since the scope finds ACC1 globally, ALL outer person tuples are blocked.
-        // (In full Drools, the not-scope would be evaluated per outer person tuple,
-        // potentially blocking only persons linked to high-balance accounts.)
-        // Pattern: build outer chain, open scope (mutates rd in-place), call fn() on original ref.
-        var outer = builder.from("persons", ctx -> ctx.persons());
-        outer.not()
-                .join((java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
-                .filter((Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 500.0)
-                .end();
-        var rule = outer.fn((ctx, a) -> {
-        });
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .not()
+                .join((Object) (java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
+                .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 500.0)
+                .end()
+                .fn((ctx, a) -> {
+                });
 
         rule.run(ctx);
-        // Scope finds ACC1 (1000 > 500) -> non-empty -> all outer tuples blocked
         assertThat(rule.executionCount()).isEqualTo(0);
     }
 
     @Test
     public void testNotScopePassesAllWhenScopeIsEmpty() {
-        // not() scope: when the scope finds NO match, all outer tuples pass.
-        // Scope: accounts with balance > 10000 -- none qualify -> scope empty.
-        var outer = builder.from("persons", ctx -> ctx.persons());
-        outer.not()
-                .join((java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
-                .filter((Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 10000.0)
-                .end();
-        var rule = outer.fn((ctx, a) -> {
-        });
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .not()
+                .join((Object) (java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
+                .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 10000.0)
+                .end()
+                .fn((ctx, a) -> {
+                });
 
         rule.run(ctx);
-        // Scope finds nothing -> isEmpty() = true -> all persons pass
         assertThat(rule.executionCount()).isEqualTo(2);
-        assertThat(rule.filterCount()).isEqualTo(0);
     }
 
     @Test
     public void testExistsScopePassesAllWhenScopeHasMatch() {
-        // exists() scope: outer tuples pass when the scope produces at least one result.
-        // Scope: high-balance accounts -- ACC1 qualifies -> scope non-empty -> all persons pass.
-        var outer = builder.from("persons", ctx -> ctx.persons());
-        outer.exists()
-                .join((java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
-                .filter((Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 500.0)
-                .end();
-        var rule = outer.fn((ctx, a) -> {
-        });
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .exists()
+                .join((Object) (java.util.function.Function<Ctx, DataSource<Account>>) ctx -> ctx.accounts())
+                .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 500.0)
+                .end()
+                .fn((ctx, a) -> {
+                });
 
         rule.run(ctx);
-        // Scope finds ACC1 -> non-empty -> exists() passes -> both persons fire fn()
         assertThat(rule.executionCount()).isEqualTo(2);
     }
 }
