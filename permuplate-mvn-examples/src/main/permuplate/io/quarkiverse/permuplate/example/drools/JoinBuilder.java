@@ -202,7 +202,17 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path2() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            return new RuleOOPathBuilder.Path2(this, rd, steps, rd.factArity() - 1);
+            String cn = getClass().getSimpleName();
+            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
+            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
+            try {
+                Object nextJoin = Class.forName(nextName)
+                        .getConstructor(Object.class, RuleDefinition.class)
+                        .newInstance(end(), rd);
+                return cast(new RuleOOPathBuilder.Path2<>(nextJoin, rd, steps, rd.factArity() - 1));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate " + nextName, e);
+            }
         }
 
         /**
@@ -217,7 +227,17 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path3() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            return new RuleOOPathBuilder.Path3(this, rd, steps, rd.factArity() - 1);
+            String cn = getClass().getSimpleName();
+            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
+            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
+            try {
+                Object nextJoin = Class.forName(nextName)
+                        .getConstructor(Object.class, RuleDefinition.class)
+                        .newInstance(end(), rd);
+                return cast(new RuleOOPathBuilder.Path3<>(nextJoin, rd, steps, rd.factArity() - 1));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate " + nextName, e);
+            }
         }
 
         /**
@@ -232,7 +252,17 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path4() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            return new RuleOOPathBuilder.Path4(this, rd, steps, rd.factArity() - 1);
+            String cn = getClass().getSimpleName();
+            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
+            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
+            try {
+                Object nextJoin = Class.forName(nextName)
+                        .getConstructor(Object.class, RuleDefinition.class)
+                        .newInstance(end(), rd);
+                return cast(new RuleOOPathBuilder.Path4<>(nextJoin, rd, steps, rd.factArity() - 1));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate " + nextName, e);
+            }
         }
 
         /**
@@ -247,7 +277,17 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path5() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            return new RuleOOPathBuilder.Path5(this, rd, steps, rd.factArity() - 1);
+            String cn = getClass().getSimpleName();
+            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
+            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
+            try {
+                Object nextJoin = Class.forName(nextName)
+                        .getConstructor(Object.class, RuleDefinition.class)
+                        .newInstance(end(), rd);
+                return cast(new RuleOOPathBuilder.Path5<>(nextJoin, rd, steps, rd.factArity() - 1));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate " + nextName, e);
+            }
         }
 
         /**
@@ -262,7 +302,17 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path6() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            return new RuleOOPathBuilder.Path6(this, rd, steps, rd.factArity() - 1);
+            String cn = getClass().getSimpleName();
+            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
+            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
+            try {
+                Object nextJoin = Class.forName(nextName)
+                        .getConstructor(Object.class, RuleDefinition.class)
+                        .newInstance(end(), rd);
+                return cast(new RuleOOPathBuilder.Path6<>(nextJoin, rd, steps, rd.factArity() - 1));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate " + nextName, e);
+            }
         }
 
         /**

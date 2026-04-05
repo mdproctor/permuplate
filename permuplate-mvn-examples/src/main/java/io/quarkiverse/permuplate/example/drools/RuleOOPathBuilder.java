@@ -12,13 +12,11 @@ public class RuleOOPathBuilder {
 
     public static class Path2<END, T extends BaseTuple, A, B> {
         private final END end;
-        @SuppressWarnings("rawtypes")
-        private final RuleDefinition rd;
+        private final RuleDefinition<?> rd;
         private final List<OOPathStep> steps;
         private final int rootIndex;
 
-        @SuppressWarnings("rawtypes")
-        public Path2(END end, RuleDefinition rd, List<OOPathStep> steps, int rootIndex) {
+        public Path2(END end, RuleDefinition<?> rd, List<OOPathStep> steps, int rootIndex) {
             this.end = end;
             this.rd = rd;
             this.steps = steps;
@@ -26,7 +24,7 @@ public class RuleOOPathBuilder {
         }
 
         @SuppressWarnings("unchecked")
-        public END path(Function2<PathContext<T>, A, ?> fn2,
+        public END path(Function2<PathContext<T>, A, Iterable<B>> fn2,
                 Predicate2<PathContext<T>, B> flt2) {
             steps.add(new OOPathStep(
                     (ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact),
@@ -38,13 +36,11 @@ public class RuleOOPathBuilder {
 
     public static class Path3<END, T extends BaseTuple, A, B, C> {
         private final END end;
-        @SuppressWarnings("rawtypes")
-        private final RuleDefinition rd;
+        private final RuleDefinition<?> rd;
         private final List<OOPathStep> steps;
         private final int rootIndex;
 
-        @SuppressWarnings("rawtypes")
-        public Path3(END end, RuleDefinition rd, List<OOPathStep> steps, int rootIndex) {
+        public Path3(END end, RuleDefinition<?> rd, List<OOPathStep> steps, int rootIndex) {
             this.end = end;
             this.rd = rd;
             this.steps = steps;
@@ -52,7 +48,7 @@ public class RuleOOPathBuilder {
         }
 
         @SuppressWarnings("unchecked")
-        public Path2<END, T, B, C> path(Function2<PathContext<T>, A, ?> fn2,
+        public Path2<END, T, B, C> path(Function2<PathContext<T>, A, Iterable<B>> fn2,
                 Predicate2<PathContext<T>, B> flt2) {
             steps.add(new OOPathStep(
                     (ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact),
@@ -63,13 +59,11 @@ public class RuleOOPathBuilder {
 
     public static class Path4<END, T extends BaseTuple, A, B, C, D> {
         private final END end;
-        @SuppressWarnings("rawtypes")
-        private final RuleDefinition rd;
+        private final RuleDefinition<?> rd;
         private final List<OOPathStep> steps;
         private final int rootIndex;
 
-        @SuppressWarnings("rawtypes")
-        public Path4(END end, RuleDefinition rd, List<OOPathStep> steps, int rootIndex) {
+        public Path4(END end, RuleDefinition<?> rd, List<OOPathStep> steps, int rootIndex) {
             this.end = end;
             this.rd = rd;
             this.steps = steps;
@@ -77,7 +71,7 @@ public class RuleOOPathBuilder {
         }
 
         @SuppressWarnings("unchecked")
-        public Path3<END, T, B, C, D> path(Function2<PathContext<T>, A, ?> fn2,
+        public Path3<END, T, B, C, D> path(Function2<PathContext<T>, A, Iterable<B>> fn2,
                 Predicate2<PathContext<T>, B> flt2) {
             steps.add(new OOPathStep(
                     (ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact),
@@ -88,13 +82,11 @@ public class RuleOOPathBuilder {
 
     public static class Path5<END, T extends BaseTuple, A, B, C, D, E> {
         private final END end;
-        @SuppressWarnings("rawtypes")
-        private final RuleDefinition rd;
+        private final RuleDefinition<?> rd;
         private final List<OOPathStep> steps;
         private final int rootIndex;
 
-        @SuppressWarnings("rawtypes")
-        public Path5(END end, RuleDefinition rd, List<OOPathStep> steps, int rootIndex) {
+        public Path5(END end, RuleDefinition<?> rd, List<OOPathStep> steps, int rootIndex) {
             this.end = end;
             this.rd = rd;
             this.steps = steps;
@@ -102,7 +94,7 @@ public class RuleOOPathBuilder {
         }
 
         @SuppressWarnings("unchecked")
-        public Path4<END, T, B, C, D, E> path(Function2<PathContext<T>, A, ?> fn2,
+        public Path4<END, T, B, C, D, E> path(Function2<PathContext<T>, A, Iterable<B>> fn2,
                 Predicate2<PathContext<T>, B> flt2) {
             steps.add(new OOPathStep(
                     (ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact),
@@ -113,13 +105,11 @@ public class RuleOOPathBuilder {
 
     public static class Path6<END, T extends BaseTuple, A, B, C, D, E, F> {
         private final END end;
-        @SuppressWarnings("rawtypes")
-        private final RuleDefinition rd;
+        private final RuleDefinition<?> rd;
         private final List<OOPathStep> steps;
         private final int rootIndex;
 
-        @SuppressWarnings("rawtypes")
-        public Path6(END end, RuleDefinition rd, List<OOPathStep> steps, int rootIndex) {
+        public Path6(END end, RuleDefinition<?> rd, List<OOPathStep> steps, int rootIndex) {
             this.end = end;
             this.rd = rd;
             this.steps = steps;
@@ -127,7 +117,7 @@ public class RuleOOPathBuilder {
         }
 
         @SuppressWarnings("unchecked")
-        public Path5<END, T, B, C, D, E, F> path(Function2<PathContext<T>, A, ?> fn2,
+        public Path5<END, T, B, C, D, E, F> path(Function2<PathContext<T>, A, Iterable<B>> fn2,
                 Predicate2<PathContext<T>, B> flt2) {
             steps.add(new OOPathStep(
                     (ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact),

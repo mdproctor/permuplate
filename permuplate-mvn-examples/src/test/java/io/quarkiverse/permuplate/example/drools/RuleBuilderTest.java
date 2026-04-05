@@ -13,12 +13,29 @@ public class RuleBuilderTest {
     @Before
     public void setUp() {
         builder = new RuleBuilder<>();
+        DataSource<Library> libraries = DataSource.of(
+                new Library("ScienceLib", java.util.List.of(
+                        new Room("Physics", java.util.List.of(
+                                new Book("Relativity", true),
+                                new Book("Draft", false))),
+                        new Room("Biology", java.util.List.of(
+                                new Book("Evolution", true),
+                                new Book("Notes", false))))),
+                new Library("ArtsLib", java.util.List.of(
+                        new Room("History", java.util.List.of(
+                                new Book("Waterloo", true),
+                                new Book("Sketch", false))),
+                        new Room("Literature", java.util.List.of(
+                                new Book("Hamlet", true),
+                                new Book("Outline", false))))));
+
         ctx = new Ctx(
                 DataSource.of(new Person("Alice", 30), new Person("Bob", 17)),
                 DataSource.of(new Account("ACC1", 1000.0), new Account("ACC2", 50.0)),
                 DataSource.of(new Order("ORD1", 150.0), new Order("ORD2", 25.0)),
                 DataSource.of(new Product("PRD1", 99.0), new Product("PRD2", 9.0)),
-                DataSource.of(new Transaction("TXN1", 200.0), new Transaction("TXN2", 15.0)));
+                DataSource.of(new Transaction("TXN1", 200.0), new Transaction("TXN2", 15.0)),
+                libraries);
     }
 
     @Test
@@ -474,5 +491,130 @@ public class RuleBuilderTest {
 
         rule.run(ctx);
         assertThat(rule.executionCount()).isEqualTo(2);
+    }
+
+    // =========================================================================
+    // OOPath — pathN() traversal
+    // =========================================================================
+
+    @Test
+    public void testPath2TraversesOneLevel() {
+        // path2(): Library -> Rooms — produces Tuple2<Library, Room> per matching room.
+        // 2 libraries x 2 rooms each x all rooms pass name != null = 4 combinations.
+        // Use typed intermediate variable to anchor B=Room for the path2() type variable.
+        RuleOOPathBuilder.Path2<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple2<Library, Room>>, BaseTuple.Tuple1<Library>, Library, Room> path2Builder = builder
+                .from("libs", ctx -> ctx.libraries()).path2();
+        var rule = path2Builder.path(
+                (pathCtx, lib) -> lib.rooms(),
+                (pathCtx, room) -> room.name() != null)
+                .fn((ctx, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(4); // 2 libs x 2 rooms
+        // fact[0] = Library, fact[1] = BaseTuple.Tuple2<Library, Room>
+        assertThat(rule.capturedFact(0, 0)).isInstanceOf(Library.class);
+        assertThat(rule.capturedFact(0, 1)).isInstanceOf(BaseTuple.Tuple2.class);
+        @SuppressWarnings("unchecked")
+        BaseTuple.Tuple2<Library, Room> t = (BaseTuple.Tuple2<Library, Room>) rule.capturedFact(0, 1);
+        assertThat(t.getA()).isInstanceOf(Library.class);
+        assertThat(t.getB()).isInstanceOf(Room.class);
+    }
+
+    @Test
+    public void testPath3TraversesTwoLevels() {
+        // path3(): Library -> Room -> Book — produces Tuple3<Library, Room, Book>.
+        // 2 libs x 2 rooms x 2 books = 8 combinations (no filters).
+        // Use typed intermediate variable to anchor B=Room, C=Book for path3() type variables.
+        RuleOOPathBuilder.Path3<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple3<Library, Room, Book>>, BaseTuple.Tuple2<Library, Room>, Library, Room, Book> path3Builder = builder
+                .from("libs", ctx -> ctx.libraries()).path3();
+        var rule = path3Builder.path(
+                (pathCtx, lib) -> lib.rooms(),
+                (pathCtx, room) -> true)
+                .path(
+                        (pathCtx, room) -> room.books(),
+                        (pathCtx, book) -> true)
+                .fn((ctx, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(8); // 2 libs x 2 rooms x 2 books
+        assertThat(rule.capturedFact(0, 1)).isInstanceOf(BaseTuple.Tuple3.class);
+    }
+
+    @Test
+    public void testPathFilterAppliedAtEachStep() {
+        // Only published books pass the second-step predicate.
+        // 2 libs x 2 rooms x 1 published book each = 4 combinations.
+        RuleOOPathBuilder.Path3<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple3<Library, Room, Book>>, BaseTuple.Tuple2<Library, Room>, Library, Room, Book> path3Builder = builder
+                .from("libs", ctx -> ctx.libraries()).path3();
+        var rule = path3Builder.path(
+                (pathCtx, lib) -> lib.rooms(),
+                (pathCtx, room) -> true)
+                .path(
+                        (pathCtx, room) -> room.books(),
+                        (pathCtx, book) -> book.published())
+                .fn((ctx, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(4); // 2 libs x 2 rooms x 1 published
+        for (int i = 0; i < rule.executionCount(); i++) {
+            @SuppressWarnings("unchecked")
+            BaseTuple.Tuple3<Library, Room, Book> t = (BaseTuple.Tuple3<Library, Room, Book>) rule.capturedFact(i, 1);
+            assertThat(t.getC().published()).isTrue();
+        }
+    }
+
+    @Test
+    public void testPathContextCrossReference() {
+        // Second-step predicate uses getTuple().getA() to cross-reference the Library
+        // while filtering a Book. Only books in ScienceLib rooms pass.
+        RuleOOPathBuilder.Path3<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple3<Library, Room, Book>>, BaseTuple.Tuple2<Library, Room>, Library, Room, Book> path3Builder = builder
+                .from("libs", ctx -> ctx.libraries()).path3();
+        var rule = path3Builder.path(
+                (pathCtx, lib) -> lib.rooms(),
+                (pathCtx, room) -> true)
+                .path(
+                        (pathCtx, room) -> room.books(),
+                        (pathCtx, book) -> pathCtx.getTuple().getA().name().startsWith("Science"))
+                .fn((ctx, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        // ScienceLib has 2 rooms x 2 books = 4 combinations
+        assertThat(rule.executionCount()).isEqualTo(4);
+        for (int i = 0; i < rule.executionCount(); i++) {
+            @SuppressWarnings("unchecked")
+            BaseTuple.Tuple3<Library, Room, Book> t = (BaseTuple.Tuple3<Library, Room, Book>) rule.capturedFact(i, 1);
+            assertThat(t.getA().name()).startsWith("Science");
+        }
+    }
+
+    @Test
+    public void testPathCombinedWithOuterJoin() {
+        // persons.join(libraries).path2(Library -> Room)
+        // Outer facts: [Person, Library, Tuple2<Library,Room>]
+        // 2 persons x 2 libraries x 2 rooms = 8 combinations
+        RuleOOPathBuilder.Path2<JoinBuilder.Join3First<Void, Ctx, Person, Library, BaseTuple.Tuple2<Library, Room>>, BaseTuple.Tuple1<Library>, Library, Room> path2Builder = builder
+                .from("persons", ctx -> ctx.persons())
+                .join(ctx -> ctx.libraries())
+                .path2();
+        var rule = path2Builder.path(
+                (pathCtx, lib) -> lib.rooms(),
+                (pathCtx, room) -> room.name() != null)
+                .fn((ctx, p, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(8); // 2p x 2libs x 2rooms
+        assertThat(rule.capturedFact(0, 0)).isInstanceOf(Person.class);
+        assertThat(rule.capturedFact(0, 1)).isInstanceOf(Library.class);
+        assertThat(rule.capturedFact(0, 2)).isInstanceOf(BaseTuple.Tuple2.class);
     }
 }
