@@ -263,3 +263,11 @@ assertThat(src).contains("c3.call(o1, o2, o3)");
 - [OVERVIEW.md](OVERVIEW.md) — architecture deep-dive, market comparison, full roadmap
 - `permuplate-processor/src/main/java/io/quarkiverse/permuplate/processor/` — the processor source files
 - `permuplate-tests/src/test/java/io/quarkiverse/permuplate/` — test classes
+
+---
+
+## Writing Style Guide
+
+**The writing style guide at `~/claude-workspace/writing-styles/blog-technical.md` is mandatory for all blog and diary entries in `docs/blog/`.** Load it in full before drafting any entry. Complete the pre-draft voice classification (I / we / Claude-named) before generating any prose. Do not show a draft without first verifying it against the style guide's "What to Avoid" section.
+
+The guide covers Mark's voice and personality, the three collaboration registers (I / we / Claude named directly), structural patterns, quantitative fingerprint, and the heading smell check.
