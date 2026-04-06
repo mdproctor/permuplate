@@ -2,7 +2,7 @@
 **Date:** 2026-04-05
 **Topic:** Full design state of the Drools RuleBuilder sandbox — Phases 1 through 3b
 **Supersedes:** *(none — first snapshot)*
-**Superseded by:** *(leave blank — filled in if this snapshot is later superseded)*
+**Superseded by:** [2026-04-06-drools-dsl-sandbox](2026-04-06-drools-dsl-sandbox.md)
 
 ---
 
