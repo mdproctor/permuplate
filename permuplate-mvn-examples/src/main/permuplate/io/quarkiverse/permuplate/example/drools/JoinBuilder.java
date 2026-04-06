@@ -411,5 +411,18 @@ public class JoinBuilder {
             return this;
         }
 
+        /**
+         * Cross-fact filter using three named variable bindings.
+         * All three variables must have been bound via var() before this call.
+         */
+        @PermuteReturn(className = "Join${i}First",
+                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
+                       when = "true")
+        public <V1, V2, V3> Object filter(Variable<V1> v1, Variable<V2> v2, Variable<V3> v3,
+                                           Predicate4<DS, V1, V2, V3> predicate) {
+            rd.addVariableFilter(v1, v2, v3, predicate);
+            return this;
+        }
+
     }
 }

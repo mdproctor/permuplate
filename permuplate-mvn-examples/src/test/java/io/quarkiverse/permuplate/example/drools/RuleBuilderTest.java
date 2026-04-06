@@ -699,4 +699,36 @@ public class RuleBuilderTest {
             assertThat(o.amount()).isGreaterThan(100.0);
         }
     }
+
+    @Test
+    public void testVarThreeVariableFilter() {
+        // 3-variable filter: Alice(age=30) + ACC1(balance=1000) + ORD1(amount=150) passes.
+        // 2 × 2 × 2 = 8 combinations; only 1 passes all three constraints.
+        Variable<Person> pVar = new Variable<>();
+        Variable<Account> aVar = new Variable<>();
+        Variable<Order> oVar = new Variable<>();
+
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .var(pVar)
+                .join(ctx -> ctx.accounts())
+                .var(aVar)
+                .join(ctx -> ctx.orders())
+                .var(oVar)
+                .filter(pVar, aVar, oVar,
+                        (ctx, p, a, o) -> p.age() >= 18
+                                && a.balance() > 500.0
+                                && o.amount() > 100.0)
+                .fn((ctx, p, a, o) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(1);
+        Person p = (Person) rule.capturedFact(0, 0);
+        Account a = (Account) rule.capturedFact(0, 1);
+        Order o = (Order) rule.capturedFact(0, 2);
+        assertThat(p.name()).isEqualTo("Alice");
+        assertThat(a.id()).isEqualTo("ACC1");
+        assertThat(o.id()).isEqualTo("ORD1");
+    }
 }
