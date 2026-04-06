@@ -617,4 +617,24 @@ public class RuleBuilderTest {
         assertThat(rule.capturedFact(0, 1)).isInstanceOf(Library.class);
         assertThat(rule.capturedFact(0, 2)).isInstanceOf(BaseTuple.Tuple2.class);
     }
+
+    // =========================================================================
+    // Variable<T> — cross-fact binding
+    // =========================================================================
+
+    @Test
+    public void testUnboundVariableThrows() {
+        Variable<Person> personVar = new Variable<>();
+        Variable<Account> accountVar = new Variable<>();
+
+        try {
+            builder.from("persons", ctx -> ctx.persons())
+                    .join(ctx -> ctx.accounts())
+                    .filter(personVar, accountVar,
+                            (ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0);
+            org.junit.Assert.fail("Expected IllegalStateException");
+        } catch (IllegalStateException e) {
+            assertThat(e.getMessage()).contains("Variable not bound");
+        }
+    }
 }

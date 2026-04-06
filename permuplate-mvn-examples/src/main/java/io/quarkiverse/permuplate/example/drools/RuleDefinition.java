@@ -146,6 +146,37 @@ public class RuleDefinition<DS> {
         this.ooPathSteps.addAll(steps);
     }
 
+    public void bindVariable(Variable<?> v, int factIndex) {
+        v.bind(factIndex);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <V1, V2> void addVariableFilter(Variable<V1> v1, Variable<V2> v2,
+            Predicate3<DS, V1, V2> predicate) {
+        if (!v1.isBound() || !v2.isBound())
+            throw new IllegalStateException(
+                    "Variable not bound — call var() before using it in filter() "
+                    + "(indices: v1=" + v1.index() + ", v2=" + v2.index() + ")");
+        // Snapshot indices now — Variable.index() is mutable; reading inside the lambda
+        // would allow post-registration rebinding to silently corrupt the filter.
+        int i1 = v1.index(), i2 = v2.index();
+        filters.add((ctx, facts) -> predicate.test((DS) ctx, (V1) facts[i1], (V2) facts[i2]));
+    }
+
+    @SuppressWarnings("unchecked")
+    public <V1, V2, V3> void addVariableFilter(Variable<V1> v1, Variable<V2> v2,
+            Variable<V3> v3,
+            Predicate4<DS, V1, V2, V3> predicate) {
+        if (!v1.isBound() || !v2.isBound() || !v3.isBound())
+            throw new IllegalStateException(
+                    "Variable not bound — call var() before using it in filter() "
+                    + "(indices: v1=" + v1.index() + ", v2=" + v2.index() + ", v3=" + v3.index() + ")");
+        // Snapshot indices now — Variable.index() is mutable; reading inside the lambda
+        // would allow post-registration rebinding to silently corrupt the filter.
+        int i1 = v1.index(), i2 = v2.index(), i3 = v3.index();
+        filters.add((ctx, facts) -> predicate.test((DS) ctx, (V1) facts[i1], (V2) facts[i2], (V3) facts[i3]));
+    }
+
     // -------------------------------------------------------------------------
     // Execution
     // -------------------------------------------------------------------------
