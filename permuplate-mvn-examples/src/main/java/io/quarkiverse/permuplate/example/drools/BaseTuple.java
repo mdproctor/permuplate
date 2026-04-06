@@ -18,6 +18,58 @@ public abstract class BaseTuple {
         return size;
     }
 
+    /**
+     * Projects this tuple's values into an instance of the target type, inferred
+     * from the assignment context via the Java varargs type-capture trick.
+     *
+     * <p>
+     * Supports:
+     * <ul>
+     * <li><b>Records</b> — calls the canonical constructor with tuple values in order.
+     * <li><b>Classes</b> — finds a constructor whose parameter count matches the tuple size
+     * and calls it with tuple values in order.
+     * </ul>
+     *
+     * <p>
+     * Usage:
+     *
+     * <pre>{@code
+     * record LibRoom(Library library, Room room) {}
+     * BaseTuple.Tuple2<Library, Room> t = ...;
+     * LibRoom result = t.as();          // T inferred from assignment
+     * LibRoom result = t.<LibRoom>as(); // or with explicit type parameter
+     * }</pre>
+     *
+     * <p>
+     * The varargs parameter {@code v} is never used at runtime — it exists only
+     * to enable Java's type inference to capture the target class at the call site.
+     * Pass no arguments; Java creates an empty array of the inferred type.
+     */
+    @SuppressWarnings({ "unchecked", "varargs" })
+    public <T> T as(T... v) {
+        Class<T> clazz = (Class<T>) v.getClass().getComponentType();
+        try {
+            // Collect tuple values in order
+            Object[] args = new Object[size()];
+            for (int i = 0; i < size(); i++) {
+                args[i] = get(i);
+            }
+            // Find a constructor whose parameter count matches the tuple size
+            for (java.lang.reflect.Constructor<?> ctor : clazz.getDeclaredConstructors()) {
+                if (ctor.getParameterCount() == size()) {
+                    ctor.setAccessible(true);
+                    return (T) ctor.newInstance(args);
+                }
+            }
+            throw new IllegalArgumentException(
+                    "No constructor with " + size() + " parameters found on " + clazz.getName());
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("as() projection failed for " + clazz.getName(), e);
+        }
+    }
+
     public static class Tuple0 extends BaseTuple {
         public Tuple0() {
             this.size = 0;

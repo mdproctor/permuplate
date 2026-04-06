@@ -186,6 +186,7 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | `@PermuteMethod` ternary `from` for conditional generation | `from="${i > 1 ? i : i+1}"` with `to="${i}"` produces an empty range at `i=1` → method omitted. At `i≥2` it produces `from=to=i` → one clone. JEXL3 supports `?:` natively. Used by `filterLatest` sentinel in `JoinBuilder` to suppress the single-fact filter at arity 1 where it would duplicate the all-facts filter. |
 | `Variable.of("name")` vs `new Variable<>()` | Named variables carry a diagnostic name used in error messages and match DRL's `$person` convention. Anonymous `new Variable<>()` remains valid; `of()` is preferred for DRL migration work. |
 | `from(Function)` shorthand | `RuleBuilder.from(Function)` delegates to `from("rule", source)`. Preferred when the string name isn't needed for debugging. Both forms are valid. |
+| `BaseTuple.as()` varargs type capture | `as(T... v)` uses an empty varargs array to capture the target type at the call site — `v.getClass().getComponentType()` gives `T.class` without requiring an explicit `Class<T>` parameter. The caller passes no arguments; Java creates a zero-length `T[]` from the assignment context. |
 
 ---
 

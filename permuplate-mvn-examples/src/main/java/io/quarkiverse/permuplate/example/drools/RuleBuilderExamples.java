@@ -87,4 +87,31 @@ public class RuleBuilderExamples {
                 .fn((ctx, p, o) -> {
                 });
     }
+
+    /**
+     * BaseTuple.as() — projects OOPath tuple results into typed records.
+     * The record's fields must be in the same positional order as the tuple elements.
+     * Useful for readable access to path traversal results.
+     *
+     * <p>
+     * Note: the explicit typed variable for path2() anchors B=Room for the compiler —
+     * the same pattern required by the OOPath test suite.
+     */
+    public static void tupleAsExample(RuleBuilder<Ctx> builder) {
+        record LibRoom(Library library, Room room) {
+        }
+
+        // Typed variable anchors B=Room for path2() — required for lambda type inference
+        RuleOOPathBuilder.Path2<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple2<Library, Room>>, BaseTuple.Tuple1<Library>, Library, Room> path2 = builder
+                .from(ctx -> ctx.libraries()).path2();
+
+        // path2() produces Tuple2<Library, Room> — project it into LibRoom for named access
+        path2.path(
+                (pathCtx, lib) -> lib.rooms(),
+                (pathCtx, room) -> room.name() != null)
+                .fn((ctx, lib, t) -> {
+                    LibRoom lr = t.as(); // named access: lr.library(), lr.room()
+                    System.out.println(lr.library().name() + " / " + lr.room().name());
+                });
+    }
 }
