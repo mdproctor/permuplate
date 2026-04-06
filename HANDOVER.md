@@ -44,7 +44,7 @@ Invoke `write-blog` — all four are Phase Updates; style guide is at `~/claude-
 | Context | Where | Retrieve with |
 |---|---|---|
 | Design state | `docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md` | `cat` that file |
-| Blog entries | `docs/blog/007-building-the-drools-dsl.md` | `cat` — last written entry |
+| Blog entries | `docs/blog/2026-04-06-03-ruling-things-out.md` | `cat` — last written entry |
 | Writing style guide | `~/claude-workspace/writing-styles/blog-technical.md` | `cat` that file |
 | 2000AD system | `~/claude-workspace/2000AD/README.md` | `cat` that file |
 | Garden index | `~/claude/knowledge-garden/GARDEN.md` | index only |
