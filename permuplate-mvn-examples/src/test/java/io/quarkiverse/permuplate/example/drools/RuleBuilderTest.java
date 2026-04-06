@@ -942,4 +942,81 @@ public class RuleBuilderTest {
 
         assertThat(withType.executionCount()).isEqualTo(withoutType.executionCount());
     }
+
+    // =========================================================================
+    // Chained not()/exists() scopes
+    // =========================================================================
+
+    @Test
+    public void testNotFollowedByExistsBothSatisfied() {
+        // Chained not() + exists() on same outer chain — both must be satisfied.
+        // not(orders > 1000): SATISFIED — no order exceeds 1000 → persons survive
+        // exists(orders > 100): SATISFIED — ORD1=150 exists → persons survive
+        // Outer filter before scopes to narrow to Alice (age >= 18)
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18)
+                .not()
+                .join(ctx -> ctx.orders())
+                .filter((Object) (Predicate2<Ctx, Order>) (ctx, o) -> o.amount() > 1000.0)
+                .end()
+                .exists()
+                .join(ctx -> ctx.orders())
+                .filter((Object) (Predicate2<Ctx, Order>) (ctx, o) -> o.amount() > 100.0)
+                .end()
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+    }
+
+    @Test
+    public void testNotUnsatisfiedBlocksEvenWhenExistsSatisfied() {
+        // not() UNSATISFIED blocks all outer facts even though exists() would pass.
+        // not(accounts > 500): UNSATISFIED — ACC1=1000 exists → all persons blocked
+        // exists(orders > 100): SATISFIED — ORD1=150 exists
+        // Because not() fails globally, result is 0 regardless of exists().
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .not()
+                .join(ctx -> ctx.accounts())
+                .filter((Object) (Predicate2<Ctx, Account>) (ctx, a) -> a.balance() > 500.0)
+                .end()
+                .exists()
+                .join(ctx -> ctx.orders())
+                .filter((Object) (Predicate2<Ctx, Order>) (ctx, o) -> o.amount() > 100.0)
+                .end()
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(0);
+    }
+
+    @Test
+    public void testTwoRulesFromSameBuilderAreIndependent() {
+        // Two rules built from the same RuleBuilder instance are fully independent.
+        // Running one rule does not affect the other's state.
+        var rule1 = builder.from("adults", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+
+        var rule2 = builder.from("high-balance", ctx -> ctx.accounts())
+                .filter((ctx, a) -> a.balance() > 500.0)
+                .fn((ctx, a) -> {
+                });
+
+        rule1.run(ctx);
+        rule2.run(ctx);
+
+        // Each rule independently matches its own data
+        assertThat(rule1.executionCount()).isEqualTo(1); // Alice only
+        assertThat(rule2.executionCount()).isEqualTo(1); // ACC1 only
+
+        // Running rule2 again resets rule2's count but does not affect rule1
+        rule2.run(ctx);
+        assertThat(rule1.executionCount()).isEqualTo(1); // rule1 unchanged
+        assertThat(rule2.executionCount()).isEqualTo(1); // rule2 reset and re-run
+    }
 }
