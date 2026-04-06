@@ -41,7 +41,7 @@ The consequence: generated classes are `JoinBuilder.Join1First`, `JoinBuilder.Jo
 
 ---
 
-## The Infrastructure
+## The Hand-Written Foundation
 
 The hand-written infrastructure took shape cleanly. Five domain records:
 
@@ -153,11 +153,13 @@ The final test suite covers:
 - **Arities 1 through 6**: systematic coverage of every arity level
 - **Leaf node** (testArity6LeafNodeCompiles): a compile-time test — if `Join6First` accidentally had a `join()` method, this test would fail to compile
 
-The leaf node test is worth explaining. It builds a 6-join chain and calls `fn()`. This compiles correctly because `Join6First` has no `join()` method — boundary omission removed it automatically when the `@PermuteReturn` evaluation produced `Join7First`, which isn't in the generated set. If the boundary omission broke, the generated `Join6First` would have a `join()` method returning `Join7First` — a non-existent class — and the compilation would fail. The test's success is proof that the generated code is structurally correct.
+The leaf node test is worth explaining. It builds a 6-join chain and calls `fn()`. This compiles correctly because `Join6First` has no `join()` method — boundary omission removed it automatically when the `@PermuteReturn` evaluation produced `Join7First`, which isn't in the generated set.
+
+If the boundary omission broke, the generated `Join6First` would have a `join()` method returning `Join7First` — a non-existent class — and the compilation would fail. The test's success is proof that the generated code is structurally correct.
 
 ---
 
-## What Came Next
+## Phase 2 Becomes Straightforward
 
 With the Drools Phase 1 example in place, the G3 alpha naming fix became the obvious next step. The First/Second split — the Drools architectural cornerstone — was blocked by the alpha naming gap in extends expansion. The formula bug (`+1` instead of `currentEmbeddedNum`) was blocking the correct `JoinNFirst extends JoinNSecond` relationship. Both needed to be fixed.
 
@@ -172,20 +174,6 @@ In Phase 2, `join()` on `JoinNSecond` can be typed as accepting `JoinNSecond` pa
 That's where the project stands. The infrastructure is proven. The template language is expressive enough for the target use case. The gap that blocked Phase 2 is closed. The next iteration builds on everything here.
 
 ---
-
-## Reflections on the Journey
-
-Looking back from Phase 1 to the initial sketch of an annotation that generates a cloned class — the scope grew considerably. What began as "clone a class and rename it" became:
-
-- An expression language with built-in functions
-- Two execution modes (APT and Maven plugin) with different capabilities
-- A validation library for annotation strings
-- Generic type parameter expansion on both class and method type parameters
-- Return type narrowing with boundary omission (the leaf node pattern)
-- Multiple overload generation per class
-- Extends clause auto-expansion
-
-Each of these was motivated by a concrete gap between what existed and what the Drools DSL needed. Nothing was added speculatively. The gap analysis drove the roadmap.
 
 The other thing the journey showed: the value of testing generated *behavior*, not just generated *syntax*. The `PermuteReturnTest` and `PermuteTypeParamTest` suites check that the generated source contains the right strings. They're valuable, but they don't catch everything. The `RuleBuilderTest` runs the generated DSL against actual data with actual predicates. That's where the `rd.asNext()` bug and the `wrapPredicate` arity bug were found — because the code actually *ran*, not just compiled.
 

@@ -84,11 +84,13 @@ That was the starting point. It was, in retrospect, quite modest compared to whe
 
 ---
 
-## Choosing the Tools
+## Two Choices That Shaped Everything
 
 Two decisions shaped everything that followed: the AST manipulation library and the expression evaluator.
 
-For AST manipulation, we went with **JavaParser**. It's a mature, actively maintained Java AST library with clean read-write APIs. You can parse a `.java` file, navigate the AST, modify nodes, and print the result back to source text. Critically, it works without a classpath — you can parse the template file without needing to resolve all its dependencies. This matters because the template might reference classes that don't exist yet (the classes being generated).
+For AST manipulation, we went with **JavaParser**. It's a mature, actively maintained Java AST library with clean read-write APIs. You can parse a `.java` file, navigate the AST, modify nodes, and print the result back to source text.
+
+Critically, it works without a classpath — you can parse the template file without needing to resolve all its dependencies. This matters because the template might reference classes that don't exist yet (the classes being generated).
 
 For expression evaluation in `${...}` placeholders, we picked **Apache Commons JEXL3**. It's a lightweight expression language that evaluates things like `"Join${i+1}"` with `i=3` to `"Join4"`. Clean, embeddable, no heavy dependencies. Later we'd discover a significant limitation in how it handles primitive types — but that came later.
 
@@ -98,4 +100,3 @@ That was the moment I knew this was going to be worth building properly.
 
 ---
 
-*Next: Discovering that "rename the class and copy the body" is the easy part — and that making field renaming, parameter expansion, and anchor call-site propagation work correctly is where the real complexity lives.*

@@ -44,7 +44,7 @@ These rules are wired into both the annotation processor (as compile errors at t
 
 ---
 
-## Thinking About IDE Support
+## The IDE Plugin I Didn't Build
 
 At this point in the project, I seriously considered building an IntelliJ plugin. The `permuplate-ide-support` module was there. The algorithm was there. The IDE plugin would use it to:
 
@@ -136,4 +136,3 @@ The test suite was now around 80 tests. The real complexity was still ahead.
 
 ---
 
-*Next: The hardest part — making type parameters grow, return types narrow by arity, and everything work together without explicit annotations on every method.*

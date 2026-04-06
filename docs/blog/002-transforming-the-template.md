@@ -124,7 +124,7 @@ One constraint: the template class name must not collide with any generated clas
 
 ---
 
-## The Test Story
+## The Test Story: In-Process Compilation and a mem: URI Trap
 
 By this point, we'd built a test suite using **Google's compile-testing library**. Each test compiles a Java source string in-process with the annotation processor attached and asserts on the generated source content:
 
@@ -146,7 +146,7 @@ One subtlety: `getCharContent(true)` is required to read source file content in 
 
 ---
 
-## Where Things Stood
+## Where Things Stood: Type-Erased and Incomplete
 
 After the initial phase, Permuplate could:
 - Generate N classes from a template with `@Permute`
@@ -162,4 +162,3 @@ That gap — and the architecture decision required to close it — led to one o
 
 ---
 
-*Next: When the annotation processor hits its limits — and why "inline mode" required building a Maven plugin.*

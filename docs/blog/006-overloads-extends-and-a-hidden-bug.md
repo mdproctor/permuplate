@@ -118,7 +118,6 @@ The existing test didn't catch it because the test was also wrong:
 
 The test asserted `contains("extends Join3Second")` at `forI=2` — which is the forward-reference output. The assertion was checking that the bug produced the expected buggy output, and passing. The comment on the test claimed the generated class was "Join3First" when it was actually "Join2First".
 
-
 This bug lived in the codebase for the entire duration of G3's development. Claude caught it when we started wiring the First/Second split — `Join2First extends Join3Second` is semantically wrong; each JoinFirst should extend its peer, not the next-arity class.
 
 The fix was a one-character change: `currentEmbeddedNum + 1` → `currentEmbeddedNum`. Then the existing test had to be updated to assert the correct behavior, and `doesNotContain` assertions were added to guard against the forward-reference regression.
@@ -179,4 +178,3 @@ The G3 story is a good illustration of the value of assertion completeness. The 
 
 ---
 
-*Next: Taking Permuplate to its real-world target — building an approximation of the Drools RuleBuilder DSL, and the surprises that emerged when the generated code had to actually run.*

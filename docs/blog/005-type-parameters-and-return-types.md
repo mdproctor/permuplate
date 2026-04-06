@@ -129,7 +129,7 @@ There's a deliberate asymmetry in the system: implicit inference (zero annotatio
 
 This is intentional. Inference works by recognizing `T1`, `T2`, `T3` as a numeric progression. `A`, `B`, `C` has no numeric suffix — the system can't detect the pattern without additional information.
 
-For the Drools DSL, I chose alpha naming throughout to match the real Drools codebase — its convention is `A, B, C, D`, not `T1, T2, T3`. That means every return type, every parameter type, every filter/consumer requires an explicit annotation. More verbose, but more faithful to Drools conventions. And it shows clearly what the fully-annotated path looks like, as a counterpoint to the implicit inference path demonstrated in other tests.
+For the Drools DSL, I chose alpha naming throughout to match the real Drools codebase — its convention is `A, B, C, D`, not `T1, T2, T3`. That means every return type, every parameter type, every filter/consumer requires an explicit annotation. More verbose, but more faithful to Drools conventions.
 
 There's an open idea to provide two versions of the DSL side by side — one using `T${j}` naming (zero-annotation implicit inference), one using alpha naming (full explicit annotation) — to show the trade-off concretely. That's deferred for now.
 
@@ -165,4 +165,3 @@ The test for alpha naming with `@PermuteReturn` revealed something important: th
 
 ---
 
-*Next: G3 and G4 — multiple overloads per class, extends clause expansion, and a bug that hid in plain sight for the entire duration of G3's development.*

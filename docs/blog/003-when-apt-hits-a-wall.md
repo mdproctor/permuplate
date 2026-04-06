@@ -48,7 +48,7 @@ Two important attributes on `@Permute` control which mode is expected:
 
 ---
 
-## Extracting the Core
+## Extracting the Core: Moving Transformers to permuplate-core
 
 Building the Maven plugin forced a refactoring that I should have done earlier: extracting the transformation logic into `permuplate-core`.
 
@@ -106,7 +106,7 @@ This pattern also handles topological ordering — when one generated class refe
 
 ---
 
-## What Inline Mode Unlocked
+## What Inline Mode Unlocked: Container Classes and Boundary Omission
 
 With the Maven plugin and inline generation in place, a range of patterns became possible that APT couldn't handle:
 
@@ -120,4 +120,3 @@ The tradeoff: inline mode is more complex to configure (requires the Maven plugi
 
 ---
 
-*Next: Growing the expression language — validation rules, built-in functions, and the JEXL autoboxing trap.*
