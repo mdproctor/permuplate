@@ -623,6 +623,31 @@ public class RuleBuilderTest {
     // =========================================================================
 
     @Test
+    public void testVarTwoFactCrossFilter() {
+        // Variable-based cross-fact filter: only Alice(age=30) + ACC1(balance=1000) passes.
+        // 2 persons × 2 accounts = 4 combinations; only 1 passes both constraints.
+        Variable<Person> personVar = new Variable<>();
+        Variable<Account> accountVar = new Variable<>();
+
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .var(personVar)
+                .join(ctx -> ctx.accounts())
+                .var(accountVar)
+                .filter(personVar, accountVar,
+                        (ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0)
+                .fn((ctx, p, a) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(1);
+        Person p = (Person) rule.capturedFact(0, 0);
+        Account a = (Account) rule.capturedFact(0, 1);
+        assertThat(p.name()).isEqualTo("Alice");
+        assertThat(a.id()).isEqualTo("ACC1");
+    }
+
+    @Test
     public void testUnboundVariableThrows() {
         Variable<Person> personVar = new Variable<>();
         Variable<Account> accountVar = new Variable<>();

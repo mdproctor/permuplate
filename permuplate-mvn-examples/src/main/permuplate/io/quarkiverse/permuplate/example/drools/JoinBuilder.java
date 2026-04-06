@@ -384,5 +384,32 @@ public class JoinBuilder {
             return this;
         }
 
+        /**
+         * Binds a variable to the most recently accumulated fact.
+         * After this call, v.index() equals rd.factArity() - 1.
+         */
+        @PermuteReturn(className = "Join${i}First",
+                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
+                       when = "true")
+        public <T> Object var(Variable<T> v) {
+            rd.bindVariable(v, rd.factArity() - 1);
+            return this;
+        }
+
+        /**
+         * Cross-fact filter using two named variable bindings.
+         * V1, V2 are the types of the bound variables — independent of the
+         * enclosing class's arity type parameters A, B, etc.
+         * Both variables must have been bound via var() before this call.
+         */
+        @PermuteReturn(className = "Join${i}First",
+                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
+                       when = "true")
+        public <V1, V2> Object filter(Variable<V1> v1, Variable<V2> v2,
+                                      Predicate3<DS, V1, V2> predicate) {
+            rd.addVariableFilter(v1, v2, predicate);
+            return this;
+        }
+
     }
 }
