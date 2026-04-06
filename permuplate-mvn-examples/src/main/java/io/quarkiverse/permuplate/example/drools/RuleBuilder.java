@@ -31,4 +31,43 @@ public class RuleBuilder<DS> {
         rd.addSource(firstSource);
         return new JoinBuilder.Join1First<>(null, rd);
     }
+
+    public <A> JoinBuilder.Join1First<Void, DS, A> extendsRule(RuleExtendsPoint.RuleExtendsPoint2<DS, A> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>("extends");
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join1First<>(null, child);
+    }
+
+    public <A, B> JoinBuilder.Join2First<Void, DS, A, B> extendsRule(RuleExtendsPoint.RuleExtendsPoint3<DS, A, B> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>("extends");
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join2First<>(null, child);
+    }
+
+    public <A, B, C> JoinBuilder.Join3First<Void, DS, A, B, C> extendsRule(RuleExtendsPoint.RuleExtendsPoint4<DS, A, B, C> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>("extends");
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join3First<>(null, child);
+    }
+
+    public <A, B, C, D> JoinBuilder.Join4First<Void, DS, A, B, C, D> extendsRule(
+            RuleExtendsPoint.RuleExtendsPoint5<DS, A, B, C, D> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>("extends");
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join4First<>(null, child);
+    }
+
+    public <A, B, C, D, E> JoinBuilder.Join5First<Void, DS, A, B, C, D, E> extendsRule(
+            RuleExtendsPoint.RuleExtendsPoint6<DS, A, B, C, D, E> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>("extends");
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join5First<>(null, child);
+    }
+
+    public <A, B, C, D, E, F> JoinBuilder.Join6First<Void, DS, A, B, C, D, E, F> extendsRule(
+            RuleExtendsPoint.RuleExtendsPoint7<DS, A, B, C, D, E, F> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>("extends");
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join6First<>(null, child);
+    }
 }

@@ -316,6 +316,31 @@ public class JoinBuilder {
         }
 
         /**
+         * Captures the current accumulated fact state as a typed extension point.
+         * Pass the result to RuleBuilder.extendsRule() to start a child rule that
+         * inherits all sources, filters, and constraint scopes up to this point.
+         *
+         * <p>Uses reflection to instantiate RuleExtendsPoint.RuleExtendsPoint(N+1) where N
+         * is the current arity — same pattern as join().
+         */
+        @SuppressWarnings("unchecked")
+        @PermuteReturn(className = "RuleExtendsPoint.RuleExtendsPoint${i+1}",
+                       typeArgs = "'DS, ' + typeArgList(1, i, 'alpha')",
+                       when = "true")
+        public Object extensionPoint() {
+            String cn = getClass().getSimpleName();
+            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
+            String className = RuleExtendsPoint.class.getName() + "$RuleExtendsPoint" + (n + 1);
+            try {
+                return cast(Class.forName(className)
+                        .getConstructor(RuleDefinition.class)
+                        .newInstance(rd));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to instantiate " + className, e);
+            }
+        }
+
+        /**
          * Terminal operation. {@code when="true"} prevents boundary omission —
          * RuleDefinition is not in the generated set.
          *
