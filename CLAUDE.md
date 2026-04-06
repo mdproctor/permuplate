@@ -188,6 +188,7 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | `from(Function)` shorthand | `RuleBuilder.from(Function)` delegates to `from("rule", source)`. Preferred when the string name isn't needed for debugging. Both forms are valid. |
 | `BaseTuple.as()` varargs type capture | `as(T... v)` uses an empty varargs array to capture the target type at the call site — `v.getClass().getComponentType()` gives `T.class` without requiring an explicit `Class<T>` parameter. The caller passes no arguments; Java creates a zero-length `T[]` from the assignment context. |
 | `type()` is a compile-time no-op | `Join0Second.type()` uses the same varargs type-capture trick as `as()` but discards the class at runtime — just `return cast(this)`. It exists only to provide the compiler a narrowed type parameter when a source returns a base type (e.g., `DataSource<Object>`). |
+| Varargs type-capture for nested generic DSL APIs | The pattern `public <T> T method(T... v)` captures the full inferred type — including nested generics like `Map<String, Map<String, Date>>` — from the assignment context. `Class<T>` parameter cannot do this because `Map<String, Map<String, Date>>.class` is illegal in Java (erasure). The varargs trick is broadly applicable to any DSL method that needs type-safe return without a `Class<T>` argument: `as()`, `type()`, `params()`, and future extensions all use this pattern in the Drools DSL sandbox. |
 
 ---
 
