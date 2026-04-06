@@ -64,7 +64,7 @@ The `permuplate-ide-support` module stands as the foundation for that future wor
 
 Working through the Drools gap analysis, one pattern kept appearing: the need to express **type parameter names** that follow a naming convention. The Drools codebase uses single-letter names: `A`, `B`, `C`, `D`, `E`, `F`. RxJava uses `T1`, `T2`, `T3`. These are human-readable and conventional; the annotation strings needed a way to generate them.
 
-We built a small library of built-in JEXL functions — what I called N4 in the gap analysis:
+Claude and I built a small library of built-in JEXL functions — what I called N4 in the gap analysis:
 
 - `alpha(n)` → `A` when n=1, `B` when n=2, ..., `Z` when n=26
 - `lower(n)` → `a`, `b`, ..., `z` (lowercase version)

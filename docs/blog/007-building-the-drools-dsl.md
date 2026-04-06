@@ -27,7 +27,7 @@ The chain advances through arity levels. At arity 1 (after `.from()`), you hold 
 
 ## The Design Pivots Before a Line of Code Was Written
 
-The first pivot happened during the design phase. The original plan had two template families: `Join0Second` and `Join0First extends Join0Second`. The First/Second split is the real Drools design — `Second` as the input contract type for multi-step joins, `First extends Second` to inherit all those overloads.
+Claude and I hit the first pivot during the design phase. The original plan had two template families: `Join0Second` and `Join0First extends Join0Second`. The First/Second split is the real Drools design — `Second` as the input contract type for multi-step joins, `First extends Second` to inherit all those overloads.
 
 Implementing this split requires G3's extends clause auto-expansion. And G3's expansion requires `T+number` naming to detect siblings via the numeric suffix pattern. Alpha naming has no numeric suffix. The auto-expansion wouldn't fire.
 

@@ -20,7 +20,7 @@ If the generated classes need to be nested inside an existing class, APT can't d
 
 ## The Maven Plugin Approach
 
-We built a Maven plugin to run at `generate-sources` — before compilation — giving us read-write access to source files directly.
+Claude and I built a Maven plugin to run at `generate-sources` — before compilation — giving us read-write access to source files directly.
 
 The flow:
 1. Maven plugin reads `src/main/permuplate/` (a non-compiled source directory for templates)

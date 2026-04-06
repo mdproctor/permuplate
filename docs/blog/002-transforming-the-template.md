@@ -6,7 +6,7 @@
 
 ## The Gap Between "Clone" and "Transform"
 
-Once we had basic cloning working — parse template, copy class, rename it — the question was what actual transformation means in this context.
+Once Claude and I had basic cloning working — parse template, copy class, rename it — the question was what actual transformation means in this context.
 
 The Drools `Join2` class looks something like this:
 
