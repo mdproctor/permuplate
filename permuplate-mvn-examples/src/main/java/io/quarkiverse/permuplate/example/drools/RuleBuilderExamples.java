@@ -89,6 +89,23 @@ public class RuleBuilderExamples {
     }
 
     /**
+     * type() — compile-time type narrowing for untyped or base-typed sources.
+     * A no-op at runtime; exists solely to give the compiler correct type information.
+     */
+    public static RuleDefinition<Ctx> typeNarrowingExample(RuleBuilder<Ctx> builder) {
+        // Simulate an untyped source (DataSource<Object>) narrowed to Person.
+        // In practice, use this when a shared/generic source needs type-safe access.
+        @SuppressWarnings("unchecked")
+        DataSource<Object> untypedPersons = (DataSource<Object>) (DataSource<?>) DataSource.of(new Person("Alice", 30));
+
+        return builder.from(ctx -> untypedPersons)
+                .<Person> type()
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+    }
+
+    /**
      * BaseTuple.as() — projects OOPath tuple results into typed records.
      * The record's fields must be in the same positional order as the tuple elements.
      * Useful for readable access to path traversal results.

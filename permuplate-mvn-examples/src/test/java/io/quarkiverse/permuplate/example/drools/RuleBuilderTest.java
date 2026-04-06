@@ -898,4 +898,48 @@ public class RuleBuilderTest {
         rule.run(ctx);
         assertThat(rule.executionCount()).isEqualTo(0);
     }
+
+    // =========================================================================
+    // type() — compile-time type narrowing
+    // =========================================================================
+
+    @Test
+    public void testTypeNarrowsBaseType() {
+        // type() narrows a base-typed DataSource to the actual runtime type.
+        // DataSource<Object> containing Persons, narrowed to Person via type().
+        @SuppressWarnings("unchecked")
+        DataSource<Object> untypedPersons = (DataSource<Object>) (DataSource<?>) DataSource.of(new Person("Alice", 30),
+                new Person("Bob", 17));
+
+        var rule = builder.from(ctx -> untypedPersons)
+                .<Person> type()
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+    }
+
+    @Test
+    public void testTypeIsNoOpAtRuntime() {
+        // type() doesn't change execution count — it's purely compile-time.
+        // Same source with and without type() should give identical results.
+        var withType = builder.from("persons", ctx -> ctx.persons())
+                .<Person> type() // redundant but valid — already typed
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+
+        var withoutType = builder.from("persons2", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+
+        withType.run(ctx);
+        withoutType.run(ctx);
+
+        assertThat(withType.executionCount()).isEqualTo(withoutType.executionCount());
+    }
 }

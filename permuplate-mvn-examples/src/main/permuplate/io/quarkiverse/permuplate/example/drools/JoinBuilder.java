@@ -316,6 +316,30 @@ public class JoinBuilder {
         }
 
         /**
+         * Narrows the last accumulated fact's type parameter at compile time.
+         * A pure no-op at runtime — useful when a DataSource uses a base type
+         * (e.g., DataSource&lt;Object&gt;) but the actual runtime type is known.
+         *
+         * <p>Uses the Java varargs type-capture trick: pass no arguments; provide
+         * the target type as an explicit type parameter: {@code .<Person>type()}.
+         *
+         * <p>Example:
+         * <pre>{@code
+         * builder.from(ctx -> untypedSource)  // DataSource<Object>
+         *        .<Person>type()              // narrow to Person
+         *        .filter((ctx, p) -> p.age() >= 18)
+         *        .fn((ctx, p) -> { });
+         * }</pre>
+         */
+        @SuppressWarnings({"unchecked", "varargs"})
+        @PermuteReturn(className = "Join${i}First",
+                       typeArgs = "'END, DS, ' + typeArgList(1, i-1, 'alpha') + (i > 1 ? ', ' : '') + 'T'",
+                       when = "true")
+        public <T> Object type(Class<T>... cls) {
+            return cast(this);
+        }
+
+        /**
          * Captures the current accumulated fact state as a typed extension point.
          * Pass the result to RuleBuilder.extendsRule() to start a child rule that
          * inherits all sources, filters, and constraint scopes up to this point.

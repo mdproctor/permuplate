@@ -187,6 +187,7 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | `Variable.of("name")` vs `new Variable<>()` | Named variables carry a diagnostic name used in error messages and match DRL's `$person` convention. Anonymous `new Variable<>()` remains valid; `of()` is preferred for DRL migration work. |
 | `from(Function)` shorthand | `RuleBuilder.from(Function)` delegates to `from("rule", source)`. Preferred when the string name isn't needed for debugging. Both forms are valid. |
 | `BaseTuple.as()` varargs type capture | `as(T... v)` uses an empty varargs array to capture the target type at the call site — `v.getClass().getComponentType()` gives `T.class` without requiring an explicit `Class<T>` parameter. The caller passes no arguments; Java creates a zero-length `T[]` from the assignment context. |
+| `type()` is a compile-time no-op | `Join0Second.type()` uses the same varargs type-capture trick as `as()` but discards the class at runtime — just `return cast(this)`. It exists only to provide the compiler a narrowed type parameter when a source returns a base type (e.g., `DataSource<Object>`). |
 
 ---
 
