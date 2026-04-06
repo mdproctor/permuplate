@@ -32,6 +32,22 @@ public class RuleBuilder<DS> {
         return new JoinBuilder.Join1First<>(null, rd);
     }
 
+    /**
+     * Starts building a rule with its first fact source using a method reference.
+     * Shorthand for {@code from("rule", source)} — preferred when a descriptive
+     * name is not needed.
+     *
+     * <pre>{@code
+     * builder.from(Ctx::persons)
+     *         .filter((ctx, p) -> p.age() >= 18)
+     *         .fn((ctx, p) -> System.out.println(p.name()));
+     * }</pre>
+     */
+    public <A> JoinBuilder.Join1First<Void, DS, A> from(
+            java.util.function.Function<DS, DataSource<A>> firstSource) {
+        return from("rule", firstSource);
+    }
+
     public <A> JoinBuilder.Join1First<Void, DS, A> extendsRule(RuleExtendsPoint.RuleExtendsPoint2<DS, A> ep) {
         RuleDefinition<DS> child = new RuleDefinition<>("extends");
         ep.baseRd().copyInto(child);

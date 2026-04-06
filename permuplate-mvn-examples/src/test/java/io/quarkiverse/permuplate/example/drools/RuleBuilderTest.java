@@ -701,6 +701,59 @@ public class RuleBuilderTest {
     }
 
     @Test
+    public void testVariableOfNamedBinding() {
+        // Variable.of("name") creates a named variable — functionally identical to new Variable<>()
+        // but carries a diagnostic name used in error messages.
+        Variable<Person> $person = Variable.of("$person");
+        Variable<Account> $account = Variable.of("$account");
+
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .var($person)
+                .join(ctx -> ctx.accounts())
+                .var($account)
+                .filter($person, $account,
+                        (ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0)
+                .fn((ctx, p, a) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+        assertThat(((Account) rule.capturedFact(0, 1)).id()).isEqualTo("ACC1");
+    }
+
+    @Test
+    public void testUnboundNamedVariableThrowsWithName() {
+        // Unbound named variable error message includes the variable name for diagnostics.
+        Variable<Person> $person = Variable.of("$person");
+        Variable<Account> $account = Variable.of("$account");
+
+        try {
+            builder.from("persons", ctx -> ctx.persons())
+                    .join(ctx -> ctx.accounts())
+                    .filter($person, $account, (ctx, p, a) -> true);
+            org.junit.Assert.fail("Expected IllegalStateException");
+        } catch (IllegalStateException e) {
+            assertThat(e.getMessage()).contains("$person");
+            assertThat(e.getMessage()).contains("$account");
+        }
+    }
+
+    @Test
+    public void testFromFunctionShorthand() {
+        // from(Function) shorthand — no string name required.
+        // Functionally identical to from("rule", source).
+        var rule = builder.from(ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+    }
+
+    @Test
     public void testVarThreeVariableFilter() {
         // 3-variable filter: Alice(age=30) + ACC1(balance=1000) + ORD1(amount=150) passes.
         // 2 × 2 × 2 = 8 combinations; only 1 passes all three constraints.

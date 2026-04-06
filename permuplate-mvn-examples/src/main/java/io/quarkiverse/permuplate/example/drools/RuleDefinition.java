@@ -156,7 +156,7 @@ public class RuleDefinition<DS> {
         if (!v1.isBound() || !v2.isBound())
             throw new IllegalStateException(
                     "Variable not bound — call var() before using it in filter() "
-                            + "(indices: v1=" + v1.index() + ", v2=" + v2.index() + ")");
+                            + "('" + v1.name() + "' index=" + v1.index() + ", '" + v2.name() + "' index=" + v2.index() + ")");
         // Snapshot indices now — Variable.index() is mutable; reading inside the lambda
         // would allow post-registration rebinding to silently corrupt the filter.
         int i1 = v1.index(), i2 = v2.index();
@@ -170,7 +170,8 @@ public class RuleDefinition<DS> {
         if (!v1.isBound() || !v2.isBound() || !v3.isBound())
             throw new IllegalStateException(
                     "Variable not bound — call var() before using it in filter() "
-                            + "(indices: v1=" + v1.index() + ", v2=" + v2.index() + ", v3=" + v3.index() + ")");
+                            + "('" + v1.name() + "' index=" + v1.index() + ", '" + v2.name() + "' index=" + v2.index()
+                            + ", '" + v3.name() + "' index=" + v3.index() + ")");
         // Snapshot indices now — Variable.index() is mutable; reading inside the lambda
         // would allow post-registration rebinding to silently corrupt the filter.
         int i1 = v1.index(), i2 = v2.index(), i3 = v3.index();

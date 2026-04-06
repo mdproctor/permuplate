@@ -184,6 +184,8 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | Propagation scope for single-value renames | `transformMethod()` and Step 5 propagate renames into parameter types and return type when `from==to` (single-value expansion). Uses word-boundary-safe `replaceTypeIdentifier()` — not `String.replace`. Multi-value expansions (`from<to`) intentionally skip propagation — no single target exists; use `@PermuteDeclr` explicitly for those parameters. `@PermuteDeclr` on a parameter always overrides propagated type. |
 | `@PermuteDeclr` takes precedence over propagation | Parameters with `@PermuteDeclr` are skipped during type-param rename propagation. Explicit always wins. Allows callers to specify a different type structure when propagation alone is insufficient. |
 | `@PermuteMethod` ternary `from` for conditional generation | `from="${i > 1 ? i : i+1}"` with `to="${i}"` produces an empty range at `i=1` → method omitted. At `i≥2` it produces `from=to=i` → one clone. JEXL3 supports `?:` natively. Used by `filterLatest` sentinel in `JoinBuilder` to suppress the single-fact filter at arity 1 where it would duplicate the all-facts filter. |
+| `Variable.of("name")` vs `new Variable<>()` | Named variables carry a diagnostic name used in error messages and match DRL's `$person` convention. Anonymous `new Variable<>()` remains valid; `of()` is preferred for DRL migration work. |
+| `from(Function)` shorthand | `RuleBuilder.from(Function)` delegates to `from("rule", source)`. Preferred when the string name isn't needed for debugging. Both forms are valid. |
 
 ---
 
