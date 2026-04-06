@@ -63,7 +63,15 @@ permuplate-processor/      PermuteProcessor (APT) — thin shell over core
 permuplate-maven-plugin/   PermuteMojo + InlineGenerator — uses core
 ```
 
-One subtlety: the Maven plugin passes `null` as the `Messager` parameter to the transformers (there's no Messager in a Maven Mojo). Every call to `messager.printMessage(...)` had to be guarded with `if (messager != null)`. Missing even one of these causes a `NullPointerException` in the Maven path only — an easy bug to miss since the APT tests pass fine.
+One subtlety: the Maven plugin passes `null` as the `Messager` parameter to the transformers (there's no Messager in a Maven Mojo). Every call to `messager.printMessage(...)` had to be guarded:
+
+```java
+if (messager != null) {
+    messager.printMessage(Kind.NOTE, "generating " + newClassName);
+}
+```
+
+Missing even one of these causes a `NullPointerException` in the Maven path only — an easy bug to miss since the APT tests pass fine.
 
 ---
 

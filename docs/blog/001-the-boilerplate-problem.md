@@ -78,7 +78,22 @@ That's not very useful on its own. The point is that the class body will also co
 - `@PermuteDeclr` — on a field or variable: rename its type and name based on `i`, propagate the rename to all usages within the scope
 - `@PermuteParam` — on a single "sentinel" method parameter: expand it into a sequence of `i` parameters
 
-Together, these three annotations can express the Join2/Join3/Join4 pattern. You write `Join2` with `@PermuteDeclr` on the fields and `@PermuteParam` on the parameters, and Permuplate generates `Join3`, `Join4`, `Join5` automatically.
+Together, these three annotations can express the Join2/Join3/Join4 pattern. The complete template looks like this:
+
+```java
+@Permute(varName = "i", from = 2, to = 6, className = "Join${i}")
+public class Join2 {
+    private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;
+
+    public void execute(
+            @PermuteParam(varName = "j", from = "1", to = "${i}",
+                          type = "Object", name = "o${j}") Object o1) {
+        c2.call(o1);
+    }
+}
+```
+
+This is valid, compilable Java at arity 2. Permuplate generates `Join3`, `Join4`, `Join5` from it automatically — field renamed, parameters expanded, call site updated.
 
 That was the starting point. It was, in retrospect, quite modest compared to where the project ended up. But it was enough to prove the concept was viable — and enough to reveal the first of many complications.
 
