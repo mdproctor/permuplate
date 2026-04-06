@@ -350,12 +350,94 @@ public class ExtensionPointTest {
         assertThat(rule2.executionCount()).isEqualTo(1);
         assertThat(((Order) rule2.capturedFact(0, 1)).id()).isEqualTo("ORD1");
     }
+
+    @Test
+    public void testExtendsChaining() {
+        // Extend-of-extend: child1 creates its own extensionPoint, child2 extends from it.
+        // ep1: persons filtered by age >= 18
+        // ep2: ep1 + accounts filtered by balance > 500.0
+        // rule: ep2 + orders filtered by amount > 100.0
+        //
+        // extensionPoint() is available on JoinNFirst because JoinNFirst extends JoinNSecond,
+        // and extensionPoint() lives on Join0Second — no extra template changes needed.
+        var ep1 = builder.from("persons", ctx -> ctx.persons())
+                         .filter((ctx, p) -> p.age() >= 18)
+                         .extensionPoint();
+
+        var ep2 = builder.extendsRule(ep1)
+                         .join(ctx -> ctx.accounts())
+                         .filter((ctx, p, a) -> a.balance() > 500.0)
+                         .extensionPoint();
+
+        var rule = builder.extendsRule(ep2)
+                          .join(ctx -> ctx.orders())
+                          .filter((ctx, p, a, o) -> o.amount() > 100.0)
+                          .fn((ctx, p, a, o) -> { });
+
+        rule.run(ctx);
+        // Alice(30) × ACC1(1000) × ORD1(150) — only one combination passes all three layers
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person)  rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+        assertThat(((Account) rule.capturedFact(0, 1)).id()).isEqualTo("ACC1");
+        assertThat(((Order)   rule.capturedFact(0, 2)).id()).isEqualTo("ORD1");
+    }
+
+    @Test
+    public void testExtendsInheritsNotScope() {
+        // Base has a not() scope. Child inherits it via copyInto().
+        // not().join(accounts).filter(balance > 500).end() — ACC1 has balance=1000 > 500,
+        // so the not() constraint is globally UNSATISFIED → 0 persons survive.
+        // Child fn never fires → executionCount = 0.
+        var ep = builder.from("persons", ctx -> ctx.persons())
+                        .not()
+                            .join(ctx -> ctx.accounts())
+                            .filter((ctx, a) -> a.balance() > 500.0)
+                        .end()
+                        .extensionPoint();
+
+        var rule = builder.extendsRule(ep)
+                          .fn((ctx, p) -> { });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(0);
+    }
+
+    @Test
+    public void testExtendsInheritsExistsScope() {
+        // Base has an exists() scope. Child inherits it via copyInto().
+        // exists().join(orders).filter(amount > 100).end() — ORD1 has amount=150 > 100,
+        // so the exists() constraint is globally SATISFIED → all 2 persons survive.
+        // Child adds age filter → only Alice (age=30) passes.
+        var ep = builder.from("persons", ctx -> ctx.persons())
+                        .exists()
+                            .join(ctx -> ctx.orders())
+                            .filter((ctx, o) -> o.amount() > 100.0)
+                        .end()
+                        .extensionPoint();
+
+        var rule = builder.extendsRule(ep)
+                          .filter((ctx, p) -> p.age() >= 18)
+                          .fn((ctx, p) -> { });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+    }
 }
 ```
 
-`testExtends4FanOut` is the key correctness test — it verifies that calling
-`extendsRule(ep)` twice produces two independent child rules, not two rules sharing
-a mutating `RuleDefinition`.
+`testExtends4FanOut` is the key correctness test — calling `extendsRule(ep)` twice
+must produce two independent child rules, not two rules sharing a mutating
+`RuleDefinition`.
+
+`testExtendsChaining` verifies extend-of-extend. `extensionPoint()` is available on
+`JoinNFirst` because `JoinNFirst extends JoinNSecond` — no extra template changes
+needed, this falls out of the existing class hierarchy.
+
+`testExtendsInheritsNotScope` and `testExtendsInheritsExistsScope` verify that
+`copyInto()` correctly transfers negation and existence scopes. Note: the sandbox
+evaluates not/exists scopes globally against `ctx` (sandbox simplification — full
+Drools tracks per-outer-tuple via beta memory).
 
 ---
 
@@ -394,8 +476,6 @@ public static void extendsExample(RuleBuilder<Ctx> builder) {
 
 - `extensionPoint()` before any joins (would need `RuleBuilder` to support it
   without `Join0Second`) — YAGNI; the sandbox always has at least one `from()`.
-- Chaining `extensionPoint()` from another child (extend of extend) — not tested
-  in vol2 `ExtensionPointTest`; deferred.
-- `not()` / `exists()` scopes copied from base into child — `copyInto()` includes
-  `negations` and `existences` lists, so it works; but there are no tests for this
-  combination. Add if needed.
+- OOPath pipeline copied from base into child — `copyInto()` does not copy
+  `ooPathRootIndex` or `ooPathSteps`; OOPath + extends combination is not tested
+  in vol2 and is deferred.
