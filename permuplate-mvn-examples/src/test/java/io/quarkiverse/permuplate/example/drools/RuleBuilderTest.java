@@ -784,4 +784,118 @@ public class RuleBuilderTest {
         assertThat(a.id()).isEqualTo("ACC1");
         assertThat(o.id()).isEqualTo("ORD1");
     }
+
+    // =========================================================================
+    // OOPath — path3() with outer join (3-level traversal from 2-fact context)
+    // =========================================================================
+
+    @Test
+    public void testPath3WithOuterJoinTraversesThreeLevels() {
+        // persons.join(libraries).path3(Library -> Room -> Book)
+        // Outer facts: [Person, Library, Tuple3<Library, Room, Book>]
+        // Filter: only published books pass the second traversal step.
+        // 2 persons × 2 libs × 2 rooms × 1 published book each = 8 combinations.
+        RuleOOPathBuilder.Path3<JoinBuilder.Join3First<Void, Ctx, Person, Library, BaseTuple.Tuple3<Library, Room, Book>>, BaseTuple.Tuple2<Library, Room>, Library, Room, Book> path3Builder = builder
+                .from("persons", ctx -> ctx.persons())
+                .join(ctx -> ctx.libraries())
+                .path3();
+        var rule = path3Builder.path(
+                (pathCtx, lib) -> lib.rooms(),
+                (pathCtx, room) -> true)
+                .path(
+                        (pathCtx, room) -> room.books(),
+                        (pathCtx, book) -> book.published())
+                .fn((ctx, person, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        // 2 persons × 2 libraries × 2 rooms × 1 published book = 8
+        assertThat(rule.executionCount()).isEqualTo(8);
+        assertThat(rule.capturedFact(0, 0)).isInstanceOf(Person.class);
+        assertThat(rule.capturedFact(0, 1)).isInstanceOf(Library.class);
+        assertThat(rule.capturedFact(0, 2)).isInstanceOf(BaseTuple.Tuple3.class);
+        for (int i = 0; i < rule.executionCount(); i++) {
+            @SuppressWarnings("unchecked")
+            BaseTuple.Tuple3<Library, Room, Book> t = (BaseTuple.Tuple3<Library, Room, Book>) rule.capturedFact(i, 2);
+            assertThat(t.getC().published()).isTrue();
+        }
+    }
+
+    // =========================================================================
+    // run() reset semantics
+    // =========================================================================
+
+    @Test
+    public void testRunResetsExecutionCount() {
+        // rule.run(ctx) resets executions on each call — executionCount() reflects only
+        // the most recent run, not accumulated across multiple runs.
+        var rule = builder.from("adults", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1); // Alice only
+
+        // Run again — should reset, not accumulate
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1); // still 1, not 2
+    }
+
+    // =========================================================================
+    // fn() side-effects — action actually executes for each matched tuple
+    // =========================================================================
+
+    @Test
+    public void testFnActionActuallyRuns() {
+        // Verify the fn() action actually executes for each matched tuple,
+        // not just that executionCount() is correct.
+        java.util.List<String> names = new java.util.ArrayList<>();
+
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> names.add(p.name()));
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(names).containsExactly("Alice");
+    }
+
+    // =========================================================================
+    // Chained filter() — AND-composition semantics
+    // =========================================================================
+
+    @Test
+    public void testChainedFiltersAreAndNotOr() {
+        // .filter(p1).filter(p2) is AND — both must pass.
+        // filter1: age >= 18 → Alice passes, Bob fails
+        // filter2: name starts with "A" → Alice passes
+        // AND result: Alice only (executionCount=1)
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18) // Alice passes
+                .filter((ctx, p) -> p.name().startsWith("A")) // Alice passes
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+    }
+
+    @Test
+    public void testChainedFiltersApplyLeftToRight() {
+        // .filter(p1).filter(p2): p1 applies first, p2 applies to p1's survivors.
+        // filter1: age >= 18 → Alice survives, Bob is eliminated
+        // filter2: name starts with "B" → Alice fails
+        // Result: 0 executions (not 1 if order were reversed)
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18) // Alice passes, Bob fails
+                .filter((ctx, p) -> p.name().startsWith("B")) // Alice fails
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(0);
+    }
 }
