@@ -156,7 +156,7 @@ public class RuleDefinition<DS> {
         if (!v1.isBound() || !v2.isBound())
             throw new IllegalStateException(
                     "Variable not bound — call var() before using it in filter() "
-                    + "(indices: v1=" + v1.index() + ", v2=" + v2.index() + ")");
+                            + "(indices: v1=" + v1.index() + ", v2=" + v2.index() + ")");
         // Snapshot indices now — Variable.index() is mutable; reading inside the lambda
         // would allow post-registration rebinding to silently corrupt the filter.
         int i1 = v1.index(), i2 = v2.index();
@@ -170,11 +170,31 @@ public class RuleDefinition<DS> {
         if (!v1.isBound() || !v2.isBound() || !v3.isBound())
             throw new IllegalStateException(
                     "Variable not bound — call var() before using it in filter() "
-                    + "(indices: v1=" + v1.index() + ", v2=" + v2.index() + ", v3=" + v3.index() + ")");
+                            + "(indices: v1=" + v1.index() + ", v2=" + v2.index() + ", v3=" + v3.index() + ")");
         // Snapshot indices now — Variable.index() is mutable; reading inside the lambda
         // would allow post-registration rebinding to silently corrupt the filter.
         int i1 = v1.index(), i2 = v2.index(), i3 = v3.index();
         filters.add((ctx, facts) -> predicate.test((DS) ctx, (V1) facts[i1], (V2) facts[i2], (V3) facts[i3]));
+    }
+
+    /**
+     * Copies this rule's sources, accumulated fact count, filters, and constraint
+     * scopes (not/exists) into the target RuleDefinition. Called by
+     * RuleBuilder.extendsRule() to inline base patterns into the child at build time.
+     *
+     * Does NOT copy: action, executions, or OOPath pipeline — those belong to each
+     * rule independently.
+     */
+    void copyInto(RuleDefinition<DS> target) {
+        target.sources.addAll(this.sources);
+        target.accumulatedFacts = this.accumulatedFacts;
+        target.filters.addAll(this.filters);
+        // Constraint scopes propagate — they are part of the pattern being inherited.
+        target.negations.addAll(this.negations);
+        target.existences.addAll(this.existences);
+        // OOPath pipeline intentionally NOT copied — it is a post-match traversal
+        // applied per rule, not a pattern constraint. Each child rule defines its
+        // own traversal independently.
     }
 
     // -------------------------------------------------------------------------
