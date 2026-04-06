@@ -1,57 +1,51 @@
-# Handover — 2026-04-05
+# Handover — 2026-04-06
 
-**Head commit:** `5e21a31` — docs: add design snapshot 2026-04-05-drools-dsl-sandbox
-**Previous handover:** *(none — first handover)*
+**Head commit:** `66aff4e` — docs: add design snapshot 2026-04-06-drools-dsl-sandbox
+**Previous handover:** `git show HEAD~1:HANDOVER.md` | diff: `git diff HEAD~1 HEAD -- HANDOVER.md`
 
 ## What Changed This Session
 
-- **Phase 1.5:** Typed `join()` via standalone method-level `@PermuteTypeParam` +
-  propagation; dual `filter()` overloads (single-fact + all-facts)
-- **Phase 2:** First/Second split, END phantom type, 15 bi-linear join overloads,
-  PermuteMojo multi-template chaining fix
-- **Phase 3a:** `not()` / `exists()` scopes with `NegationScope<OUTER,DS>` builder
-- **Phase 3b:** OOPath `path2()..path6()` traversal — BaseTuple hierarchy,
-  PathN builders, PathContext, correlated execution in RuleDefinition
-- **Permuplate core:** `PermuteTypeParamTransformer` Step 5, rename propagation,
-  `buildTypeParam` word-boundary fix
-- 32 tests passing; pushed to `mdproctor/permuplate` main
-- Design snapshot committed: `docs/design-snapshots/2026-04-05-drools-dsl-sandbox.md`
-- **Pending:** 4 ADR drafts written but NOT committed (user said "handoff" before YES)
+- **ADRs 0001–0004 committed** (were pending in previous handover — now done)
+- **Blog entries 001–007 fully revised** against current writing style guide:
+  - Voice register (I/we/Claude) applied throughout
+  - Headings: bare structural slots replaced with thematic titles
+  - `*Next:*` template footers removed; entries stand alone
+  - New rules applied: Claude introduced by name before first "we"; consecutive "we" varied
+- **Writing style guide updated** (`~/claude-workspace/writing-styles/blog-technical.md`):
+  - `### Introduce Claude before using "we"` — added with do/don't examples
+  - `### Vary "we"` — added with alternatives table and before/after
+  - Both checks added to revision checklist item 3
+- **CLAUDE.md** — Writing Style Guide section added (points to blog-technical.md)
+- **Design snapshot** superseded: `docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md`
+- **2000AD publication system** shelved at `~/claude-workspace/2000AD/` — artwork, writing guide, revision guide, CI action; ready to apply at publication time
+- **Garden** — 3 submissions: two-Claude path verification, `>?<` SVG sed target, `git -C` multi-repo ops
+- **Blog entries 008–011 NOT written** — proposed, selected, deferred
 
 ## State Right Now
 
-Drools DSL sandbox complete through Phase 3b. Features match real Drools except:
-- `Variable<T>` cross-fact binding (high priority — migration blocker)
-- `extensionPoint()` / `extendsRule()` (high priority — migration blocker)
-- `ifn()`, `fn()` returning `BaseRuleBuilder<END>`, `index()`, `type()` (lower priority)
-- DROOLS-DSL.md needs comprehensive refresh (many outdated sections)
-- CLAUDE.md missing Phase 3a/3b non-obvious decisions
+*Unchanged — `git show HEAD~1:HANDOVER.md`* (Drools sandbox feature state, open questions, migration blockers all unchanged)
 
 ## Immediate Next Step
 
-Confirm the 4 ADR drafts (already written in conversation context — just need YES to write):
-- 0001: Standalone method-level @PermuteTypeParam with propagation
-- 0002: OOPath runtime as pipeline on RuleDefinition
-- 0003: END phantom type added in Phase 2 not Phase 3
-- 0004: NegationScope as separate class
+Write blog entries 008–011 using the revised style guide:
+- 008: Making Joins Type-Safe (typed join(), dual filter, standalone @PermuteTypeParam)
+- 009: The First/Second Split (Phase 2, END phantom type, bi-linear joins)
+- 010: Ruling Things Out (not()/exists() scopes, fn() placement bug)
+- 011: OOPath Traversal (path2()–path6(), BaseTuple, PathContext)
 
-Then: brainstorm `Variable<T>` — needed before real Drools migration.
+Invoke `write-blog` — all four are Phase Updates; style guide is at `~/claude-workspace/writing-styles/blog-technical.md`.
 
-## Open Questions
+## Open Questions / Blockers
 
-- `Variable<T>` design: how to add cross-fact binding without breaking existing `filter()` API
-- `ctx` position in lambda signatures (deferred since Phase 1) — lock in before migration?
-- `fn()` return type: `RuleDefinition<DS>` vs `BaseRuleBuilder<END>` — matters for first migration targets?
-- Migration order: Consumer family first (pure G1) or start with Join chain?
-- DROOLS-DSL.md refresh: defer or do before migration?
+*Unchanged — `git show HEAD~1:HANDOVER.md`*
 
 ## References
 
-| Context | Where |
-|---|---|
-| Design state | `docs/design-snapshots/2026-04-05-drools-dsl-sandbox.md` |
-| Drools DSL design | `permuplate-mvn-examples/DROOLS-DSL.md` |
-| Session specs (14 files) | `docs/superpowers/specs/` |
-| Previous session handoff | `docs/handoffs/session-handoff-2026-04-04.md` |
-| Real Drools reference | `/Users/mdproctor/dev/droolsoct2025/droolsvol2/src/main/java/org/drools/core/RuleBuilder.java` |
-| Knowledge garden | `~/claude/knowledge-garden/GARDEN.md` |
+| Context | Where | Retrieve with |
+|---|---|---|
+| Design state | `docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md` | `cat` that file |
+| Blog entries | `docs/blog/007-building-the-drools-dsl.md` | `cat` — last written entry |
+| Writing style guide | `~/claude-workspace/writing-styles/blog-technical.md` | `cat` that file |
+| 2000AD system | `~/claude-workspace/2000AD/README.md` | `cat` that file |
+| Garden index | `~/claude/knowledge-garden/GARDEN.md` | index only |
+| Previous handover | git history | `git show HEAD~1:HANDOVER.md` |
