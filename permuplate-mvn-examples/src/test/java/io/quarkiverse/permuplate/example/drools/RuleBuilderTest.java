@@ -662,4 +662,41 @@ public class RuleBuilderTest {
             assertThat(e.getMessage()).contains("Variable not bound");
         }
     }
+
+    @Test
+    public void testVarIndexCapturedAtBindTime() {
+        // personVar bound to index 0 (Person). Two more facts joined after.
+        // filter(personVar, orderVar, ...) cross-references index 0 and index 2,
+        // skipping the intermediate Account at index 1.
+        //
+        // Combinations: 2 persons × 2 accounts × 2 orders = 8.
+        // Passing: Alice(age=30) × any account × ORD1(amount=150) — age>=18, amount>100.
+        //   Alice + ACC1 + ORD1 → pass
+        //   Alice + ACC2 + ORD1 → pass
+        //   All Bob rows       → fail (age=17)
+        //   All ORD2 rows      → fail (amount=25)
+        // Expected executionCount = 2.
+        Variable<Person> personVar = new Variable<>();
+        Variable<Order> orderVar = new Variable<>();
+
+        var rule = builder.from("persons", ctx -> ctx.persons())
+                .var(personVar) // personVar → index 0
+                .join(ctx -> ctx.accounts()) // index 1 — no variable bound
+                .join(ctx -> ctx.orders())
+                .var(orderVar) // orderVar → index 2
+                .filter(personVar, orderVar,
+                        (ctx, p, o) -> p.age() >= 18 && o.amount() > 100.0)
+                .fn((ctx, p, a, o) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(2);
+        for (int i = 0; i < rule.executionCount(); i++) {
+            Person p = (Person) rule.capturedFact(i, 0);
+            Order o = (Order) rule.capturedFact(i, 2);
+            assertThat(p.name()).isEqualTo("Alice");
+            assertThat(o.amount()).isGreaterThan(100.0);
+        }
+    }
 }
