@@ -244,6 +244,32 @@ assertThat(src).contains("c3.call(o1, o2, o3)");
 | `PermuteReturnTest` | `@PermuteReturn`: APT explicit mode, implicit inference, boundary omission, V2/V3/V6 validation |
 | `PermuteMethodTest` | `@PermuteMethod`: multiple overloads, inferred `to`, leaf nodes, extends expansion, APT mode, method-level `@PermuteTypeParam` |
 
+### Drools DSL Sandbox Tests
+
+The sandbox (`permuplate-mvn-examples`) has its own test suite in
+`src/test/java/io/quarkiverse/permuplate/example/drools/`. Tests are
+organized one class per DSL feature, mirroring the Drools vol2 reference:
+
+| Sandbox class | DSL feature |
+|---|---|
+| `RuleBuilderTest` | Core builder chain, joins, filters, bilinear, not/exists, OOPath, variable binding |
+| `ExtensionPointTest` | `extensionPoint()` / `extendsRule()` cross-rule inheritance |
+
+**Before beginning any DSL work, read all test files in the vol2 reference
+suite — not just the one directly related to the feature.** The full suite
+gives a much broader understanding of the DSL's intended behaviour and often
+reveals design constraints not obvious from the API alone.
+
+Vol2 tests are at:
+`/Users/mdproctor/dev/droolsoct2025/droolsvol2/src/test/java/org/drools/core/`
+
+Key files: `ExtensionPointTest`, `OOPathTest`, `Filter1Test`,
+`BiLinearTuplePredicateCacheTest`, `RuleBuilderTest`, `RuleBaseTest`,
+`RuleProapgationAndExecutionTest`, `DataBuilderTest`, `ExecutorTest`.
+
+After completing the extends feature, do a systematic review of all sandbox
+work to date against the full vol2 test suite to identify gaps.
+
 ---
 
 ## Example templates (in permuplate-apt-examples/)
