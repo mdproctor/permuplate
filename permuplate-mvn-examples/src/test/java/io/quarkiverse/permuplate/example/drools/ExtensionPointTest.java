@@ -112,4 +112,75 @@ public class ExtensionPointTest {
         assertThat(rule2.executionCount()).isEqualTo(1);
         assertThat(((Order) rule2.capturedFact(0, 1)).id()).isEqualTo("ORD1");
     }
+
+    @Test
+    public void testExtendsChaining() {
+        // Extend-of-extend: ep1 captures 1 join; ep2 extends ep1 and captures 2 joins;
+        // rule extends ep2 and adds a third join.
+        // extensionPoint() is available on JoinNFirst because JoinNFirst extends JoinNSecond.
+        var ep1 = builder.from("persons", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18)
+                .extensionPoint();
+
+        var ep2 = builder.extendsRule(ep1)
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, p, a) -> a.balance() > 500.0)
+                .extensionPoint();
+
+        var rule = builder.extendsRule(ep2)
+                .join(ctx -> ctx.orders())
+                .filter((ctx, p, a, o) -> o.amount() > 100.0)
+                .fn((ctx, p, a, o) -> {
+                });
+
+        rule.run(ctx);
+        // Alice(30) × ACC1(1000) × ORD1(150) — only one combination passes all three layers
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+        assertThat(((Account) rule.capturedFact(0, 1)).id()).isEqualTo("ACC1");
+        assertThat(((Order) rule.capturedFact(0, 2)).id()).isEqualTo("ORD1");
+    }
+
+    @Test
+    public void testExtendsInheritsNotScope() {
+        // Base has a not() scope. copyInto() must transfer negations to the child.
+        // not().join(accounts).filter(balance > 500).end():
+        // ACC1 has balance=1000 > 500, so the not() is globally UNSATISFIED → 0 persons survive.
+        var ep = builder.from("persons", ctx -> ctx.persons())
+                .not()
+                .join(ctx -> ctx.accounts())
+                .filter((Object) (Predicate2<Ctx, Account>) (ctx, a) -> a.balance() > 500.0)
+                .end()
+                .extensionPoint();
+
+        var rule = builder.extendsRule(ep)
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(0);
+    }
+
+    @Test
+    public void testExtendsInheritsExistsScope() {
+        // Base has an exists() scope. copyInto() must transfer existences to the child.
+        // exists().join(orders).filter(amount > 100).end():
+        // ORD1 has amount=150 > 100, so the exists() is globally SATISFIED → all 2 persons survive.
+        // Child adds age filter → only Alice (age=30 >= 18) passes.
+        var ep = builder.from("persons", ctx -> ctx.persons())
+                .exists()
+                .join(ctx -> ctx.orders())
+                .filter((Object) (Predicate2<Ctx, Order>) (ctx, o) -> o.amount() > 100.0)
+                .end()
+                .extensionPoint();
+
+        var rule = builder.extendsRule(ep)
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+    }
 }
