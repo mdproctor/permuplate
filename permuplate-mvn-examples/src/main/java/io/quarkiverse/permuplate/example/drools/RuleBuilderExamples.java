@@ -49,4 +49,30 @@ public class RuleBuilderExamples {
                 .fn((ctx, p, a) -> {
                 });
     }
+
+    /**
+     * extensionPoint() / extendsRule() — authoring-time pattern reuse.
+     * Both child rules inherit Person + the age filter from the base.
+     * The Rete network handles node sharing automatically; no special
+     * runtime inheritance concept exists.
+     */
+    public static void extendsExample(RuleBuilder<Ctx> builder) {
+        var ep = builder.from("persons", ctx -> ctx.persons())
+                .filter((ctx, p) -> p.age() >= 18)
+                .extensionPoint();
+
+        // Child 1: high-balance accounts for adult persons
+        var highBalance = builder.extendsRule(ep)
+                .join(ctx -> ctx.accounts())
+                .filter((ctx, p, a) -> a.balance() > 500.0)
+                .fn((ctx, p, a) -> {
+                });
+
+        // Child 2: large orders for adult persons
+        var largeOrders = builder.extendsRule(ep)
+                .join(ctx -> ctx.orders())
+                .filter((ctx, p, o) -> o.amount() > 100.0)
+                .fn((ctx, p, o) -> {
+                });
+    }
 }
