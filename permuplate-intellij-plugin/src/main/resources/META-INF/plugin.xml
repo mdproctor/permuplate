@@ -2,7 +2,11 @@
     <id>io.quarkiverse.permuplate</id>
     <name>Permuplate</name>
     <version>1.0.0-SNAPSHOT</version>
-    <description>IDE support for Permuplate annotation-driven code generation</description>
+    <description><![CDATA[
+        IDE support for Permuplate annotation-driven code generation.
+        Makes IntelliJ refactoring operations (rename, find usages, safe delete)
+        fully aware of the permutation chain between template classes and generated siblings.
+    ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
