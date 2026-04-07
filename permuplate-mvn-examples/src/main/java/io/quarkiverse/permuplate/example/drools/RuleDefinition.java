@@ -146,6 +146,15 @@ public class RuleDefinition<DS> {
         this.ooPathSteps.addAll(steps);
     }
 
+    /**
+     * Marks that a params value will occupy fact index 0 at runtime.
+     * Called by ParametersFirst before returning a chain builder, so that
+     * wrapPredicate()'s trim logic accounts for the injected params fact.
+     */
+    void addParamsFact() {
+        accumulatedFacts++;
+    }
+
     public void bindVariable(Variable<?> v, int factIndex) {
         v.bind(factIndex);
     }
@@ -216,13 +225,40 @@ public class RuleDefinition<DS> {
     }
 
     /**
+     * Executes this rule with a params value as the first fact (index 0).
+     * The params value is injected as a single-element initial combination;
+     * all data sources cross-product on top of it.
+     */
+    public RuleDefinition<DS> run(DS ctx, Object params) {
+        executions.clear();
+        List<Object[]> initial = new java.util.ArrayList<>();
+        initial.add(new Object[] { params });
+        for (Object[] facts : matchedTuplesFrom(ctx, initial)) {
+            if (action != null)
+                action.accept(ctx, facts);
+            executions.add(Arrays.asList(facts));
+        }
+        return this;
+    }
+
+    /**
      * Executes sources and filters, returning the list of matched fact-tuple arrays.
      * Called by {@link #run} and also by parent chains when this RuleDefinition is
      * used as a bi-linear source via {@link #addBilinearSource}.
      */
     List<Object[]> matchedTuples(DS ctx) {
-        List<Object[]> combinations = new ArrayList<>();
-        combinations.add(new Object[0]);
+        List<Object[]> initial = new ArrayList<>();
+        initial.add(new Object[0]);
+        return matchedTuplesFrom(ctx, initial);
+    }
+
+    /**
+     * Executes sources and filters starting from the given initial combinations.
+     * Used by {@link #matchedTuples} (starting from an empty tuple) and by
+     * {@link #run(Object, Object)} (starting from a params-seeded tuple).
+     */
+    List<Object[]> matchedTuplesFrom(DS ctx, List<Object[]> initial) {
+        List<Object[]> combinations = initial;
 
         for (TupleSource<DS> source : sources) {
             List<Object[]> next = new ArrayList<>();
