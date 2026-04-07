@@ -58,6 +58,14 @@ Three things make the transformations correct rather than just textual:
 
 ---
 
+## Permuplate in Action: The Drools DSL Sandbox
+
+Permuplate's practical value is best illustrated by the Drools RuleBuilder DSL sandbox — a fully type-safe rule-construction API built entirely from Permuplate-generated classes. Six phases of DSL evolution (arity-polymorphic joins, constraint scopes, OOPath traversal, variable binding, cross-rule inheritance, and named params) are each generated from a single annotated template.
+
+See [`permuplate-mvn-examples/DROOLS-DSL.md`](permuplate-mvn-examples/DROOLS-DSL.md) for a complete walkthrough.
+
+---
+
 ## Quick start
 
 **Step 1: Add to your `pom.xml`**
@@ -814,6 +822,16 @@ The test suite uses Google's [compile-testing](https://github.com/google/compile
 ## Deep dive
 
 For a detailed explanation of the architecture, transformation pipeline, design decisions, non-obvious implementation details, and a longer roadmap, see [OVERVIEW.md](OVERVIEW.md).
+
+---
+
+## Architecture and Design Records
+
+- [`OVERVIEW.md`](OVERVIEW.md) — Deep-dive into the annotation processor architecture
+- [`permuplate-mvn-examples/DROOLS-DSL.md`](permuplate-mvn-examples/DROOLS-DSL.md) — Drools DSL sandbox: six phases of type-safe API generation
+- [`docs/design-snapshots/`](docs/design-snapshots/) — Frozen architecture state records (2026-04-06 is current)
+- [`docs/adr/`](docs/adr/) — Formal architectural decisions (ADR-0001 through ADR-0004)
+- [`docs/blog/`](docs/blog/) — Development diary: 11 entries covering the full Permuplate journey
 
 ---
 

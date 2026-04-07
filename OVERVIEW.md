@@ -19,6 +19,18 @@ In both paths, the source of the template is read via the compiler `Trees` API, 
 
 ---
 
+## Two-Tier Architecture
+
+Permuplate operates at two levels:
+
+**Tier 1 — The Annotation Processor** (this document)
+The core tool: `@Permute`, `@PermuteDeclr`, `@PermuteParam`, and companions. Reads annotated Java source, generates N typed classes per template. Covered throughout this document.
+
+**Tier 2 — DSL Applications**
+What you build *with* Permuplate. The primary example is the Drools RuleBuilder DSL sandbox in `permuplate-mvn-examples/` — six phases of a type-safe rule-construction API, each generated from a single template class. See [`DROOLS-DSL.md`](../permuplate-mvn-examples/DROOLS-DSL.md) for the full architecture.
+
+---
+
 ## Annotation API Detail
 
 ### `@Permute`
@@ -299,3 +311,13 @@ Currently only Maven is supported (via `annotationProcessorPaths`). A Gradle set
 
 **Publishing to Maven Central**
 The annotations and processor jars could be published independently. The annotations jar is tiny and has no runtime dependencies. The processor jar brings in JavaParser and JEXL3 as processor-only deps — they do not become compile or runtime dependencies of the consuming project.
+
+---
+
+## Design Records
+
+The annotation processor architecture is stable and covered in this document. For the evolving DSL sandbox architecture:
+
+- **Current state:** [`docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md`](../docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md)
+- **Key decisions:** [`docs/adr/`](../docs/adr/) — ADR-0001 through ADR-0004
+- **Development narrative:** [`docs/blog/`](../docs/blog/) — 11 diary entries
