@@ -22,5 +22,13 @@
             order="first"/>
         <gotoDeclarationHandler
             implementation="io.quarkiverse.permuplate.intellij.navigation.PermuteMethodNavigator"/>
+        <findUsagesHandlerFactory
+            implementation="io.quarkiverse.permuplate.intellij.navigation.PermuteFamilyFindUsagesHandlerFactory"/>
+        <editorNotificationProvider
+            implementation="io.quarkiverse.permuplate.intellij.editor.GeneratedFileNotification"/>
+        <safeDeleteProcessorDelegate
+            implementation="io.quarkiverse.permuplate.intellij.safedelete.PermuteSafeDeleteDelegate"/>
+        <moveFileHandler
+            implementation="io.quarkiverse.permuplate.intellij.move.PermutePackageMoveHandler"/>
     </extensions>
 </idea-plugin>
