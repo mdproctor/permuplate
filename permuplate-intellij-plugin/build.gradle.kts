@@ -19,12 +19,15 @@ repositories {
 }
 
 dependencies {
-    // Algorithm library — bundled into plugin zip
+    // Algorithm library — bundled into plugin zip.
+    // Requires: /opt/homebrew/bin/mvn -pl permuplate-ide-support package -am
+    // Run from permuplate root before building this module.
     implementation(files("../permuplate-ide-support/target/quarkus-permuplate-ide-support-1.0.0-SNAPSHOT.jar"))
 
     intellijPlatform {
         intellijIdeaCommunity("2023.2")
         bundledPlugin("com.intellij.java")   // Java PSI APIs
+        instrumentationTools()               // @NotNull/@Nullable parameter instrumentation
     }
 
     // Annotation types available in test fixtures
