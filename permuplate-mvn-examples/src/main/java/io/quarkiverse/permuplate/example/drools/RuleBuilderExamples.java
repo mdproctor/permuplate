@@ -23,7 +23,7 @@ public class RuleBuilderExamples {
      * The cross-fact predicate uses the lambda parameters directly — no
      * variable declarations or {@code var()} calls needed.
      */
-    public static RuleDefinition<Ctx> adultHighBalanceCompact(RuleBuilder<Ctx> builder) {
+    public static RuleResult<Ctx> adultHighBalanceCompact(RuleBuilder<Ctx> builder) {
         return builder.from("persons", ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0)
@@ -39,7 +39,7 @@ public class RuleBuilderExamples {
      * join. The filter references them by name rather than by position. Produces
      * identical results to the compact form above.
      */
-    public static RuleDefinition<Ctx> adultHighBalanceNamed(RuleBuilder<Ctx> builder) {
+    public static RuleResult<Ctx> adultHighBalanceNamed(RuleBuilder<Ctx> builder) {
         Variable<Person> $person = Variable.of("$person");
         Variable<Account> $account = Variable.of("$account");
 
@@ -54,7 +54,7 @@ public class RuleBuilderExamples {
      * from() shorthand — method reference, no string name required.
      * Equivalent to from("rule", Ctx::persons).
      */
-    public static RuleDefinition<Ctx> adultHighBalanceShorthand(RuleBuilder<Ctx> builder) {
+    public static RuleResult<Ctx> adultHighBalanceShorthand(RuleBuilder<Ctx> builder) {
         return builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0)
@@ -92,7 +92,7 @@ public class RuleBuilderExamples {
      * type() — compile-time type narrowing for untyped or base-typed sources.
      * A no-op at runtime; exists solely to give the compiler correct type information.
      */
-    public static RuleDefinition<Ctx> typeNarrowingExample(RuleBuilder<Ctx> builder) {
+    public static RuleResult<Ctx> typeNarrowingExample(RuleBuilder<Ctx> builder) {
         // Simulate an untyped source (DataSource<Object>) narrowed to Person.
         // In practice, use this when a shared/generic source needs type-safe access.
         @SuppressWarnings("unchecked")

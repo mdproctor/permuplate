@@ -372,12 +372,12 @@ public class JoinBuilder {
          * {@code exists()...end()} (which return JoinNSecond), the fluent chain
          * can call {@code fn()} directly. Join0First inherits this via extends.
          */
-        @PermuteReturn(className = "RuleDefinition", typeArgs = "'DS'", when = "true")
+        @PermuteReturn(className = "RuleResult", typeArgs = "'DS'", when = "true")
         public Object fn(
                 @PermuteDeclr(type = "Consumer${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
                 Object action) {
             rd.setAction(action);
-            return rd;
+            return new RuleResult<>(rd);
         }
     }
 
