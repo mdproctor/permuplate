@@ -89,6 +89,35 @@ public class RuleBuilderExamples {
     }
 
     /**
+     * Named rule with typed params — preferred style matching vol2 API.
+     * Params3 is injected as fact[0]; persons cross-product at fact[1].
+     * At run time: rule.run(ctx, new Params3("Alice", "world", "foo"))
+     */
+    public static RuleResult<Ctx> namedRuleWithTypedParams(RuleBuilder<Ctx> builder) {
+        record Params3(String p1, String p2, String p3) {
+        }
+
+        return builder.rule("findMatchingAdults")
+                .<Params3> params()
+                .join(ctx -> ctx.persons())
+                .filter((ctx, p, person) -> person.name().equals(p.p1()))
+                .fn((ctx, p, person) -> System.out.println(person.name()));
+    }
+
+    /**
+     * Named rule with map params — named access, no record needed.
+     * At run time: rule.run(ctx, new ArgMap().put("name", "Alice"))
+     */
+    public static RuleResult<Ctx> namedRuleWithMapParams(RuleBuilder<Ctx> builder) {
+        return builder.rule("filterByName")
+                .map()
+                .param("name", String.class)
+                .from(ctx -> ctx.persons())
+                .filter((ctx, a, p) -> p.name().equals((String) a.get("name")))
+                .fn((ctx, a, p) -> System.out.println(p.name()));
+    }
+
+    /**
      * type() — compile-time type narrowing for untyped or base-typed sources.
      * A no-op at runtime; exists solely to give the compiler correct type information.
      */
