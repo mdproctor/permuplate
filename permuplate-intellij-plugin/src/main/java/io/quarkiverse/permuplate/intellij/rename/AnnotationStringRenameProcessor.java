@@ -1,5 +1,6 @@
 package io.quarkiverse.permuplate.intellij.rename;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.util.Pair;
@@ -75,6 +76,7 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
         List<PsiLiteralExpression> affected = findAffectedLiterals(cls, oldLiteral);
 
         List<Pair<SmartPsiElementPointer<PsiLiteralExpression>, String>> updates = new ArrayList<>();
+        List<Pair<SmartPsiElementPointer<PsiLiteralExpression>, RenameResult.NeedsDisambiguation>> disambiguationCases = new ArrayList<>();
         SmartPointerManager pointerManager = SmartPointerManager.getInstance(cls.getProject());
 
         for (PsiLiteralExpression literal : affected) {
@@ -88,6 +90,20 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
                 SmartPsiElementPointer<PsiLiteralExpression> pointer =
                         pointerManager.createSmartPsiElementPointer(literal);
                 updates.add(Pair.create(pointer, updated.newTemplate()));
+            } else if (result instanceof RenameResult.NeedsDisambiguation disambiguation) {
+                SmartPsiElementPointer<PsiLiteralExpression> pointer =
+                        pointerManager.createSmartPsiElementPointer(literal);
+                disambiguationCases.add(Pair.create(pointer, disambiguation));
+            }
+        }
+
+        // Show dialog for ambiguous cases (interactive mode only — not in headless/batch environments)
+        if (!disambiguationCases.isEmpty()
+                && !ApplicationManager.getApplication().isHeadlessEnvironment()) {
+            DisambiguationDialog dialog = new DisambiguationDialog(
+                    cls.getProject(), disambiguationCases, oldName, newName);
+            if (dialog.showAndGet()) {
+                updates.addAll(dialog.getResolvedUpdates());
             }
         }
 
