@@ -134,6 +134,18 @@ public class RuleBuilderExamples {
     }
 
     /**
+     * index() — DSL hint for Rete indexing optimization.
+     * No-op at runtime in the sandbox; present for vol2 API completeness.
+     */
+    public static RuleResult<Ctx> indexHintExample(RuleBuilder<Ctx> builder) {
+        return builder.from(ctx -> ctx.persons())
+                .index()
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+    }
+
+    /**
      * BaseTuple.as() — projects OOPath tuple results into typed records.
      * The record's fields must be in the same positional order as the tuple elements.
      * Useful for readable access to path traversal results.

@@ -434,6 +434,17 @@ public class JoinBuilder {
         }
 
         /**
+         * DSL hint for Rete index optimization. No-op in the sandbox runtime —
+         * present for API completeness and migration fidelity with vol2.
+         */
+        @PermuteReturn(className = "Join${i}First",
+                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
+                       when = "true")
+        public Object index() {
+            return this;
+        }
+
+        /**
          * Binds a variable to the most recently accumulated fact.
          * After this call, v.index() equals rd.factArity() - 1.
          */

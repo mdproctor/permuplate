@@ -993,6 +993,21 @@ public class RuleBuilderTest {
     }
 
     @Test
+    public void testIndexIsNoOpAtRuntime() {
+        // index() is a DSL hint for Rete optimization — no-op in sandbox.
+        // Verifies it compiles and chains correctly without affecting execution.
+        var rule = builder.from(ctx -> ctx.persons())
+                .index()
+                .filter((ctx, p) -> p.age() >= 18)
+                .fn((ctx, p) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1);
+        assertThat(((Person) rule.capturedFact(0, 0)).name()).isEqualTo("Alice");
+    }
+
+    @Test
     public void testTwoRulesFromSameBuilderAreIndependent() {
         // Two rules built from the same RuleBuilder instance are fully independent.
         // Running one rule does not affect the other's state.
