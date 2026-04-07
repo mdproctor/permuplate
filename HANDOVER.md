@@ -1,51 +1,49 @@
-# Handover — 2026-04-06
+# Handover — 2026-04-07
 
-**Head commit:** `66aff4e` — docs: add design snapshot 2026-04-06-drools-dsl-sandbox
-**Previous handover:** `git show HEAD~1:HANDOVER.md` | diff: `git diff HEAD~1 HEAD -- HANDOVER.md`
+**Head commit:** `7b62fbc` — docs(blog): add entry 012 — named rules, vol2 bugs, and open question
+**Previous handover:** `git show HEAD~1:HANDOVER.md`
+
+---
 
 ## What Changed This Session
 
-- **ADRs 0001–0004 committed** (were pending in previous handover — now done)
-- **Blog entries 001–007 fully revised** against current writing style guide:
-  - Voice register (I/we/Claude) applied throughout
-  - Headings: bare structural slots replaced with thematic titles
-  - `*Next:*` template footers removed; entries stand alone
-  - New rules applied: Claude introduced by name before first "we"; consecutive "we" varied
-- **Writing style guide updated** (`~/claude-workspace/writing-styles/blog-technical.md`):
-  - `### Introduce Claude before using "we"` — added with do/don't examples
-  - `### Vary "we"` — added with alternatives table and before/after
-  - Both checks added to revision checklist item 3
-- **CLAUDE.md** — Writing Style Guide section added (points to blog-technical.md)
-- **Design snapshot** superseded: `docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md`
-- **2000AD publication system** shelved at `~/claude-workspace/2000AD/` — artwork, writing guide, revision guide, CI action; ready to apply at publication time
-- **Garden** — 3 submissions: two-Claude path verification, `>?<` SVG sed target, `git -C` multi-repo ops
-- **Blog entries 008–011 NOT written** — proposed, selected, deferred
+- **Phase 6 complete:** `builder.rule("name")`, `ParametersFirst`, four param styles, `ArgList`, `ArgMap`, `RuleResult<DS>` (fn() return type). 68 tests, all pass.
+- **API cleanup:** `from(String, Function)` removed — not in vol2, not type-safe. Only `from(Function)` remains.
+- **API additions:** `Variable.of("name")`, `type()`, `as()`, `index()` (no-op DSL hint matching vol2).
+- **Vol2 full cross-reference:** All 14 test files + source read. Sandbox 95%+ fidelity. Three vol2 bugs found — logged in `docs/ideas/IDEAS.md`.
+- **Documentation refresh:** DROOLS-DSL.md fully rewritten (Phase 1–6). CLAUDE.md +15 non-obvious decision rows. README + OVERVIEW two-tier architecture sections. All accurate.
+- **ADR-0005:** Sandbox scope boundary — DSL design only, Rete engine out of scope.
+- **Design snapshot:** `docs/design-snapshots/2026-04-07-drools-dsl-sandbox.md`
+- **Blog entry 012:** `docs/blog/2026-04-07-01-named-rules-vol2-bugs-open-question.md`
+- **Garden submission:** GE-0057 — `addParamsFact()` silent wrong-fact extraction bug.
+- **Ideas logged:** Vol2 bugs (3), ctx + two-context design, IDE refactoring safety.
+
+---
 
 ## State Right Now
 
-*Unchanged — `git show HEAD~1:HANDOVER.md`* (Drools sandbox feature state, open questions, migration blockers all unchanged)
+Sandbox is migration-ready. Six phases complete, 68 tests, documentation current.
+
+**Two open questions (parked, do not block migration):**
+1. `ctx` position in lambda signatures — deferred until two-context shape is known
+2. Two-context design for imperfect reasoning (Bayesian/fuzzy/Dempster-Shafer) — pluggable, TBD on first implementation
+
+**NegationScope type safety** — double-cast inside not()/exists() is sandbox-only; real Drools types scopes properly. Not a migration blocker.
+
+---
 
 ## Immediate Next Step
 
-Write blog entries 008–011 using the revised style guide:
-- 008: Making Joins Type-Safe (typed join(), dual filter, standalone @PermuteTypeParam)
-- 009: The First/Second Split (Phase 2, END phantom type, bi-linear joins)
-- 010: Ruling Things Out (not()/exists() scopes, fn() placement bug)
-- 011: OOPath Traversal (path2()–path6(), BaseTuple, PathContext)
+Start real Drools migration. Order: Consumer family (pure G1) → Predicate (G1) → Join chain (G1+G2+G3+extends). Fix three vol2 bugs as they're encountered (see `docs/ideas/IDEAS.md`).
 
-Invoke `write-blog` — all four are Phase Updates; style guide is at `~/claude-workspace/writing-styles/blog-technical.md`.
-
-## Open Questions / Blockers
-
-*Unchanged — `git show HEAD~1:HANDOVER.md`*
+---
 
 ## References
 
 | Context | Where | Retrieve with |
 |---|---|---|
-| Design state | `docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md` | `cat` that file |
-| Blog entries | `docs/blog/2026-04-06-03-ruling-things-out.md` | `cat` — last written entry |
-| Writing style guide | `~/claude-workspace/writing-styles/blog-technical.md` | `cat` that file |
-| 2000AD system | `~/claude-workspace/2000AD/README.md` | `cat` that file |
-| Garden index | `~/claude/knowledge-garden/GARDEN.md` | index only |
-| Previous handover | git history | `git show HEAD~1:HANDOVER.md` |
+| Design state | `docs/design-snapshots/2026-04-07-drools-dsl-sandbox.md` | read directly |
+| Open questions | `docs/ideas/IDEAS.md` | read directly |
+| Vol2 reference | `/Users/mdproctor/dev/droolsoct2025/droolsvol2/src/main/java/org/drools/core/RuleBuilder.java` | read on demand |
+| ADRs | `docs/adr/0001–0005` | read on demand |
+| Last blog | `docs/blog/2026-04-07-01-named-rules-vol2-bugs-open-question.md` | read on demand |
