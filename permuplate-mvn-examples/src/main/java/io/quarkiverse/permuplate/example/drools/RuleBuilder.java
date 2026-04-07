@@ -48,6 +48,22 @@ public class RuleBuilder<DS> {
         return from("rule", firstSource);
     }
 
+    /**
+     * Starts building a named rule. Returns ParametersFirst which supports all
+     * four param styles plus from() to skip params.
+     *
+     * <pre>{@code
+     * builder.rule("findAdults")
+     *         .from(ctx -> ctx.persons())
+     *         .filter((ctx, p) -> p.age() >= 18)
+     *         .fn((ctx, p) -> {
+     *         });
+     * }</pre>
+     */
+    public ParametersFirst<DS> rule(String name) {
+        return new ParametersFirst<>(name);
+    }
+
     public <A> JoinBuilder.Join1First<Void, DS, A> extendsRule(RuleExtendsPoint.RuleExtendsPoint2<DS, A> ep) {
         RuleDefinition<DS> child = new RuleDefinition<>("extends");
         ep.baseRd().copyInto(child);
