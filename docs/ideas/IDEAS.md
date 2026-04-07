@@ -5,6 +5,40 @@ Promote to an ADR when ready to decide; discard when no longer relevant.
 
 ---
 
+## 2026-04-07 — ctx position and two-context design for imperfect reasoning
+
+**Priority:** high
+**Status:** active
+
+Lambda signatures are currently `(ctx, a, b, ...)` with DS context first. Two
+connected decisions are deferred until the imperfect-reasoning system is designed:
+
+1. **ctx position** — putting DS context first pushes the first join fact to `b`,
+   which is already a mild naming concern. Adding a second context for node-level
+   uncertainty would push it to `c` or further. Contexts at the end `(a, b, ctx)`
+   or implicit (closure-based) may be cleaner. Cannot decide without knowing the
+   full two-context shape.
+
+2. **Two-context design for imperfect reasoning** — a pluggable uncertainty system
+   (Bayesian probability, Dempster-Shafer, fuzzy logic, MYCIN certainty factors)
+   requires a second context beyond the DS RuleUnit context. Uncertainty can attach
+   to rules, filters, and/or facts depending on the model. The accumulation/
+   combination logic is the plugin's responsibility. The exact type, position,
+   and threading of this second context is TBD — will be discovered during
+   first implementation attempt.
+
+**Decision:** defer both. Refactor `ctx` position when the two-context shape is
+known. Start migration with current convention; signature changes are mechanical
+and can be done in one pass.
+
+**Context:** Arose from discussion of locking in ctx position before migration
+(2026-04-07). The two issues are coupled — cannot decide ctx position without
+knowing how many contexts the DSL will carry and in what order.
+
+**Promoted to:**
+
+---
+
 ## 2026-04-07 — Fix three vol2 bugs before or during Drools migration
 
 **Priority:** high
