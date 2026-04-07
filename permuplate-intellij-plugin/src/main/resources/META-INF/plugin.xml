@@ -10,5 +10,8 @@
     <extensions defaultExtensionNs="com.intellij">
         <fileBasedIndex implementation="io.quarkiverse.permuplate.intellij.index.PermuteTemplateIndex"/>
         <fileBasedIndex implementation="io.quarkiverse.permuplate.intellij.index.PermuteGeneratedIndex"/>
+        <renamePsiElementProcessor
+            implementation="io.quarkiverse.permuplate.intellij.rename.AnnotationStringRenameProcessor"
+            order="first"/>
     </extensions>
 </idea-plugin>
