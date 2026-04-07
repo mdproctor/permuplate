@@ -50,7 +50,8 @@ intellijPlatform {
         version = "1.0.0-SNAPSHOT"
         description = "IDE support for Permuplate annotation-driven code generation"
         ideaVersion {
-            sinceBuild = "232"  // 2023.2
+            sinceBuild = "232"       // 2023.2 minimum
+            untilBuild = provider { null }  // no upper bound — works on all future builds
         }
     }
 }
