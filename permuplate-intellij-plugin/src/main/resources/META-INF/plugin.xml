@@ -1,0 +1,13 @@
+<idea-plugin>
+    <id>io.quarkiverse.permuplate</id>
+    <name>Permuplate</name>
+    <version>1.0.0-SNAPSHOT</version>
+    <description>IDE support for Permuplate annotation-driven code generation</description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Registered in Task 12 -->
+    </extensions>
+</idea-plugin>
