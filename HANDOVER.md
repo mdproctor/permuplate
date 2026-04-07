@@ -1,40 +1,42 @@
-# Handover — 2026-04-07
+# Handover — 2026-04-07 (session 2)
 
-**Head commit:** `7b62fbc` — docs(blog): add entry 012 — named rules, vol2 bugs, and open question
-**Previous handover:** `git show HEAD~1:HANDOVER.md`
+**Head commit:** `057bf88` — docs(blog): add entry 013 — five bugs fixed, IDE plugin gap discovered
+**Previous handover:** `git show HEAD~2:HANDOVER.md` (session 1 of same day)
 
 ---
 
 ## What Changed This Session
 
-- **Phase 6 complete:** `builder.rule("name")`, `ParametersFirst`, four param styles, `ArgList`, `ArgMap`, `RuleResult<DS>` (fn() return type). 68 tests, all pass.
-- **API cleanup:** `from(String, Function)` removed — not in vol2, not type-safe. Only `from(Function)` remains.
-- **API additions:** `Variable.of("name")`, `type()`, `as()`, `index()` (no-op DSL hint matching vol2).
-- **Vol2 full cross-reference:** All 14 test files + source read. Sandbox 95%+ fidelity. Three vol2 bugs found — logged in `docs/ideas/IDEAS.md`.
-- **Documentation refresh:** DROOLS-DSL.md fully rewritten (Phase 1–6). CLAUDE.md +15 non-obvious decision rows. README + OVERVIEW two-tier architecture sections. All accurate.
-- **ADR-0005:** Sandbox scope boundary — DSL design only, Rete engine out of scope.
-- **Design snapshot:** `docs/design-snapshots/2026-04-07-drools-dsl-sandbox.md`
-- **Blog entry 012:** `docs/blog/2026-04-07-01-named-rules-vol2-bugs-open-question.md`
-- **Garden submission:** GE-0057 — `addParamsFact()` silent wrong-fact extraction bug.
-- **Ideas logged:** Vol2 bugs (3), ctx + two-context design, IDE refactoring safety.
+- **Vol2 bugs fixed (5, not 3):** `RuleExtendsPoint.java` naming typo, `ParametersFirst.params()` varargs,
+  and the entire `Join3Second` path block (`path2`–`path6`) — all had same copy-paste error
+  (`Join2First`/`B` → `Join4First`/`D`). Fixed in `/Users/mdproctor/dev/droolsoct2025/droolsvol2/`.
+- **Plugin gap discovered:** IDE plugins don't exist yet — only `permuplate-ide-support` (algorithm
+  foundation). IntelliJ plugin and VS Code extension are roadmap, not reality.
+- **IDE refactoring problem space mapped:** 11 interaction points catalogued (see blog entry 013).
+- **GE-0058 submitted:** stubs with wrong generic types compile silently (Java erasure gotcha).
+- **Blog entry 013:** `docs/blog/2026-04-07-mdp02-cleaning-house-finding-gap.md`
 
 ---
 
 ## State Right Now
 
-Sandbox is migration-ready. Six phases complete, 68 tests, documentation current.
+Migration not started. Vol2 reference is now clean.
 
-**Two open questions (parked, do not block migration):**
-1. `ctx` position in lambda signatures — deferred until two-context shape is known
-2. Two-context design for imperfect reasoning (Bayesian/fuzzy/Dempster-Shafer) — pluggable, TBD on first implementation
+IDE plugin brainstorm: problem space mapped, design not written. Ready to design in next session.
 
-**NegationScope type safety** — double-cast inside not()/exists() is sandbox-only; real Drools types scopes properly. Not a migration blocker.
+**11 interaction points identified (design must cover all):**
+bidirectional rename ripple, className string opacity, cross-family annotation string refs,
+@PermuteMethod overload identity, boundary omission in rename, find-usages family blindness,
+safe-delete no-op, direct-edit overwrite, package move orphans, type param rename ambiguity,
+field rename revert.
 
 ---
 
 ## Immediate Next Step
 
-Start real Drools migration. Order: Consumer family (pure G1) → Predicate (G1) → Join chain (G1+G2+G3+extends). Fix three vol2 bugs as they're encountered (see `docs/ideas/IDEAS.md`).
+Start fresh session: brainstorm → design spec → implementation plan for IntelliJ + VS Code plugins.
+Entry point: `permuplate-ide-support/` already has the algorithm foundation.
+Resume from the 11 interaction points — all must be covered in the design.
 
 ---
 
@@ -43,7 +45,7 @@ Start real Drools migration. Order: Consumer family (pure G1) → Predicate (G1)
 | Context | Where | Retrieve with |
 |---|---|---|
 | Design state | `docs/design-snapshots/2026-04-07-drools-dsl-sandbox.md` | read directly |
+| IDE problem space | `docs/blog/2026-04-07-mdp02-cleaning-house-finding-gap.md` | read directly |
 | Open questions | `docs/ideas/IDEAS.md` | read directly |
-| Vol2 reference | `/Users/mdproctor/dev/droolsoct2025/droolsvol2/src/main/java/org/drools/core/RuleBuilder.java` | read on demand |
-| ADRs | `docs/adr/0001–0005` | read on demand |
-| Last blog | `docs/blog/2026-04-07-01-named-rules-vol2-bugs-open-question.md` | read on demand |
+| Vol2 reference | `/Users/mdproctor/dev/droolsoct2025/droolsvol2/` | read on demand |
+| Algorithm foundation | `permuplate-ide-support/src/main/java/io/quarkiverse/permuplate/ide/` | read on demand |

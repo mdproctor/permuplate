@@ -321,3 +321,15 @@ work to date against the full vol2 test suite to identify gaps.
 **The writing style guide at `~/claude-workspace/writing-styles/blog-technical.md` is mandatory for all blog and diary entries in `docs/blog/`.** Load it in full before drafting any entry. Complete the pre-draft voice classification (I / we / Claude-named) before generating any prose. Do not show a draft without first verifying it against the style guide's "What to Avoid" section.
 
 The guide covers Mark's voice and personality, the three collaboration registers (I / we / Claude named directly), structural patterns, quantitative fingerprint, and the heading smell check.
+
+## Work Tracking
+
+**Issue tracking:** enabled
+**GitHub repo:** mdproctor/permuplate
+**Changelog:** GitHub Releases (run `gh release create --generate-notes` at milestones)
+
+**Automatic behaviours (Claude follows these when this section is present):**
+- Before starting any significant task, check if it spans multiple concerns.
+  If it does, help break it into separate issues before beginning work.
+- When staging changes before a commit, check if they span multiple issues.
+  If they do, suggest splitting the commit using `git add -p`.
