@@ -1,3 +1,5 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+
 plugins {
     id("java")
     id("org.jetbrains.intellij.platform") version "2.2.0"
@@ -28,7 +30,12 @@ dependencies {
         intellijIdeaCommunity("2023.2")
         bundledPlugin("com.intellij.java")   // Java PSI APIs
         instrumentationTools()               // @NotNull/@Nullable parameter instrumentation
+        testFramework(TestFrameworkType.Platform)
+        testFramework(TestFrameworkType.JUnit5)
     }
+
+    // JUnit 4 — required by BasePlatformTestCase (IntelliJ's JUnit3-style test base)
+    testImplementation("junit:junit:4.13.2")
 
     // Annotation types available in test fixtures
     testImplementation(files(

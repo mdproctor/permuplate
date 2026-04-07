@@ -2,6 +2,7 @@ package io.quarkiverse.permuplate.intellij.index;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Persisted data for one @Permute-annotated template class.
@@ -31,5 +32,24 @@ public final class PermuteTemplateData implements Serializable {
         this.generatedNames = List.copyOf(generatedNames);
         this.templateFilePath = templateFilePath;
         this.memberAnnotationStrings = List.copyOf(memberAnnotationStrings);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof PermuteTemplateData other)) return false;
+        return from == other.from
+                && to == other.to
+                && Objects.equals(varName, other.varName)
+                && Objects.equals(classNameTemplate, other.classNameTemplate)
+                && Objects.equals(generatedNames, other.generatedNames)
+                && Objects.equals(templateFilePath, other.templateFilePath)
+                && Objects.equals(memberAnnotationStrings, other.memberAnnotationStrings);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(varName, from, to, classNameTemplate,
+                generatedNames, templateFilePath, memberAnnotationStrings);
     }
 }

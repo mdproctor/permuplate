@@ -2,6 +2,7 @@ package io.quarkiverse.permuplate.intellij.index;
 
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
+import com.intellij.psi.PsiModifierListOwner;
 import com.intellij.util.indexing.*;
 import com.intellij.util.io.DataExternalizer;
 import com.intellij.util.io.EnumeratorStringDescriptor;
@@ -25,6 +26,7 @@ public class PermuteGeneratedIndex extends FileBasedIndexExtension<String, Strin
 
     private static final String PERMUTE_FQN =
             "io.quarkiverse.permuplate.annotations.Permute";
+    private static final String PERMUTE_SIMPLE = "Permute";
 
     @Override public @NotNull ID<String, String> getName() { return NAME; }
 
@@ -36,7 +38,7 @@ public class PermuteGeneratedIndex extends FileBasedIndexExtension<String, Strin
             if (!(psiFile instanceof PsiJavaFile javaFile)) return result;
 
             for (PsiClass cls : javaFile.getClasses()) {
-                PsiAnnotation permute = cls.getAnnotation(PERMUTE_FQN);
+                PsiAnnotation permute = findAnnotation(cls, PERMUTE_FQN, PERMUTE_SIMPLE);
                 if (permute == null) continue;
 
                 String templateName = cls.getName();
@@ -56,6 +58,20 @@ public class PermuteGeneratedIndex extends FileBasedIndexExtension<String, Strin
             }
             return result;
         };
+    }
+
+    /**
+     * Find an annotation by FQN with fallback to simple name for unresolved imports.
+     */
+    private static @org.jetbrains.annotations.Nullable PsiAnnotation findAnnotation(
+            PsiModifierListOwner owner, String fqn, String simpleName) {
+        PsiAnnotation direct = owner.getAnnotation(fqn);
+        if (direct != null) return direct;
+        for (PsiAnnotation ann : owner.getAnnotations()) {
+            String name = ann.getQualifiedName();
+            if (fqn.equals(name) || simpleName.equals(name)) return ann;
+        }
+        return null;
     }
 
     private static String getStringAttr(PsiAnnotation ann, String attr) {
