@@ -30,5 +30,29 @@
             implementation="io.quarkiverse.permuplate.intellij.safedelete.PermuteSafeDeleteDelegate"/>
         <moveFileHandler
             implementation="io.quarkiverse.permuplate.intellij.move.PermutePackageMoveHandler"/>
+        <localInspection
+            language="JAVA"
+            shortName="PermuteAnnotationString"
+            displayName="Permuplate annotation string validation"
+            groupName="Permuplate"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="io.quarkiverse.permuplate.intellij.inspection.AnnotationStringInspection"/>
+        <localInspection
+            language="JAVA"
+            shortName="PermuteStaleAnnotationString"
+            displayName="Permuplate stale annotation string detection"
+            groupName="Permuplate"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="io.quarkiverse.permuplate.intellij.inspection.StaleAnnotationStringInspection"/>
+        <localInspection
+            language="JAVA"
+            shortName="PermuteBoundaryOmission"
+            displayName="Permuplate boundary omission warning"
+            groupName="Permuplate"
+            enabledByDefault="true"
+            level="WARNING"
+            implementationClass="io.quarkiverse.permuplate.intellij.inspection.BoundaryOmissionInspection"/>
     </extensions>
 </idea-plugin>
