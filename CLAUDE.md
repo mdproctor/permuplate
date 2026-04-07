@@ -4,7 +4,7 @@
 
 **Type:** java
 
-This file gives future Claude sessions everything needed to contribute to Permuplate without re-deriving the architecture from scratch. Read this first, then consult [OVERVIEW.md](OVERVIEW.md) for deeper detail and [README.md](README.md) for the user-facing picture.
+This file gives future Claude sessions everything needed to contribute to Permuplate without re-deriving the architecture from scratch. Read this first, then consult [OVERVIEW.md](OVERVIEW.md) for deeper detail on the annotation processor core and [README.md](README.md) for the user-facing picture. For the current state of the DSL sandbox architecture, consult the [design snapshots](docs/design-snapshots/) — the 2026-04-06 snapshot is the current reference.
 
 ---
 
@@ -189,6 +189,21 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | `BaseTuple.as()` varargs type capture | `as(T... v)` uses an empty varargs array to capture the target type at the call site — `v.getClass().getComponentType()` gives `T.class` without requiring an explicit `Class<T>` parameter. The caller passes no arguments; Java creates a zero-length `T[]` from the assignment context. |
 | `type()` is a compile-time no-op | `Join0Second.type()` uses the same varargs type-capture trick as `as()` but discards the class at runtime — just `return cast(this)`. It exists only to provide the compiler a narrowed type parameter when a source returns a base type (e.g., `DataSource<Object>`). |
 | Varargs type-capture for nested generic DSL APIs | The pattern `public <T> T method(T... v)` captures the full inferred type — including nested generics like `Map<String, Map<String, Date>>` — from the assignment context. `Class<T>` parameter cannot do this because `Map<String, Map<String, Date>>.class` is illegal in Java (erasure). The varargs trick is broadly applicable to any DSL method that needs type-safe return without a `Class<T>` argument: `as()`, `type()`, `params()`, and future extensions all use this pattern in the Drools DSL sandbox. |
+| END phantom type added proactively in Phase 2 | Adding END alongside the First/Second split (not deferred to Phase 3) avoided retroactive updates to all class signatures and call sites. `Join0First<END, DS, A>` carries END throughout so scope chain-back can return it via `end()`. See ADR-0003. |
+| `JoinNFirst extends JoinNSecond` — two-family hierarchy | `filter()` lives on `Join0First` (after fact accumulation); `join()`, `fn()`, `not()`, `exists()`, `path2()..path6()`, `extensionPoint()`, `var()` live on `Join0Second` (before or independent of arity). This split enables `fn()` on Second while keeping filter on First. |
+| `fn()` on `Join0Second`, not `Join0First` | `fn()` terminates the builder and must be callable at any arity without a filter having been applied first. Placing it on Second makes it available immediately after `from()` or `join()`. |
+| `NegationScope` as separate class, not `JoinNSecond` subtype | Inheriting `join()` from `JoinNSecond` would add sources to the outer `RuleDefinition`; inside a scope all sources must go to the scope's own private `RuleDefinition`. The conflict makes inheritance impossible. `NegationScope<OUTER, DS>` is independent, captures outer builder as `OUTER`, returns it from `end()`. See ADR-0004. |
+| OOPath runtime as separate pipeline on `RuleDefinition` | OOPath traversal is correlated (each child collection depends on the current parent fact) — incompatible with the cross-product `TupleSource` model. A separate `ooPathRootIndex + ooPathSteps` pipeline fires only when set, leaving all existing sources unchanged. See ADR-0002. |
+| `path2()..path6()` fixed-arity instead of `path().path().end()` | Fixed-arity methods avoid an `end()` call at the tail and make traversal depth visible at a glance — you can scan a rule and immediately see how deep it goes without counting `.path()` calls. |
+| `BaseTuple` mutable inheritance, not records | OOPath traversal populates the tuple incrementally — one slot per step as it passes the filter. Records are immutable; incremental population requires mutable `set(int, T)`. `Tuple2 extends Tuple1` so typed `getA()`, `getB()` getters are inherited. |
+| `PathContext` clean rewrite | The Drools `PathContext` has a buggy constructor (fall-through switch without breaks). The sandbox version is eight lines. Primary use case: cross-referencing earlier path elements while filtering the current one. |
+| `copyTuple()` at OOPath leaf | `executePipeline()` mutates the shared tuple via `set(index, value)`. Without copying at the leaf, collecting results from sibling branches corrupts each other's data. `copyTuple()` is called once per leaf — not per traversal step. |
+| `from(Function)` is the only entry point; `from(String, Function)` removed | The string-based form was a sandbox invention not present in vol2. Now that `builder.rule("name")` provides the rule name, `from(String, Function)` is redundant, non-idiomatic, and non-type-safe. Removed entirely. |
+| `extensionPoint()` uses reflection (same pattern as `join()`) | `extensionPoint()` on `Join0Second` must instantiate `RuleExtendsPoint.RuleExtendsPointN` where N varies with arity. Since `new RuleExtendsPoint${i+1}<>(rd)` is not valid Java, the method reads the arity from `getClass().getSimpleName()` and uses `Class.forName()` to instantiate the right inner class — same pattern as `join()`. |
+| `extendsRule()` is authoring-time deduplication | `extendsRule()` simply copies the base rule's sources and filters into the child `RuleDefinition` at build time via `copyInto()`. The Rete network performs node sharing automatically regardless of how rules are authored — no special runtime concept is needed. See `knowledge-garden/drools/rule-builder-dsl.md`. |
+| `addParamsFact()` for filter-trim correctness | When params are injected via `run(ctx, params)`, they occupy fact[0] at runtime but are NOT registered as a `TupleSource`. Without calling `rd.addParamsFact()` (which increments `accumulatedFacts`) at build time, `wrapPredicate()`'s trim logic miscounts the fact positions, causing single-fact filters to extract the wrong fact. |
+| `RuleResult<DS>` replaces `RuleDefinition<DS>` as `fn()` return | `fn()` now returns `RuleResult<DS>` — a thin wrapper exposing the same query API (`run`, `executionCount`, `capturedFact`, etc.) plus a no-op `end()`. This allows `.fn(...).end()` to compile, matching vol2's chain syntax where `end()` closes a named-rule scope. Existing tests required no changes since `RuleResult` exposes the same methods. |
+| `ParametersFirst` is the canonical entry point; `RuleBuilder.from()` is a shorthand | In vol2, every rule starts with `builder.rule("name")`. Our `builder.from(source)` is a shorthand equivalent to `builder.rule("rule").from(source)`. The canonical form for migration-ready code is always `builder.rule("name")`. |
 
 ---
 
@@ -257,8 +272,10 @@ organized one class per DSL feature, mirroring the Drools vol2 reference:
 
 | Sandbox class | DSL feature |
 |---|---|
-| `RuleBuilderTest` | Core builder chain, joins, filters, bilinear, not/exists, OOPath, variable binding |
-| `ExtensionPointTest` | `extensionPoint()` / `extendsRule()` cross-rule inheritance |
+| `RuleBuilderTest` | Core builder chain, joins, filters (positional + single-fact + variable), bilinear, not/exists scopes, OOPath traversal, Variable binding, run-reset, fn side-effects, filter AND-composition |
+| `ExtensionPointTest` | `extensionPoint()` / `extendsRule()` — filter-only, add-join, two-base-joins, fan-out, extend-of-extend, not/exists scope inheritance |
+| `NamedRuleTest` | Named rules (`builder.rule()`), four param approaches (typed/list/map/individual), `fn().end()` chain, extension point integration |
+| `TupleAsTest` | `BaseTuple.as()` projection — Tuple2/Tuple3 to typed records, OOPath filter use case |
 
 **Before beginning any DSL work, read all test files in the vol2 reference
 suite — not just the one directly related to the feature.** The full suite
@@ -291,7 +308,9 @@ work to date against the full vol2 test suite to identify gaps.
 ## What to read next
 
 - [README.md](README.md) — user-facing overview with examples and quick start
-- [OVERVIEW.md](OVERVIEW.md) — architecture deep-dive, market comparison, full roadmap
+- [OVERVIEW.md](OVERVIEW.md) — architecture deep-dive, market comparison, full roadmap (annotation processor core)
+- [Design snapshots](docs/design-snapshots/) — frozen architecture state records; the 2026-04-06 snapshot is the current reference for sandbox architecture
+- [ADRs](docs/adr/) — formal records of key architectural decisions (ADR-0001..0004 cover DSL sandbox)
 - `permuplate-processor/src/main/java/io/quarkiverse/permuplate/processor/` — the processor source files
 - `permuplate-tests/src/test/java/io/quarkiverse/permuplate/` — test classes
 
