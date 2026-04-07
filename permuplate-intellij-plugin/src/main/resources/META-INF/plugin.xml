@@ -20,5 +20,7 @@
         <renameHandler
             implementation="io.quarkiverse.permuplate.intellij.rename.GeneratedFileRenameHandler"
             order="first"/>
+        <gotoDeclarationHandler
+            implementation="io.quarkiverse.permuplate.intellij.navigation.PermuteMethodNavigator"/>
     </extensions>
 </idea-plugin>
