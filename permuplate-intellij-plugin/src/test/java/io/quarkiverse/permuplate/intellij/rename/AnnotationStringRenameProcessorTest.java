@@ -1,5 +1,9 @@
 package io.quarkiverse.permuplate.intellij.rename;
 
+import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 
 public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
@@ -18,5 +22,79 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
                 "import io.quarkiverse.permuplate.annotations.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Merge${i}\")\n" +
                 "public class Merge2 {}");
+    }
+
+    public void testFieldRenameUpdatesPermuteDeclrName() {
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +
+                "    private Object c<caret>2;\n" +
+                "}");
+
+        myFixture.renameElementAtCaret("d2");
+
+        myFixture.checkResult(
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteDeclr(type=\"Callable${i}\", name=\"d${i}\")\n" +
+                "    private Object d2;\n" +
+                "}");
+    }
+
+    public void testMethodRenameUpdatesPermuteMethodName() {
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteMethod(varName=\"j\", to=\"${i-1}\", name=\"join${j}\")\n" +
+                "    public void joi<caret>n2() {}\n" +
+                "}");
+
+        myFixture.renameElementAtCaret("merge2");
+
+        myFixture.checkResult(
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteMethod(varName=\"j\", to=\"${i-1}\", name=\"merge${j}\")\n" +
+                "    public void merge2() {}\n" +
+                "}");
+    }
+
+    public void testCrossFileAnnotationStringUpdatedOnFamilyRename() {
+        myFixture.addFileToProject("Callable2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "@Permute(varName=\"i\", from=3, to=10, className=\"Callable${i}\")\n" +
+                "public interface Callable2 {}");
+
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +
+                "    private Object c2;\n" +
+                "}");
+
+        // Rename Callable2 → Task2 (rename the class in Callable2.java)
+        PsiClass callable2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Callable2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(callable2);
+        myFixture.renameElement(callable2, "Task2");
+
+        // Join2.java annotation string should be updated
+        PsiFile join2 = myFixture.getPsiManager().findFile(
+                myFixture.findFileInTempDir("Join2.java"));
+        assertNotNull(join2);
+        assertTrue("Expected type=\"Task${i}\" in Join2.java but got:\n" + join2.getText(),
+                join2.getText().contains("type=\"Task${i}\""));
     }
 }
