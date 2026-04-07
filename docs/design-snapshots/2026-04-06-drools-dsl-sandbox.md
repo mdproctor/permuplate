@@ -2,7 +2,7 @@
 **Date:** 2026-04-06
 **Topic:** Full design state of the Drools DSL sandbox — Phases 1 through 3b, post-ADR formalisation
 **Supersedes:** [2026-04-05-drools-dsl-sandbox](2026-04-05-drools-dsl-sandbox.md)
-**Superseded by:** *(leave blank — filled in if this snapshot is later superseded)*
+**Superseded by:** [2026-04-07-drools-dsl-sandbox](2026-04-07-drools-dsl-sandbox.md)
 
 ---
 
