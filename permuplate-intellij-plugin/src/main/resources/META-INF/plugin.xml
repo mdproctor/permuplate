@@ -13,5 +13,8 @@
         <renamePsiElementProcessor
             implementation="io.quarkiverse.permuplate.intellij.rename.AnnotationStringRenameProcessor"
             order="first"/>
+        <renameHandler
+            implementation="io.quarkiverse.permuplate.intellij.rename.GeneratedFileRenameHandler"
+            order="first"/>
     </extensions>
 </idea-plugin>

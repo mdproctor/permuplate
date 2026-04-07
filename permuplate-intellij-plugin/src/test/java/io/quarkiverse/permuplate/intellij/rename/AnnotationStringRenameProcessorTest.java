@@ -97,4 +97,22 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         assertTrue("Expected type=\"Task${i}\" in Join2.java but got:\n" + join2.getText(),
                 join2.getText().contains("type=\"Task${i}\""));
     }
+
+    public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
+        com.intellij.openapi.vfs.VirtualFile generatedFile =
+                myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Join3.java",
+                "package io.example;\npublic class Join3 {}");
+        assertTrue("Expected isGeneratedFile to be true for target/generated-sources path",
+                io.quarkiverse.permuplate.intellij.index.PermuteFileDetector
+                        .isGeneratedFile(generatedFile));
+
+        com.intellij.openapi.vfs.VirtualFile sourceFile =
+                myFixture.getTempDirFixture().createFile(
+                "src/main/java/io/example/Join2.java",
+                "package io.example;\npublic class Join2 {}");
+        assertFalse("Expected isGeneratedFile to be false for src/main/java path",
+                io.quarkiverse.permuplate.intellij.index.PermuteFileDetector
+                        .isGeneratedFile(sourceFile));
+    }
 }
