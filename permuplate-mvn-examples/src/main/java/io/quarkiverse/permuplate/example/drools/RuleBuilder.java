@@ -13,7 +13,7 @@ import java.util.function.Function;
  *
  * <pre>{@code
  * RuleBuilder<Ctx> builder = new RuleBuilder<>();
- * RuleDefinition<Ctx> rule = builder.from("adults", ctx -> ctx.persons())
+ * RuleDefinition<Ctx> rule = builder.from(ctx -> ctx.persons())
  *         .filter((ctx, a) -> a.age() >= 18)
  *         .fn((ctx, a) -> System.out.println(a.name()));
  * rule.run(ctx);
@@ -22,20 +22,7 @@ import java.util.function.Function;
 public class RuleBuilder<DS> {
 
     /**
-     * Starts building a rule with its first fact source.
-     * Returns {@code Join1First<Void, DS, A>} — Void indicates no outer scope.
-     */
-    public <A> JoinBuilder.Join1First<Void, DS, A> from(String name,
-            Function<DS, DataSource<A>> firstSource) {
-        RuleDefinition<DS> rd = new RuleDefinition<>(name);
-        rd.addSource(firstSource);
-        return new JoinBuilder.Join1First<>(null, rd);
-    }
-
-    /**
      * Starts building a rule with its first fact source using a method reference.
-     * Shorthand for {@code from("rule", source)} — preferred when a descriptive
-     * name is not needed.
      *
      * <pre>{@code
      * builder.from(Ctx::persons)
@@ -44,8 +31,10 @@ public class RuleBuilder<DS> {
      * }</pre>
      */
     public <A> JoinBuilder.Join1First<Void, DS, A> from(
-            java.util.function.Function<DS, DataSource<A>> firstSource) {
-        return from("rule", firstSource);
+            Function<DS, DataSource<A>> firstSource) {
+        RuleDefinition<DS> rd = new RuleDefinition<>("rule");
+        rd.addSource(firstSource);
+        return new JoinBuilder.Join1First<>(null, rd);
     }
 
     /**

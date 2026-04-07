@@ -40,7 +40,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity1Structural() {
-        var rule = builder.from("structural", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, a) -> a.age() >= 18)
                 .fn((ctx, a) -> {
                 });
@@ -52,7 +52,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity1AdultFilterMatchesOnlyAlice() {
-        var rule = builder.from("adults", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, a) -> a.age() >= 18)
                 .fn((ctx, a) -> {
                 });
@@ -65,7 +65,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity1NoFilterMatchesAll() {
-        var rule = builder.from("all", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .fn((ctx, a) -> {
                 });
 
@@ -76,7 +76,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity1MultipleFiltersChained() {
-        var rule = builder.from("chained", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, a) -> a.age() >= 18)
                 .filter((ctx, a) -> a.name().startsWith("A"))
                 .fn((ctx, a) -> {
@@ -90,7 +90,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity2CrossProductNoFilter() {
-        var rule = builder.from("all-pairs", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .fn((ctx, a, b) -> {
                 });
@@ -102,7 +102,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity2FilterOnBothFacts() {
-        var rule = builder.from("adult-high-balance", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0)
                 .fn((ctx, a, b) -> {
@@ -118,7 +118,7 @@ public class RuleBuilderTest {
     @Test
     public void testArity2MultipleFilters() {
         // Chained .filter().filter() — verifies filterCount=2 is structurally recorded
-        var rule = builder.from("two-filters", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, a, b) -> a.age() >= 18)
                 .filter((ctx, a, b) -> b.balance() > 500.0)
@@ -134,7 +134,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity2CapturedFactsDistinguishByType() {
-        var rule = builder.from("typed", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .fn((ctx, a, b) -> {
                 });
@@ -148,7 +148,7 @@ public class RuleBuilderTest {
     @Test
     public void testArity3ThreeFacts() {
         // Unfiltered three-way cross-product: 2×2×2 = 8 combinations
-        var rule = builder.from("three-facts", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .join(ctx -> ctx.orders())
                 .fn((ctx, a, b, c) -> {
@@ -164,7 +164,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity3IntermediateFilter() {
-        var rule = builder.from("filtered-triple", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0)
                 .join(ctx -> ctx.orders())
@@ -185,7 +185,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity4AllTypesDistinct() {
-        var rule = builder.from("four-facts", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .join(ctx -> ctx.orders())
                 .join(ctx -> ctx.products())
@@ -203,7 +203,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity5AllTypesDistinct() {
-        var rule = builder.from("five-facts", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .join(ctx -> ctx.orders())
                 .join(ctx -> ctx.products())
@@ -219,7 +219,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testArity6LeafNodeCompiles() {
-        var rule = builder.from("six-facts", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .join(ctx -> ctx.orders())
                 .join(ctx -> ctx.products())
@@ -235,7 +235,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testFilterRejectsAllCombinations() {
-        var rule = builder.from("impossible", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, a) -> a.age() > 200)
                 .fn((ctx, a) -> {
                 });
@@ -247,7 +247,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testMultipleExecutionsRecordedSeparately() {
-        var rule = builder.from("multi", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .fn((ctx, a) -> {
                 });
 
@@ -267,7 +267,7 @@ public class RuleBuilderTest {
         // Compile-time proof: the typed join() chain resolves B=Account from the lambda.
         // a is Person, b is Account — the compiler enforces types, no casts needed.
         // Runtime behaviour is equivalent to testArity2FilterOnBothFacts.
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0)
                 .fn((ctx, a, b) -> {
@@ -284,7 +284,7 @@ public class RuleBuilderTest {
     public void testArity3FullyTyped() {
         // Compile-time proof: three-way join resolves A=Person, B=Account, C=Order.
         // Runtime behaviour is equivalent to testArity3IntermediateFilter (single combined filter).
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .join(ctx -> ctx.orders())
                 .filter((ctx, a, b, c) -> a.age() >= 18 && b.balance() > 500.0 && c.amount() > 100.0)
@@ -307,7 +307,7 @@ public class RuleBuilderTest {
     public void testArity2SingleFactFilter() {
         // filter(Predicate2<DS, Account>) — tests only the most recently joined fact.
         // 2 persons × 1 high-balance account = 2 executions (person not filtered here).
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, b) -> b.balance() > 500.0)
                 .fn((ctx, a, b) -> {
@@ -322,7 +322,7 @@ public class RuleBuilderTest {
     public void testArity2BothFilterTypesChained() {
         // Chain single-fact filter (on Account) then cross-fact filter (Person + Account).
         // Only Alice(30) + ACC1(1000) satisfies both.
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, b) -> b.balance() > 500.0)
                 .filter((ctx, a, b) -> a.age() >= 18)
@@ -340,7 +340,7 @@ public class RuleBuilderTest {
     public void testArity3SingleFactFilterOnLatestFact() {
         // After joining persons + accounts + orders, single-fact filter tests only Order.
         // 2 persons × 2 accounts × 1 qualifying order (ORD1 amount>100) = 4 combos.
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .join(ctx -> ctx.orders())
                 .filter((ctx, c) -> c.amount() > 100.0)
@@ -362,7 +362,7 @@ public class RuleBuilderTest {
         // Structural: Join2First<Void,Ctx,Person,Account> IS-A Join2Second<Void,Ctx,Person,Account>.
         // This test only compiles if the extends relation is correct.
         // If Join2First does not extend Join2Second, this assignment fails at compile time.
-        JoinBuilder.Join2Second<Void, Ctx, Person, Account> asSecond = builder.from("persons", ctx -> ctx.persons())
+        JoinBuilder.Join2Second<Void, Ctx, Person, Account> asSecond = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts());
         assertThat(asSecond).isNotNull();
     }
@@ -370,13 +370,13 @@ public class RuleBuilderTest {
     @Test
     public void testBilinearJoin1Plus2Gives3Facts() {
         // Pre-build a 2-fact sub-network: only adult persons with high-balance accounts.
-        var personAccounts = builder.from("pa", ctx -> ctx.persons())
+        var personAccounts = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0);
 
         // Bi-linear join: orders (1 fact) x personAccounts (2 facts) -> 3-fact rule.
         // personAccounts' internal filter gates its own tuples; only Alice+ACC1 qualifies.
-        var rule = builder.from("orders", ctx -> ctx.orders())
+        var rule = builder.from(ctx -> ctx.orders())
                 .join(personAccounts)
                 .fn((ctx, a, b, c) -> {
                 });
@@ -397,10 +397,10 @@ public class RuleBuilderTest {
         // It gates which Account tuples enter the cross-product -- it does NOT re-run
         // against the combined (Person, Account) tuple. Result: both persons are joined
         // with only ACC1, giving 2 matches (not 1).
-        var highBalanceAccounts = builder.from("acc", ctx -> ctx.accounts())
+        var highBalanceAccounts = builder.from(ctx -> ctx.accounts())
                 .filter((ctx, a) -> a.balance() > 500.0); // only ACC1 passes
 
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .join(highBalanceAccounts)
                 .fn((ctx, a, b) -> {
                 });
@@ -418,16 +418,16 @@ public class RuleBuilderTest {
         // Two rules share the same pre-built personAccounts sub-network.
         // This is the core Rete node-sharing pattern: in a real Rete network,
         // both rules would share the same beta memory for the personAccounts sub-network.
-        var personAccounts = builder.from("pa", ctx -> ctx.persons())
+        var personAccounts = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, a, b) -> a.age() >= 18 && b.balance() > 500.0);
 
-        var rule1 = builder.from("orders", ctx -> ctx.orders())
+        var rule1 = builder.from(ctx -> ctx.orders())
                 .join(personAccounts)
                 .fn((ctx, a, b, c) -> {
                 });
 
-        var rule2 = builder.from("products", ctx -> ctx.products())
+        var rule2 = builder.from(ctx -> ctx.products())
                 .join(personAccounts)
                 .fn((ctx, a, b, c) -> {
                 });
@@ -453,7 +453,7 @@ public class RuleBuilderTest {
         // not() scope evaluates independently against ctx (sandbox simplification).
         // Scope: any account with balance > 500 -- ACC1 qualifies.
         // Since the scope finds ACC1 globally, ALL outer person tuples are blocked.
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .not()
                 .join(ctx -> ctx.accounts())
                 .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 500.0)
@@ -467,7 +467,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testNotScopePassesAllWhenScopeIsEmpty() {
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .not()
                 .join(ctx -> ctx.accounts())
                 .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 10000.0)
@@ -481,7 +481,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testExistsScopePassesAllWhenScopeHasMatch() {
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .exists()
                 .join(ctx -> ctx.accounts())
                 .filter((Object) (Predicate2<Ctx, Account>) (ctx, b) -> b.balance() > 500.0)
@@ -503,7 +503,7 @@ public class RuleBuilderTest {
         // 2 libraries x 2 rooms each x all rooms pass name != null = 4 combinations.
         // Use typed intermediate variable to anchor B=Room for the path2() type variable.
         RuleOOPathBuilder.Path2<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple2<Library, Room>>, BaseTuple.Tuple1<Library>, Library, Room> path2Builder = builder
-                .from("libs", ctx -> ctx.libraries()).path2();
+                .from(ctx -> ctx.libraries()).path2();
         var rule = path2Builder.path(
                 (pathCtx, lib) -> lib.rooms(),
                 (pathCtx, room) -> room.name() != null)
@@ -528,7 +528,7 @@ public class RuleBuilderTest {
         // 2 libs x 2 rooms x 2 books = 8 combinations (no filters).
         // Use typed intermediate variable to anchor B=Room, C=Book for path3() type variables.
         RuleOOPathBuilder.Path3<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple3<Library, Room, Book>>, BaseTuple.Tuple2<Library, Room>, Library, Room, Book> path3Builder = builder
-                .from("libs", ctx -> ctx.libraries()).path3();
+                .from(ctx -> ctx.libraries()).path3();
         var rule = path3Builder.path(
                 (pathCtx, lib) -> lib.rooms(),
                 (pathCtx, room) -> true)
@@ -549,7 +549,7 @@ public class RuleBuilderTest {
         // Only published books pass the second-step predicate.
         // 2 libs x 2 rooms x 1 published book each = 4 combinations.
         RuleOOPathBuilder.Path3<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple3<Library, Room, Book>>, BaseTuple.Tuple2<Library, Room>, Library, Room, Book> path3Builder = builder
-                .from("libs", ctx -> ctx.libraries()).path3();
+                .from(ctx -> ctx.libraries()).path3();
         var rule = path3Builder.path(
                 (pathCtx, lib) -> lib.rooms(),
                 (pathCtx, room) -> true)
@@ -574,7 +574,7 @@ public class RuleBuilderTest {
         // Second-step predicate uses getTuple().getA() to cross-reference the Library
         // while filtering a Book. Only books in ScienceLib rooms pass.
         RuleOOPathBuilder.Path3<JoinBuilder.Join2First<Void, Ctx, Library, BaseTuple.Tuple3<Library, Room, Book>>, BaseTuple.Tuple2<Library, Room>, Library, Room, Book> path3Builder = builder
-                .from("libs", ctx -> ctx.libraries()).path3();
+                .from(ctx -> ctx.libraries()).path3();
         var rule = path3Builder.path(
                 (pathCtx, lib) -> lib.rooms(),
                 (pathCtx, room) -> true)
@@ -601,7 +601,7 @@ public class RuleBuilderTest {
         // Outer facts: [Person, Library, Tuple2<Library,Room>]
         // 2 persons x 2 libraries x 2 rooms = 8 combinations
         RuleOOPathBuilder.Path2<JoinBuilder.Join3First<Void, Ctx, Person, Library, BaseTuple.Tuple2<Library, Room>>, BaseTuple.Tuple1<Library>, Library, Room> path2Builder = builder
-                .from("persons", ctx -> ctx.persons())
+                .from(ctx -> ctx.persons())
                 .join(ctx -> ctx.libraries())
                 .path2();
         var rule = path2Builder.path(
@@ -629,7 +629,7 @@ public class RuleBuilderTest {
         Variable<Person> personVar = new Variable<>();
         Variable<Account> accountVar = new Variable<>();
 
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .var(personVar)
                 .join(ctx -> ctx.accounts())
                 .var(accountVar)
@@ -653,7 +653,7 @@ public class RuleBuilderTest {
         Variable<Account> accountVar = new Variable<>();
 
         try {
-            builder.from("persons", ctx -> ctx.persons())
+            builder.from(ctx -> ctx.persons())
                     .join(ctx -> ctx.accounts())
                     .filter(personVar, accountVar,
                             (ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0);
@@ -679,7 +679,7 @@ public class RuleBuilderTest {
         Variable<Person> personVar = new Variable<>();
         Variable<Order> orderVar = new Variable<>();
 
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .var(personVar) // personVar → index 0
                 .join(ctx -> ctx.accounts()) // index 1 — no variable bound
                 .join(ctx -> ctx.orders())
@@ -707,7 +707,7 @@ public class RuleBuilderTest {
         Variable<Person> $person = Variable.of("$person");
         Variable<Account> $account = Variable.of("$account");
 
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .var($person)
                 .join(ctx -> ctx.accounts())
                 .var($account)
@@ -729,7 +729,7 @@ public class RuleBuilderTest {
         Variable<Account> $account = Variable.of("$account");
 
         try {
-            builder.from("persons", ctx -> ctx.persons())
+            builder.from(ctx -> ctx.persons())
                     .join(ctx -> ctx.accounts())
                     .filter($person, $account, (ctx, p, a) -> true);
             org.junit.Assert.fail("Expected IllegalStateException");
@@ -741,8 +741,7 @@ public class RuleBuilderTest {
 
     @Test
     public void testFromFunctionShorthand() {
-        // from(Function) shorthand — no string name required.
-        // Functionally identical to from("rule", source).
+        // from(Function) — the standard entry point for building a rule.
         var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .fn((ctx, p) -> {
@@ -761,7 +760,7 @@ public class RuleBuilderTest {
         Variable<Account> aVar = new Variable<>();
         Variable<Order> oVar = new Variable<>();
 
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .var(pVar)
                 .join(ctx -> ctx.accounts())
                 .var(aVar)
@@ -796,7 +795,7 @@ public class RuleBuilderTest {
         // Filter: only published books pass the second traversal step.
         // 2 persons × 2 libs × 2 rooms × 1 published book each = 8 combinations.
         RuleOOPathBuilder.Path3<JoinBuilder.Join3First<Void, Ctx, Person, Library, BaseTuple.Tuple3<Library, Room, Book>>, BaseTuple.Tuple2<Library, Room>, Library, Room, Book> path3Builder = builder
-                .from("persons", ctx -> ctx.persons())
+                .from(ctx -> ctx.persons())
                 .join(ctx -> ctx.libraries())
                 .path3();
         var rule = path3Builder.path(
@@ -830,7 +829,7 @@ public class RuleBuilderTest {
     public void testRunResetsExecutionCount() {
         // rule.run(ctx) resets executions on each call — executionCount() reflects only
         // the most recent run, not accumulated across multiple runs.
-        var rule = builder.from("adults", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .fn((ctx, p) -> {
                 });
@@ -853,7 +852,7 @@ public class RuleBuilderTest {
         // not just that executionCount() is correct.
         java.util.List<String> names = new java.util.ArrayList<>();
 
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .fn((ctx, p) -> names.add(p.name()));
 
@@ -872,7 +871,7 @@ public class RuleBuilderTest {
         // filter1: age >= 18 → Alice passes, Bob fails
         // filter2: name starts with "A" → Alice passes
         // AND result: Alice only (executionCount=1)
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18) // Alice passes
                 .filter((ctx, p) -> p.name().startsWith("A")) // Alice passes
                 .fn((ctx, p) -> {
@@ -889,7 +888,7 @@ public class RuleBuilderTest {
         // filter1: age >= 18 → Alice survives, Bob is eliminated
         // filter2: name starts with "B" → Alice fails
         // Result: 0 executions (not 1 if order were reversed)
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18) // Alice passes, Bob fails
                 .filter((ctx, p) -> p.name().startsWith("B")) // Alice fails
                 .fn((ctx, p) -> {
@@ -926,13 +925,13 @@ public class RuleBuilderTest {
     public void testTypeIsNoOpAtRuntime() {
         // type() doesn't change execution count — it's purely compile-time.
         // Same source with and without type() should give identical results.
-        var withType = builder.from("persons", ctx -> ctx.persons())
+        var withType = builder.from(ctx -> ctx.persons())
                 .<Person> type() // redundant but valid — already typed
                 .filter((ctx, p) -> p.age() >= 18)
                 .fn((ctx, p) -> {
                 });
 
-        var withoutType = builder.from("persons2", ctx -> ctx.persons())
+        var withoutType = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .fn((ctx, p) -> {
                 });
@@ -953,7 +952,7 @@ public class RuleBuilderTest {
         // not(orders > 1000): SATISFIED — no order exceeds 1000 → persons survive
         // exists(orders > 100): SATISFIED — ORD1=150 exists → persons survive
         // Outer filter before scopes to narrow to Alice (age >= 18)
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .not()
                 .join(ctx -> ctx.orders())
@@ -977,7 +976,7 @@ public class RuleBuilderTest {
         // not(accounts > 500): UNSATISFIED — ACC1=1000 exists → all persons blocked
         // exists(orders > 100): SATISFIED — ORD1=150 exists
         // Because not() fails globally, result is 0 regardless of exists().
-        var rule = builder.from("persons", ctx -> ctx.persons())
+        var rule = builder.from(ctx -> ctx.persons())
                 .not()
                 .join(ctx -> ctx.accounts())
                 .filter((Object) (Predicate2<Ctx, Account>) (ctx, a) -> a.balance() > 500.0)
@@ -997,12 +996,12 @@ public class RuleBuilderTest {
     public void testTwoRulesFromSameBuilderAreIndependent() {
         // Two rules built from the same RuleBuilder instance are fully independent.
         // Running one rule does not affect the other's state.
-        var rule1 = builder.from("adults", ctx -> ctx.persons())
+        var rule1 = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .fn((ctx, p) -> {
                 });
 
-        var rule2 = builder.from("high-balance", ctx -> ctx.accounts())
+        var rule2 = builder.from(ctx -> ctx.accounts())
                 .filter((ctx, a) -> a.balance() > 500.0)
                 .fn((ctx, a) -> {
                 });

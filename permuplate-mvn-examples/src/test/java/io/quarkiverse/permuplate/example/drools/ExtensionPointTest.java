@@ -29,7 +29,7 @@ public class ExtensionPointTest {
     @Test
     public void testExtends1FilterOnly() {
         // Base: 1 join. Child: adds filter on inherited facts, no new joins.
-        var ep = builder.from("persons", ctx -> ctx.persons())
+        var ep = builder.from(ctx -> ctx.persons())
                 .extensionPoint();
 
         var rule = builder.extendsRule(ep)
@@ -45,7 +45,7 @@ public class ExtensionPointTest {
     @Test
     public void testExtends2AddsJoin() {
         // Base: 1 join + filter. Child: adds a second join.
-        var ep = builder.from("persons", ctx -> ctx.persons())
+        var ep = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .extensionPoint();
 
@@ -65,7 +65,7 @@ public class ExtensionPointTest {
     @Test
     public void testExtends3TwoBaseJoins() {
         // Base: 2 joins + filter. Child: adds a third join.
-        var ep = builder.from("persons", ctx -> ctx.persons())
+        var ep = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0)
                 .extensionPoint();
@@ -85,7 +85,7 @@ public class ExtensionPointTest {
     @Test
     public void testExtends4FanOut() {
         // Two child rules from the same extension point — each gets an independent copy.
-        var ep = builder.from("persons", ctx -> ctx.persons())
+        var ep = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .extensionPoint();
 
@@ -118,7 +118,7 @@ public class ExtensionPointTest {
         // Extend-of-extend: ep1 captures 1 join; ep2 extends ep1 and captures 2 joins;
         // rule extends ep2 and adds a third join.
         // extensionPoint() is available on JoinNFirst because JoinNFirst extends JoinNSecond.
-        var ep1 = builder.from("persons", ctx -> ctx.persons())
+        var ep1 = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .extensionPoint();
 
@@ -146,7 +146,7 @@ public class ExtensionPointTest {
         // Base has a not() scope. copyInto() must transfer negations to the child.
         // not().join(accounts).filter(balance > 500).end():
         // ACC1 has balance=1000 > 500, so the not() is globally UNSATISFIED → 0 persons survive.
-        var ep = builder.from("persons", ctx -> ctx.persons())
+        var ep = builder.from(ctx -> ctx.persons())
                 .not()
                 .join(ctx -> ctx.accounts())
                 .filter((Object) (Predicate2<Ctx, Account>) (ctx, a) -> a.balance() > 500.0)
@@ -167,7 +167,7 @@ public class ExtensionPointTest {
         // exists().join(orders).filter(amount > 100).end():
         // ORD1 has amount=150 > 100, so the exists() is globally SATISFIED → all 2 persons survive.
         // Child adds age filter → only Alice (age=30 >= 18) passes.
-        var ep = builder.from("persons", ctx -> ctx.persons())
+        var ep = builder.from(ctx -> ctx.persons())
                 .exists()
                 .join(ctx -> ctx.orders())
                 .filter((Object) (Predicate2<Ctx, Order>) (ctx, o) -> o.amount() > 100.0)

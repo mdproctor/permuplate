@@ -24,7 +24,7 @@ public class RuleBuilderExamples {
      * variable declarations or {@code var()} calls needed.
      */
     public static RuleResult<Ctx> adultHighBalanceCompact(RuleBuilder<Ctx> builder) {
-        return builder.from("persons", ctx -> ctx.persons())
+        return builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts())
                 .filter((ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0)
                 .fn((ctx, p, a) -> {
@@ -43,7 +43,7 @@ public class RuleBuilderExamples {
         Variable<Person> $person = Variable.of("$person");
         Variable<Account> $account = Variable.of("$account");
 
-        return builder.from("persons", ctx -> ctx.persons()).var($person)
+        return builder.from(ctx -> ctx.persons()).var($person)
                 .join(ctx -> ctx.accounts()).var($account)
                 .filter($person, $account, (ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0)
                 .fn((ctx, p, a) -> {
@@ -51,8 +51,7 @@ public class RuleBuilderExamples {
     }
 
     /**
-     * from() shorthand — method reference, no string name required.
-     * Equivalent to from("rule", Ctx::persons).
+     * from() — standard entry point using a method reference.
      */
     public static RuleResult<Ctx> adultHighBalanceShorthand(RuleBuilder<Ctx> builder) {
         return builder.from(ctx -> ctx.persons())
@@ -69,7 +68,7 @@ public class RuleBuilderExamples {
      * runtime inheritance concept exists.
      */
     public static void extendsExample(RuleBuilder<Ctx> builder) {
-        var ep = builder.from("persons", ctx -> ctx.persons())
+        var ep = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .extensionPoint();
 
