@@ -21,6 +21,11 @@ public class RuleResult<DS> {
         return this;
     }
 
+    public RuleResult<DS> run(DS ctx, Object params) {
+        rd.run(ctx, params);
+        return this;
+    }
+
     public int executionCount() {
         return rd.executionCount();
     }
