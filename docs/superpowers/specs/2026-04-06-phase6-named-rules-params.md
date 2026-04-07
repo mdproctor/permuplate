@@ -352,8 +352,12 @@ public class ParametersFirst<DS> {
     }
 
     /**
-     * Extends a base rule's patterns. Equivalent to builder.extendsRule(ep)
-     * but associates the rule name.
+     * Extends a base rule's patterns — all six overloads, one per base arity.
+     * Identical to RuleBuilder.extendsRule() but creates a named RuleDefinition.
+     *
+     * Implementation note: vol2 shows salient examples; implement ALL permutations
+     * in ALL appropriate places. Every arity that exists on RuleBuilder.extendsRule()
+     * must also exist here on ParametersFirst.extendsRule().
      */
     public <A> JoinBuilder.Join1First<Void, DS, A>
             extendsRule(RuleExtendsPoint.RuleExtendsPoint2<DS, A> ep) {
@@ -362,7 +366,40 @@ public class ParametersFirst<DS> {
         return new JoinBuilder.Join1First<>(null, child);
     }
 
-    // ... extendsRule overloads for RuleExtendsPoint3..7 follow the same pattern
+    public <A, B> JoinBuilder.Join2First<Void, DS, A, B>
+            extendsRule(RuleExtendsPoint.RuleExtendsPoint3<DS, A, B> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>(name);
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join2First<>(null, child);
+    }
+
+    public <A, B, C> JoinBuilder.Join3First<Void, DS, A, B, C>
+            extendsRule(RuleExtendsPoint.RuleExtendsPoint4<DS, A, B, C> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>(name);
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join3First<>(null, child);
+    }
+
+    public <A, B, C, D> JoinBuilder.Join4First<Void, DS, A, B, C, D>
+            extendsRule(RuleExtendsPoint.RuleExtendsPoint5<DS, A, B, C, D> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>(name);
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join4First<>(null, child);
+    }
+
+    public <A, B, C, D, E> JoinBuilder.Join5First<Void, DS, A, B, C, D, E>
+            extendsRule(RuleExtendsPoint.RuleExtendsPoint6<DS, A, B, C, D, E> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>(name);
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join5First<>(null, child);
+    }
+
+    public <A, B, C, D, E, F> JoinBuilder.Join6First<Void, DS, A, B, C, D, E, F>
+            extendsRule(RuleExtendsPoint.RuleExtendsPoint7<DS, A, B, C, D, E, F> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>(name);
+        ep.baseRd().copyInto(child);
+        return new JoinBuilder.Join6First<>(null, child);
+    }
 
     /**
      * Zero-arg action — rule fires with only ctx, no facts.
@@ -669,11 +706,22 @@ public static void namedRuleWithMapParams(RuleBuilder<Ctx> builder) {
 
 ---
 
+## Implementation Completeness Principle
+
+Vol2 shows salient working points — not exhaustive permutations. When implementing
+any feature, apply it consistently across **all arities** and **all appropriate
+places**. Specific guidance:
+
+- **All arity overloads must be present everywhere they logically apply.** If a
+  method exists at arity 2 it must exist at arities 3–7. If `extendsRule()` is on
+  `RuleBuilder`, it must also be complete on `ParametersFirst`.
+- **If in doubt, add the overload.** Missing arity overloads are silent compile
+  errors during migration — the user gets "no matching method" with no explanation.
+
 ## What This Does Not Include
 
-- `extendsRule()` overloads for `RuleExtendsPoint3..7` on `ParametersFirst` — same
-  pattern as `RuleExtendsPoint2`; add if needed during migration.
-- `ifn()` overloads on `ParametersSecond` for all fact arities — add during migration.
+- `ifn()` overloads on `ParametersSecond` for multi-fact consumers — add if the
+  migration reveals rules that terminate after params-only (no joins).
 - Runtime type validation of params (e.g., verifying the passed instance matches
   the captured class from `params(P... cls)`) — YAGNI for the sandbox.
 - `list()` as a separate shorthand on `ParametersFirst` — it's equivalent to the
