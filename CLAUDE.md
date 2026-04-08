@@ -45,7 +45,7 @@ Maven is at `/opt/homebrew/bin/mvn`. The standard build command is:
 The IntelliJ plugin uses a separate Gradle build. From `permuplate-intellij-plugin/`:
 
 ```bash
-./gradlew test          # run plugin tests (17 tests)
+./gradlew test          # run plugin tests (48 tests)
 ./gradlew buildPlugin   # produce installable zip in build/distributions/
 ```
 

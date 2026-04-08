@@ -2,7 +2,7 @@
 **Date:** 2026-04-08
 **Topic:** IntelliJ plugin — full IDE refactoring awareness for Permuplate templates
 **Supersedes:** *(none)*
-**Superseded by:** *(leave blank — filled in if this snapshot is later superseded)*
+**Superseded by:** [2026-04-08-intellij-plugin-complete](2026-04-08-intellij-plugin-complete.md)
 
 ---
 
