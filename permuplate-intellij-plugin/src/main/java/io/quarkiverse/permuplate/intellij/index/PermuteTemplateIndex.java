@@ -43,6 +43,7 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
             if (!(psiFile instanceof PsiJavaFile javaFile)) return result;
 
             for (PsiClass cls : javaFile.getClasses()) {
+                if (cls.isAnnotationType()) continue; // skip annotation declarations (e.g. Permute.java itself)
                 PsiAnnotation permute = findAnnotation(cls, PERMUTE_FQN, PERMUTE_SIMPLE);
                 if (permute == null) continue;
 
@@ -148,7 +149,7 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
         return PermuteTemplateDataExternalizer.INSTANCE;
     }
 
-    @Override public int getVersion() { return 1; }
+    @Override public int getVersion() { return 2; }
 
     @Override public @NotNull FileBasedIndex.InputFilter getInputFilter() {
         return (VirtualFile file) -> "java".equals(file.getExtension());
