@@ -129,6 +129,81 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         assertEquals("Expected redirect to Join2 template", "Join2", ((PsiClass) substituted).getName());
     }
 
+    // -------------------------------------------------------------------------
+    // substituteElementToRename — negative paths
+    // -------------------------------------------------------------------------
+
+    public void testSubstituteReturnsElementForNonGeneratedFile() {
+        // A class NOT in a generated-sources path → no redirect
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {}");
+
+        PsiClass join2 = ((com.intellij.psi.PsiJavaFile) myFixture.getFile()).getClasses()[0];
+        AnnotationStringRenameProcessor processor = new AnnotationStringRenameProcessor();
+        PsiElement result = processor.substituteElementToRename(join2, null);
+
+        assertSame("Non-generated file: element should be returned unchanged", join2, result);
+    }
+
+    public void testSubstituteReturnsElementWhenNoTemplateInProject() throws Exception {
+        // A class in a generated-sources path, but no @Permute template exists anywhere in project
+        VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Unknown3.java",
+                "package io.example;\npublic class Unknown3 {}");
+
+        PsiFile generatedPsiFile = PsiManager.getInstance(getProject()).findFile(generatedVFile);
+        assertNotNull(generatedPsiFile);
+        PsiClass unknown3 = ((PsiJavaFile) generatedPsiFile).getClasses()[0];
+
+        AnnotationStringRenameProcessor processor = new AnnotationStringRenameProcessor();
+        PsiElement result = processor.substituteElementToRename(unknown3, null);
+
+        // No template → PSI scan finds nothing → returns original element unchanged
+        assertSame("No template in project: element should be returned unchanged", unknown3, result);
+    }
+
+    // -------------------------------------------------------------------------
+    // End-to-end: rename from generated file redirects to template and updates annotation
+    //
+    // myFixture.renameElement() calls substituteElementToRename() on registered processors.
+    // The PSI scan fallback detects @Permute on Join2 and redirects.
+    // prepareRenaming() on Join2 then updates the annotation string.
+    // -------------------------------------------------------------------------
+
+    public void testEndToEndRenameFromGeneratedFileUpdatesTemplateAnnotation() throws Exception {
+        // Template with @Permute annotation
+        PsiFile templatePsiFile = myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {}");
+
+        // Generated file in target/generated-sources so isGeneratedFile() fires
+        VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Join3.java",
+                "package io.example;\npublic class Join3 {}");
+
+        PsiFile generatedPsiFile = PsiManager.getInstance(getProject()).findFile(generatedVFile);
+        assertNotNull(generatedPsiFile);
+        PsiClass join3 = ((PsiJavaFile) generatedPsiFile).getClasses()[0];
+        assertEquals("Join3", join3.getName());
+
+        // Rename Join3 → Merge2 (user triggered from generated file)
+        // substituteElementToRename() redirects to Join2 (PSI scan finds @Permute)
+        // prepareRenaming() on Join2 with newName="Merge2" updates className="Join${i}" → "Merge${i}"
+        myFixture.renameElement(join3, "Merge2");
+
+        // The template file should now have Merge2 as class name and Merge${i} in annotation
+        String templateText = templatePsiFile.getText();
+        assertTrue("Template class should be renamed to Merge2",
+                templateText.contains("class Merge2"));
+        assertTrue("Annotation className should be updated to Merge${i}",
+                templateText.contains("className=\"Merge${i}\""));
+    }
+
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
         com.intellij.openapi.vfs.VirtualFile generatedFile =
                 myFixture.getTempDirFixture().createFile(

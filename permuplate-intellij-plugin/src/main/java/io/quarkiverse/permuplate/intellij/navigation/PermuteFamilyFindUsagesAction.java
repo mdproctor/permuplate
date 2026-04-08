@@ -91,6 +91,9 @@ public class PermuteFamilyFindUsagesAction extends AnAction {
      * Collects counterpart members from all other classes in the permutation family.
      * The containing class (primary) is excluded; all other template + generated siblings
      * are included if a matching member can be found by name.
+     *
+     * Strategy: try the fast FileBasedIndex lookup first; fall back to direct PSI
+     * annotation inspection when the index is not yet populated (e.g. in tests).
      */
     @NotNull
     static List<PsiElement> collectFamilySiblings(@NotNull PsiMember member) {
@@ -110,17 +113,26 @@ public class PermuteFamilyFindUsagesAction extends AnAction {
         List<String> generatedNames;
 
         if (PermuteFileDetector.isTemplate(containingClass)) {
+            // Fast path: use FileBasedIndex forward lookup
             PermuteTemplateData data = PermuteFileDetector.templateDataFor(containingName, project);
             if (data == null) return List.of();
             templateName = containingName;
             generatedNames = data.generatedNames;
         } else {
-            // In a generated class — look up its template via the reverse index
-            templateName = PermuteFileDetector.templateNameFor(containingName, project);
-            if (templateName == null) return List.of();
-            PermuteTemplateData data = PermuteFileDetector.templateDataFor(templateName, project);
-            if (data == null) return List.of();
-            generatedNames = data.generatedNames;
+            // Check if the class has a @Permute annotation via PSI (fallback when index not ready)
+            PsiAnnotation permuteAnn = findPermuteAnnotation(containingClass);
+            if (permuteAnn != null) {
+                templateName = containingName;
+                generatedNames = computeGeneratedNamesFromAnnotation(permuteAnn);
+                if (generatedNames.isEmpty()) return List.of();
+            } else {
+                // In a generated class — look up its template via the reverse index
+                templateName = PermuteFileDetector.templateNameFor(containingName, project);
+                if (templateName == null) return List.of();
+                PermuteTemplateData data = PermuteFileDetector.templateDataFor(templateName, project);
+                if (data == null) return List.of();
+                generatedNames = data.generatedNames;
+            }
         }
 
         // All family class names except the one we're already in
@@ -143,9 +155,9 @@ public class PermuteFamilyFindUsagesAction extends AnAction {
     }
 
     @Nullable
-    private static PsiElement findMatchingMember(@NotNull PsiClass cls,
-                                                  @NotNull String memberName,
-                                                  @NotNull PsiMember original) {
+    static PsiElement findMatchingMember(@NotNull PsiClass cls,
+                                          @NotNull String memberName,
+                                          @NotNull PsiMember original) {
         String baseName = stripTrailingDigits(memberName);
         if (original instanceof PsiMethod) {
             for (PsiMethod m : cls.getMethods()) {
@@ -160,9 +172,48 @@ public class PermuteFamilyFindUsagesAction extends AnAction {
         return null;
     }
 
-    private static String stripTrailingDigits(@NotNull String name) {
+    static String stripTrailingDigits(@NotNull String name) {
         int i = name.length();
         while (i > 0 && Character.isDigit(name.charAt(i - 1))) i--;
         return name.substring(0, i);
+    }
+
+    // --- PSI-annotation fallback helpers (used when FileBasedIndex is not yet populated) ---
+
+    @Nullable
+    private static PsiAnnotation findPermuteAnnotation(@NotNull PsiClass cls) {
+        for (PsiAnnotation ann : cls.getAnnotations()) {
+            PsiJavaCodeReferenceElement ref = ann.getNameReferenceElement();
+            if (ref != null && "Permute".equals(ref.getReferenceName())) return ann;
+        }
+        return null;
+    }
+
+    @NotNull
+    private static List<String> computeGeneratedNamesFromAnnotation(@NotNull PsiAnnotation ann) {
+        String varName = getStringAttr(ann, "varName");
+        String className = getStringAttr(ann, "className");
+        int from = getIntAttr(ann, "from", 1);
+        int to = getIntAttr(ann, "to", 1);
+        if (varName == null || className == null) return List.of();
+        String placeholder = "${" + varName + "}";
+        List<String> names = new ArrayList<>(Math.max(0, to - from + 1));
+        for (int v = from; v <= to; v++) {
+            names.add(className.replace(placeholder, String.valueOf(v)));
+        }
+        return names;
+    }
+
+    @Nullable
+    private static String getStringAttr(@NotNull PsiAnnotation ann, @NotNull String attr) {
+        PsiAnnotationMemberValue v = ann.findAttributeValue(attr);
+        if (v instanceof PsiLiteralExpression lit && lit.getValue() instanceof String s) return s;
+        return null;
+    }
+
+    private static int getIntAttr(@NotNull PsiAnnotation ann, @NotNull String attr, int def) {
+        PsiAnnotationMemberValue v = ann.findAttributeValue(attr);
+        if (v instanceof PsiLiteralExpression lit && lit.getValue() instanceof Integer i) return i;
+        return def;
     }
 }
