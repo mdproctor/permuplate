@@ -183,7 +183,7 @@ A persistent `FileBasedIndex` maps templates to their generated families. All pl
 | **PermuteTemplateIndex** | `fileBasedIndex` | all (shared foundation) |
 | **AnnotationStringRenameProcessor** | `renamePsiElementProcessor` | 1, 2, 3, 4, 11 |
 | **GeneratedFileRenameHandler** | `renameHandler` (high priority) | 2 (reverse rename block) |
-| **PermuteFamilyFindUsagesHandlerFactory** | `findUsagesHandlerFactory` | 7 |
+| **PermuteFamilyFindUsagesAction** | `<actions>` (EditorPopupMenu, ProjectViewPopupMenu) | 7 |
 | **PermuteMethodNavigator** | `gotoDeclarationHandler` | 5 |
 | **PermuteSafeDeleteDelegate** | `refactoring.safeDeleteProcessor` | 8 |
 | **GeneratedFileNotification** | `editorNotificationProvider` | 9 |
@@ -219,11 +219,23 @@ User renames Join2 → Merge2
 ### Rename Flow (generated side)
 
 ```
-User presses Shift+F6 inside Join3.java (target/generated-sources/)
+User presses Shift+F6 on a class inside Join3.java (target/generated-sources/)
+  → GeneratedFileRenameHandler.isAvailableOnDataContext()
+      → isPermuteManagedFile() checks index: is "Join3" a known generated class?
+      → YES → returns false (handler steps aside — no block dialog)
+  → Standard rename flow runs
+  → AnnotationStringRenameProcessor.substituteElementToRename(Join3, editor)
+      → fast path: FileBasedIndex reverse lookup "Join3" → "Join2"
+      → fallback: PSI scan for @Permute annotation producing "Join3"
+      → returns Join2 (template class)
+  → IntelliJ renames Join2 (not Join3) with user's new name
+  → prepareRenaming(Join2, "Merge2") updates annotation strings
+  → next build regenerates Merge3…Merge5
+
+For non-Permuplate generated files (no known template in index):
   → GeneratedFileRenameHandler.isAvailableOnDataContext() → true
   → Dialog: "Join3.java is generated from Join2.java. Rename there instead?"
   → [Go to Template] → opens Join2.java at corresponding element
-  → rename proceeds normally through AnnotationStringRenameProcessor
 ```
 
 ### NeedsDisambiguation
@@ -253,12 +265,88 @@ Generated files regenerate into the correct new package automatically. The real 
 
 ---
 
-## Algorithm Porting Note (VS Code)
+## VS Code Extension — Porting Guide
 
-The VS Code extension requires a TypeScript port of this module. The port must:
+### Algorithm Port (TypeScript)
+
+The extension needs a TypeScript port of `permuplate-ide-support`. The port must:
 - Implement `parse()`, `matches()`, `computeRename()`, `validate()` with identical semantics
 - Ship matching Jest tests for every case covered by `AnnotationStringAlgorithmTest.java`
-- Be the single source of truth for VS Code — no divergence from the Java reference implementation
-- Bug fixes must be applied to both implementations simultaneously with matching tests in both
+- Be the single source of truth — no divergence from the Java reference
+- Bug fixes applied to both implementations simultaneously with matching tests in both
 
 The port lives at `permuplate-vscode/src/algorithm.ts` (directory does not exist yet).
+
+Start here: the Java source is in `permuplate-ide-support/src/main/java/io/quarkiverse/permuplate/ide/`.
+The tests that define expected behaviour: `permuplate-tests/src/test/java/io/quarkiverse/permuplate/` — specifically `AnnotationStringAlgorithmTest.java` in `permuplate-ide-support/src/test/`.
+
+### Index Equivalent (no FileBasedIndex in VS Code)
+
+IntelliJ uses `FileBasedIndex` (persistent, incremental). VS Code needs an equivalent:
+
+**Option A — Language Server (recommended):** Implement a small Java Language Server (LSP) using `eclipse.jdt.ls` or a custom LSP that leverages the existing `PermuteTemplateIndex` logic. The client-side TypeScript extension communicates via LSP.
+
+**Option B — in-process workspace scan:** On extension activation (and on file-save), scan all `.java` files in the workspace for `@Permute` annotations using a regex pre-filter (same as `containsPermute()` in the indexers). Build an in-memory map:
+```typescript
+// Forward: templateName → { varName, from, to, classNameTemplate, generatedNames[], templateFilePath }
+// Reverse: generatedName → templateName
+```
+Re-scan on `workspace.onDidSaveTextDocument` when the saved file contains `@Permute`. This is O(changed files) on save — acceptable for most projects.
+
+**Option B is the right starting point.** It needs no Java tooling, works immediately, and the scan logic mirrors `PermuteGeneratedIndex.getIndexer()` almost line-for-line.
+
+### Feature Priority for VS Code
+
+Not all 11 interaction points are equally valuable or equally feasible:
+
+| Priority | # | Feature | VS Code API | Notes |
+|---|---|---|---|---|
+| **P1** | 3, 4 | Annotation string rename (className=, type=, name=) | `vscode.languages.registerRenameProvider` | Core value prop. Triggered on class/member rename. |
+| **P1** | 11 | Same for `@PermuteTypeParam` name | same rename provider | Same provider, same algorithm. |
+| **P2** | 1, 2 | Rename ripple template↔generated | rename provider + `substituteElementToRename` equivalent | VS Code rename providers can redirect; harder to hook cleanly. |
+| **P2** | 3, 4 | Validation squiggles (R2/R3/R4) | `vscode.languages.createDiagnosticCollection` | Run `validate()` on annotation string literals. |
+| **P3** | 7 | Find family usages | `vscode.commands.registerCommand` + right-click | Custom command, show in References panel. |
+| **P3** | 5 | Go-to template method | `vscode.languages.registerDefinitionProvider` | Navigate from `@PermuteMethod` sentinel. |
+| **P4** | 9 | Generated file banner | `vscode.window.showInformationMessage` on open | Simple — check file path for `generated-sources`. |
+| **P4** | 8 | Safe delete warning | Not a direct VS Code concept — show warning dialog on delete | `workspace.onDidDeleteFiles` with undo prompt. |
+| **Low** | 6 | Boundary omission warning | `DiagnosticCollection` | Requires evaluating `@PermuteReturn` / `@PermuteMethod` range expressions. Complex. |
+| **Low** | 10 | Package move | Not a VS Code concept | Java refactoring only. Skip. |
+
+**Recommended first milestone:** P1 rename provider only. This is the feature users hit most and it directly uses the TypeScript algorithm port.
+
+### VS Code Rename Provider — How It Works
+
+```typescript
+// Triggered when user renames a Java symbol:
+vscode.languages.registerRenameProvider('java', {
+    provideRenameEdits(document, position, newName, token) {
+        // 1. Find the symbol at position (class name, field, method)
+        // 2. Look up in workspace index: is this symbol in a Permuplate template?
+        // 3. For each annotation string in the template file:
+        //      const template = parse(annotationStringValue);
+        //      const result = computeRename(template, oldName, newName);
+        //      if result is Updated: add WorkspaceEdit for the string literal
+        //      if result is NeedsDisambiguation: prompt user (QuickPick or InputBox)
+        // 4. Return WorkspaceEdit with all annotation string updates
+    }
+});
+```
+
+The `WorkspaceEdit` merges with IntelliJ's Java rename atomically (VS Code 1.75+). If using the Java extension's LSP, hook `client.onRequest('workspace/applyEdit', ...)`.
+
+### Disambiguation Dialog
+
+`computeRename()` can return `NeedsDisambiguation(affectedLiterals)`. In VS Code:
+- Use `vscode.window.showQuickPick()` to list affected strings
+- Pre-fill with best-guess values (same logic as IntelliJ's `DisambiguationDialog`)
+- User selects which strings to update
+
+### Generated File Detection
+
+Same as IntelliJ: check if `document.uri.fsPath` contains `target/generated-sources`. No index needed.
+
+### What NOT to Port
+
+- `expandStringConstants()` — only needed by the annotation processor (Maven plugin), not for IDE tooling
+- The `NeedsDisambiguation` dialog is a nice-to-have; ship the `Updated` path first
+- Boundary omission inspection requires evaluating JEXL expressions — skip until later
