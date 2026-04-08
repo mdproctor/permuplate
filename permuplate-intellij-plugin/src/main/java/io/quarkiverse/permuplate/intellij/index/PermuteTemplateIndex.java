@@ -20,15 +20,6 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
     public static final ID<String, PermuteTemplateData> NAME =
             ID.create("permuplate.template.forward");
 
-    private static final String PERMUTE_FQN =
-            "io.quarkiverse.permuplate.Permute";
-    private static final String PERMUTE_SIMPLE = "Permute";
-    private static final Set<String> MEMBER_ANNOTATION_FQNS = Set.of(
-            "io.quarkiverse.permuplate.PermuteDeclr",
-            "io.quarkiverse.permuplate.PermuteParam",
-            "io.quarkiverse.permuplate.PermuteTypeParam",
-            "io.quarkiverse.permuplate.PermuteMethod"
-    );
     private static final Set<String> MEMBER_ANNOTATION_SIMPLE_NAMES = Set.of(
             "PermuteDeclr", "PermuteParam", "PermuteTypeParam", "PermuteMethod"
     );
@@ -39,12 +30,17 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
     public @NotNull DataIndexer<String, PermuteTemplateData, FileContent> getIndexer() {
         return inputData -> {
             Map<String, PermuteTemplateData> result = new HashMap<>();
+
+            // Cheap text pre-filter — avoids PSI for files that can't possibly be templates
+            CharSequence text = inputData.getContentAsText();
+            if (!containsPermute(text)) return result;
+
             PsiFile psiFile = inputData.getPsiFile();
             if (!(psiFile instanceof PsiJavaFile javaFile)) return result;
 
             for (PsiClass cls : javaFile.getClasses()) {
-                if (cls.isAnnotationType()) continue; // skip annotation declarations (e.g. Permute.java itself)
-                PsiAnnotation permute = findAnnotation(cls, PERMUTE_FQN, PERMUTE_SIMPLE);
+                if (cls.isAnnotationType()) continue;
+                PsiAnnotation permute = findPermuteAnnotation(cls);
                 if (permute == null) continue;
 
                 String templateName = cls.getName();
@@ -69,20 +65,22 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
 
     // --- helpers ---
 
+    /** Cheap substring check — avoids PSI for 99% of project files. */
+    private static boolean containsPermute(CharSequence text) {
+        String s = text.toString();
+        return s.contains("@Permute") || s.contains("@io.quarkiverse.permuplate.Permute");
+    }
+
     /**
-     * Find an annotation on the given element by FQN, with fallback to simple name.
-     * The fallback handles projects where the annotation JAR is not yet on the
-     * compile classpath — PSI cannot resolve the import to a FQN in that case,
-     * so {@code getQualifiedName()} returns only the simple name.
+     * Find @Permute by simple name via source text reference element.
+     * Avoids getQualifiedName() / getAnnotation(fqn) which trigger FQN resolution
+     * and can cause recursive index reads from within the indexer.
      */
-    private static @org.jetbrains.annotations.Nullable PsiAnnotation findAnnotation(
-            PsiModifierListOwner owner, String fqn, String simpleName) {
-        PsiAnnotation direct = owner.getAnnotation(fqn);
-        if (direct != null) return direct;
-        // Fallback: scan annotations by name string to handle unresolved imports
-        for (PsiAnnotation ann : owner.getAnnotations()) {
-            String name = ann.getQualifiedName();
-            if (fqn.equals(name) || simpleName.equals(name)) return ann;
+    @org.jetbrains.annotations.Nullable
+    private static PsiAnnotation findPermuteAnnotation(PsiClass cls) {
+        for (PsiAnnotation ann : cls.getAnnotations()) {
+            PsiJavaCodeReferenceElement ref = ann.getNameReferenceElement();
+            if (ref != null && "Permute".equals(ref.getReferenceName())) return ann;
         }
         return null;
     }
@@ -113,14 +111,14 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
     }
 
     /** Collect all string attribute values from @PermuteDeclr / @PermuteParam /
-     *  @PermuteTypeParam / @PermuteMethod on class members. */
+     *  @PermuteTypeParam / @PermuteMethod on class members.
+     *  Uses simple name matching to avoid FQN resolution in the indexer. */
     private static List<String> collectMemberAnnotationStrings(PsiClass cls) {
         List<String> strings = new ArrayList<>();
         for (PsiMember member : getAllMembers(cls)) {
             for (PsiAnnotation ann : member.getAnnotations()) {
-                String annName = ann.getQualifiedName();
-                if (!MEMBER_ANNOTATION_FQNS.contains(annName)
-                        && !MEMBER_ANNOTATION_SIMPLE_NAMES.contains(annName)) continue;
+                PsiJavaCodeReferenceElement ref = ann.getNameReferenceElement();
+                if (ref == null || !MEMBER_ANNOTATION_SIMPLE_NAMES.contains(ref.getReferenceName())) continue;
                 for (PsiNameValuePair pair : ann.getParameterList().getAttributes()) {
                     if (pair.getValue() instanceof PsiLiteralExpression lit
                             && lit.getValue() instanceof String s
@@ -149,7 +147,7 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
         return PermuteTemplateDataExternalizer.INSTANCE;
     }
 
-    @Override public int getVersion() { return 2; }
+    @Override public int getVersion() { return 3; }
 
     @Override public @NotNull FileBasedIndex.InputFilter getInputFilter() {
         return (VirtualFile file) -> "java".equals(file.getExtension());
