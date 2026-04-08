@@ -2,6 +2,7 @@ package io.quarkiverse.permuplate.intellij.rename;
 
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
@@ -23,7 +24,23 @@ public class GeneratedFileRenameHandler implements RenameHandler {
     @Override
     public boolean isAvailableOnDataContext(@NotNull DataContext dataContext) {
         VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(dataContext);
-        return file != null && PermuteFileDetector.isGeneratedFile(file);
+        if (file == null || !PermuteFileDetector.isGeneratedFile(file)) return false;
+        // Permuplate-managed generated files are handled silently by
+        // AnnotationStringRenameProcessor.substituteElementToRename() — no block dialog needed.
+        Project project = CommonDataKeys.PROJECT.getData(dataContext);
+        if (project != null && isPermuteManagedFile(project, file)) return false;
+        return true;
+    }
+
+    private static boolean isPermuteManagedFile(@NotNull Project project, @NotNull VirtualFile file) {
+        return ReadAction.compute(() -> {
+            PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+            if (!(psiFile instanceof PsiJavaFile javaFile)) return false;
+            PsiClass[] classes = javaFile.getClasses();
+            if (classes.length == 0) return false;
+            String className = classes[0].getName();
+            return className != null && PermuteFileDetector.templateNameFor(className, project) != null;
+        });
     }
 
     @Override

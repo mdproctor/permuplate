@@ -1,8 +1,12 @@
 package io.quarkiverse.permuplate.intellij.rename;
 
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiJavaFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 
@@ -96,6 +100,33 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         assertNotNull(join2);
         assertTrue("Expected type=\"Task${i}\" in Join2.java but got:\n" + join2.getText(),
                 join2.getText().contains("type=\"Task${i}\""));
+    }
+
+    public void testSubstituteElementToRenameRedirectsGeneratedToTemplate() throws Exception {
+        // Template file — will be scanned by PermuteGeneratedIndex, mapping "Join3".."Join5" → "Join2"
+        myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {}");
+
+        // Generated file lives under target/generated-sources so isGeneratedFile() returns true
+        VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Join3.java",
+                "package io.example;\npublic class Join3 {}");
+
+        PsiFile generatedPsiFile = PsiManager.getInstance(getProject()).findFile(generatedVFile);
+        assertNotNull(generatedPsiFile);
+        assertTrue(generatedPsiFile instanceof PsiJavaFile);
+        PsiClass join3 = ((PsiJavaFile) generatedPsiFile).getClasses()[0];
+        assertEquals("Join3", join3.getName());
+
+        AnnotationStringRenameProcessor processor = new AnnotationStringRenameProcessor();
+        PsiElement substituted = processor.substituteElementToRename(join3, null);
+
+        assertNotNull("substituteElementToRename must not return null", substituted);
+        assertTrue("Expected redirect to a PsiClass", substituted instanceof PsiClass);
+        assertEquals("Expected redirect to Join2 template", "Join2", ((PsiClass) substituted).getName());
     }
 
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
