@@ -30,6 +30,8 @@ permuplate-parent/
 ├── permuplate-apt-examples/    APT examples (renamed from permuplate-example)
 ├── permuplate-mvn-examples/    Maven plugin examples with Handlers inline demo
 └── permuplate-tests/           Unit tests via Google compile-testing
+
+permuplate-intellij-plugin/     IntelliJ plugin (Gradle, Java 17) — NOT aggregated into Maven parent
 ```
 
 The processor module uses `-proc:none` to prevent self-invocation during its own compilation. The apt-examples and test modules must list the processor **and its transitive deps** (javaparser-core, commons-jexl3) explicitly under `annotationProcessorPaths` — `maven-compiler-plugin` 3.x does not auto-discover them.
@@ -39,6 +41,15 @@ Maven is at `/opt/homebrew/bin/mvn`. The standard build command is:
 ```bash
 /opt/homebrew/bin/mvn clean install
 ```
+
+The IntelliJ plugin uses a separate Gradle build. From `permuplate-intellij-plugin/`:
+
+```bash
+./gradlew test          # run plugin tests (17 tests)
+./gradlew buildPlugin   # produce installable zip in build/distributions/
+```
+
+Requires Maven modules built first (`mvn install`) — the plugin depends on `permuplate-ide-support` and `permuplate-annotations` jars from `target/`. IntelliJ's internal compiler does not support the `Trees` API — enable **Delegate IDE build/run actions to Maven** in IntelliJ settings (Build, Execution, Deployment → Build Tools → Maven → Runner).
 
 ---
 
