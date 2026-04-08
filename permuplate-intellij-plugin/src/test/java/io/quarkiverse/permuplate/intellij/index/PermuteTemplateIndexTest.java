@@ -41,7 +41,7 @@ public class PermuteTemplateIndexTest extends BasePlatformTestCase {
     public void testForwardIndexContainsTemplate() {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
@@ -61,7 +61,7 @@ public class PermuteTemplateIndexTest extends BasePlatformTestCase {
     public void testReverseIndexMapsGeneratedToTemplate() {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
@@ -86,7 +86,7 @@ public class PermuteTemplateIndexTest extends BasePlatformTestCase {
     public void testMemberAnnotationStringsCollected() {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +

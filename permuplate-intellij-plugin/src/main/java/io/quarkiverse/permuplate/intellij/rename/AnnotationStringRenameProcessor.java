@@ -40,11 +40,11 @@ import java.util.*;
 public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
 
     private static final Set<String> ALL_ANNOTATION_FQNS = Set.of(
-            "io.quarkiverse.permuplate.annotations.Permute",
-            "io.quarkiverse.permuplate.annotations.PermuteDeclr",
-            "io.quarkiverse.permuplate.annotations.PermuteParam",
-            "io.quarkiverse.permuplate.annotations.PermuteTypeParam",
-            "io.quarkiverse.permuplate.annotations.PermuteMethod"
+            "io.quarkiverse.permuplate.Permute",
+            "io.quarkiverse.permuplate.PermuteDeclr",
+            "io.quarkiverse.permuplate.PermuteParam",
+            "io.quarkiverse.permuplate.PermuteTypeParam",
+            "io.quarkiverse.permuplate.PermuteMethod"
     );
 
     /**

@@ -27,14 +27,14 @@ import java.util.Set;
 public class PermuteMethodNavigator implements GotoDeclarationHandler {
 
     private static final Set<String> ALL_ANNOTATION_FQNS = Set.of(
-            "io.quarkiverse.permuplate.annotations.Permute",
-            "io.quarkiverse.permuplate.annotations.PermuteDeclr",
-            "io.quarkiverse.permuplate.annotations.PermuteParam",
-            "io.quarkiverse.permuplate.annotations.PermuteTypeParam",
-            "io.quarkiverse.permuplate.annotations.PermuteMethod",
-            "io.quarkiverse.permuplate.annotations.PermuteVar",
-            "io.quarkiverse.permuplate.annotations.PermuteReturn",
-            "io.quarkiverse.permuplate.annotations.PermuteExtends"
+            "io.quarkiverse.permuplate.Permute",
+            "io.quarkiverse.permuplate.PermuteDeclr",
+            "io.quarkiverse.permuplate.PermuteParam",
+            "io.quarkiverse.permuplate.PermuteTypeParam",
+            "io.quarkiverse.permuplate.PermuteMethod",
+            "io.quarkiverse.permuplate.PermuteVar",
+            "io.quarkiverse.permuplate.PermuteReturn",
+            "io.quarkiverse.permuplate.PermuteExtends"
     );
 
     @Override

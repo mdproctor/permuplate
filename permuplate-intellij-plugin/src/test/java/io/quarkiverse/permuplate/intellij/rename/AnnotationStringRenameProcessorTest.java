@@ -11,7 +11,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
     public void testClassRenameUpdatesClassNameAttribute() {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join<caret>2 {}");
 
@@ -19,7 +19,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
 
         myFixture.checkResult(
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Merge${i}\")\n" +
                 "public class Merge2 {}");
     }
@@ -27,7 +27,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
     public void testFieldRenameUpdatesPermuteDeclrName() {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +
@@ -38,7 +38,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
 
         myFixture.checkResult(
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Callable${i}\", name=\"d${i}\")\n" +
@@ -49,7 +49,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
     public void testMethodRenameUpdatesPermuteMethodName() {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteMethod(varName=\"j\", to=\"${i-1}\", name=\"join${j}\")\n" +
@@ -60,7 +60,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
 
         myFixture.checkResult(
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteMethod(varName=\"j\", to=\"${i-1}\", name=\"merge${j}\")\n" +
@@ -71,13 +71,13 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
     public void testCrossFileAnnotationStringUpdatedOnFamilyRename() {
         myFixture.addFileToProject("Callable2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=10, className=\"Callable${i}\")\n" +
                 "public interface Callable2 {}");
 
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +

@@ -26,7 +26,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         myFixture.enableInspections(new AnnotationStringInspection());
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {}");
         List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
@@ -38,7 +38,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         myFixture.enableInspections(new AnnotationStringInspection());
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"${i}\")\n" +
                 "public class Join2 {}");
         List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
@@ -53,7 +53,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         myFixture.enableInspections(new AnnotationStringInspection());
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Foo${i}\")\n" +
                 "public class Join2 {}");
         List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
@@ -69,7 +69,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         // className="Bar${i}" on class Join2 — "Bar" not in "Join2" → stale
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Bar${i}\")\n" +
                 "public class Join2 {}");
         List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
@@ -85,7 +85,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         // to="${i-1}" with outer from=1 → subtracted(1) >= outerFrom(1) → empty range at i=1
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
                 "@Permute(varName=\"i\", from=1, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteMethod(varName=\"j\", from=\"1\", to=\"${i-1}\")\n" +

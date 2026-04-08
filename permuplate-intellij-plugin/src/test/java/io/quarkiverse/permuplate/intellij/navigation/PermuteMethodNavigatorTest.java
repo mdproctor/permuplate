@@ -10,13 +10,13 @@ public class PermuteMethodNavigatorTest extends BasePlatformTestCase {
     public void testAnnotationStringLiteralNavigatesToTemplateClass() {
         myFixture.addFileToProject("Callable2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.Permute;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
                 "@Permute(varName=\"i\", from=3, to=10, className=\"Callable${i}\")\n" +
                 "public interface Callable2 {}");
 
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
-                "import io.quarkiverse.permuplate.annotations.*;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
                 "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Call<caret>able${i}\", name=\"c${i}\")\n" +

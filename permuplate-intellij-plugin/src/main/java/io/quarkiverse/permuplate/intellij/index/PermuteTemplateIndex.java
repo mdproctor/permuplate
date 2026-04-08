@@ -21,13 +21,13 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
             ID.create("permuplate.template.forward");
 
     private static final String PERMUTE_FQN =
-            "io.quarkiverse.permuplate.annotations.Permute";
+            "io.quarkiverse.permuplate.Permute";
     private static final String PERMUTE_SIMPLE = "Permute";
     private static final Set<String> MEMBER_ANNOTATION_FQNS = Set.of(
-            "io.quarkiverse.permuplate.annotations.PermuteDeclr",
-            "io.quarkiverse.permuplate.annotations.PermuteParam",
-            "io.quarkiverse.permuplate.annotations.PermuteTypeParam",
-            "io.quarkiverse.permuplate.annotations.PermuteMethod"
+            "io.quarkiverse.permuplate.PermuteDeclr",
+            "io.quarkiverse.permuplate.PermuteParam",
+            "io.quarkiverse.permuplate.PermuteTypeParam",
+            "io.quarkiverse.permuplate.PermuteMethod"
     );
     private static final Set<String> MEMBER_ANNOTATION_SIMPLE_NAMES = Set.of(
             "PermuteDeclr", "PermuteParam", "PermuteTypeParam", "PermuteMethod"

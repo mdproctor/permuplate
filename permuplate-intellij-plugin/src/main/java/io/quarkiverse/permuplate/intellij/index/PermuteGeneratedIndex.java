@@ -25,7 +25,7 @@ public class PermuteGeneratedIndex extends FileBasedIndexExtension<String, Strin
             ID.create("permuplate.template.reverse");
 
     private static final String PERMUTE_FQN =
-            "io.quarkiverse.permuplate.annotations.Permute";
+            "io.quarkiverse.permuplate.Permute";
     private static final String PERMUTE_SIMPLE = "Permute";
 
     @Override public @NotNull ID<String, String> getName() { return NAME; }
