@@ -22,8 +22,6 @@
             order="first"/>
         <gotoDeclarationHandler
             implementation="io.quarkiverse.permuplate.intellij.navigation.PermuteMethodNavigator"/>
-        <findUsagesHandlerFactory
-            implementation="io.quarkiverse.permuplate.intellij.navigation.PermuteFamilyFindUsagesHandlerFactory"/>
         <editorNotificationProvider
             implementation="io.quarkiverse.permuplate.intellij.editor.GeneratedFileNotification"/>
         <safeDeleteProcessorDelegate
@@ -55,4 +53,14 @@
             level="WARNING"
             implementationClass="io.quarkiverse.permuplate.intellij.inspection.BoundaryOmissionInspection"/>
     </extensions>
+
+    <actions>
+        <action id="Permuplate.FamilyFindUsages"
+                class="io.quarkiverse.permuplate.intellij.navigation.PermuteFamilyFindUsagesAction"
+                text="Find Usages in Permutation Family"
+                description="Find usages of this element across all permutation siblings">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="FindUsages"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="FindUsages"/>
+        </action>
+    </actions>
 </idea-plugin>
