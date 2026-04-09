@@ -71,4 +71,61 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         assertTrue("Expected PsiClass redirect", result instanceof PsiClass);
         assertEquals("Expected Join2", "Join2", ((PsiClass) result).getName());
     }
+
+    public void testResolvesGeneratedMethodToTemplateMethod() throws Exception {
+        myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    public void join2() {}\n" +
+                "}");
+
+        VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Join3.java",
+                "package io.example;\n" +
+                "public class Join3 {\n" +
+                "    public void join3() {}\n" +
+                "}");
+
+        PsiJavaFile generatedFile = (PsiJavaFile) PsiManager.getInstance(getProject())
+                .findFile(generatedVFile);
+        PsiClass join3 = generatedFile.getClasses()[0];
+        PsiMethod join3Method = join3.getMethods()[0];
+        assertEquals("join3", join3Method.getName());
+
+        PsiElement result = PermuteElementResolver.resolveToTemplateElement(join3Method, null);
+
+        assertTrue("Expected PsiMethod", result instanceof PsiMethod);
+        assertEquals("Expected join2 in template", "join2", ((PsiMethod) result).getName());
+    }
+
+    public void testResolvesGeneratedFieldToTemplateField() throws Exception {
+        myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +
+                "    private Object c2;\n" +
+                "}");
+
+        VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Join3.java",
+                "package io.example;\n" +
+                "public class Join3 {\n" +
+                "    private Object c3;\n" +
+                "}");
+
+        PsiJavaFile generatedFile = (PsiJavaFile) PsiManager.getInstance(getProject())
+                .findFile(generatedVFile);
+        PsiClass join3 = generatedFile.getClasses()[0];
+        PsiField c3 = join3.getFields()[0];
+        assertEquals("c3", c3.getName());
+
+        PsiElement result = PermuteElementResolver.resolveToTemplateElement(c3, null);
+
+        assertTrue("Expected PsiField", result instanceof PsiField);
+        assertEquals("Expected c2 in template", "c2", ((PsiField) result).getName());
+    }
 }

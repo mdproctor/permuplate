@@ -138,10 +138,30 @@ public final class PermuteElementResolver {
         return null;
     }
 
-    // Placeholder — extended in Tasks 4 and 5
     @NotNull
     private static PsiElement findMatchingTemplateElement(@NotNull PsiElement element,
                                                            @NotNull PsiClass templateClass) {
-        return element; // graceful fallthrough until member resolution is added
+        if (element instanceof PsiMethod method) {
+            String name = method.getName();
+            String baseName = stripTrailingDigits(name);
+            for (PsiMethod m : templateClass.getMethods()) {
+                String mBase = stripTrailingDigits(m.getName());
+                if (name.equals(m.getName()) || baseName.equals(mBase)) return m;
+            }
+
+        } else if (element instanceof PsiField field) {
+            String name = field.getName();
+            String baseName = stripTrailingDigits(name);
+            for (PsiField f : templateClass.getFields()) {
+                String fName = f.getName();
+                if (fName == null) continue;
+                if (name.equals(fName) || baseName.equals(stripTrailingDigits(fName))) return f;
+            }
+
+        } else if (element instanceof PsiParameter) {
+            // Handled in Task 5 — falls through to graceful return below
+        }
+
+        return element; // graceful fallthrough
     }
 }
