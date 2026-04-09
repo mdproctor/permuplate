@@ -2,7 +2,7 @@
 **Date:** 2026-04-08
 **Topic:** IntelliJ plugin — feature-complete, all 11 interaction points shipped
 **Supersedes:** [2026-04-08-intellij-plugin](2026-04-08-intellij-plugin.md)
-**Superseded by:** *(leave blank — filled in if this snapshot is later superseded)*
+**Superseded by:** [2026-04-09-intellij-plugin-element-resolver](2026-04-09-intellij-plugin-element-resolver.md)
 
 ---
 

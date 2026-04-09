@@ -45,11 +45,13 @@ Maven is at `/opt/homebrew/bin/mvn`. The standard build command is:
 The IntelliJ plugin uses a separate Gradle build. From `permuplate-intellij-plugin/`:
 
 ```bash
-./gradlew test          # run plugin tests (48 tests)
+./gradlew test          # run plugin tests (56 tests)
 ./gradlew buildPlugin   # produce installable zip in build/distributions/
 ```
 
 Requires Maven modules built first (`mvn install`) — the plugin depends on `permuplate-ide-support` and `permuplate-annotations` jars from `target/`. IntelliJ's internal compiler does not support the `Trees` API — enable **Delegate IDE build/run actions to Maven** in IntelliJ settings (Build, Execution, Deployment → Build Tools → Maven → Runner).
+
+**Java 17 required for Gradle:** If the shell default JDK is Java 21+ (especially Java 26), Gradle 8.6 fails with a cryptic `JavaVersion.parse` error. Set explicitly: `JAVA_HOME=/opt/homebrew/Cellar/openjdk@17/17.0.18 ./gradlew test`
 
 ---
 
