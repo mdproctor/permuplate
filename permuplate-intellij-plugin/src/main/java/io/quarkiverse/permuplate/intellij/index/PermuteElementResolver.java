@@ -104,7 +104,8 @@ public final class PermuteElementResolver {
      * template match is found (graceful fallthrough for all cases).
      *
      * Handles: PsiClass (redirect to template class), PsiMethod and PsiField (base-name
-     * match in template). PsiParameter is a placeholder extended in Task 5.
+     * match in template), PsiParameter (two-step: find template method by base name, then
+     * find matching parameter by base name within it).
      */
     @NotNull
     public static PsiElement resolveToTemplateElement(@NotNull PsiElement element,
@@ -160,8 +161,29 @@ public final class PermuteElementResolver {
                 if (name.equals(fName) || baseName.equals(stripTrailingDigits(fName))) return f;
             }
 
-        } else if (element instanceof PsiParameter) {
-            // Handled in Task 5 — falls through to graceful return below
+        } else if (element instanceof PsiParameter param) {
+            // Find the template method by base name match on the containing generated method
+            PsiElement scope = param.getDeclarationScope();
+            if (!(scope instanceof PsiMethod generatedMethod)) return element;
+
+            String methodBaseName = stripTrailingDigits(generatedMethod.getName());
+            PsiMethod templateMethod = null;
+            for (PsiMethod m : templateClass.getMethods()) {
+                if (methodBaseName.equals(stripTrailingDigits(m.getName()))) {
+                    templateMethod = m;
+                    break;
+                }
+            }
+            if (templateMethod == null) return element;
+
+            // Find matching parameter by base name
+            String paramName = param.getName();
+            if (paramName == null) return element;
+            String paramBase = stripTrailingDigits(paramName);
+            for (PsiParameter p : templateMethod.getParameterList().getParameters()) {
+                String pName = p.getName();
+                if (pName != null && paramBase.equals(stripTrailingDigits(pName))) return p;
+            }
         }
 
         return element; // graceful fallthrough

@@ -100,6 +100,39 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         assertEquals("Expected join2 in template", "join2", ((PsiMethod) result).getName());
     }
 
+    public void testResolvesGeneratedParameterToTemplateParameter() throws Exception {
+        // Template has sentinel parameter o1 (from @PermuteParam, generates o1..o(i-1))
+        myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    public void join2(@PermuteParam(varName=\"j\", from=\"1\", to=\"${i-1}\", " +
+                "type=\"Object\", name=\"o${j}\") Object o1) {}\n" +
+                "}");
+
+        // Generated Join3 has expanded params o1, o2
+        VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Join3.java",
+                "package io.example;\n" +
+                "public class Join3 {\n" +
+                "    public void join3(Object o1, Object o2) {}\n" +
+                "}");
+
+        PsiJavaFile generatedFile = (PsiJavaFile) PsiManager.getInstance(getProject())
+                .findFile(generatedVFile);
+        PsiClass join3 = generatedFile.getClasses()[0];
+        PsiMethod join3Method = join3.getMethods()[0];
+        // o2 is the second parameter
+        PsiParameter o2 = join3Method.getParameterList().getParameters()[1];
+        assertEquals("o2", o2.getName());
+
+        PsiElement result = PermuteElementResolver.resolveToTemplateElement(o2, null);
+
+        assertTrue("Expected PsiParameter", result instanceof PsiParameter);
+        assertEquals("Expected o1 sentinel in template", "o1", ((PsiParameter) result).getName());
+    }
+
     public void testResolvesGeneratedFieldToTemplateField() throws Exception {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
