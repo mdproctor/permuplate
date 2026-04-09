@@ -17,6 +17,8 @@ import java.lang.annotation.Target;
  * <li><b>Constructor parameter</b> — the constructor body only</li>
  * <li><b>For-each loop variable</b> — the loop body only</li>
  * <li><b>Method parameter</b> — the method body only; name rename is optional</li>
+ * <li><b>Object creation expression (TYPE_USE)</b> — updates the constructor class name
+ * in {@code new @PermuteDeclr(type="X${i+1}") X${i}<>(args)} expressions</li>
  * </ul>
  *
  * <p>
@@ -55,10 +57,13 @@ import java.lang.annotation.Target;
  *
  * // Method parameter (type only — name unchanged):
  * public Object join(@PermuteDeclr(type="Source<T${i+1}>") Object src) { ... }
+ *
+ * // Object creation expression (TYPE_USE) — updates constructor class name:
+ * return new @PermuteDeclr(type="Join${i+1}First") Join3First<>(end());
  * }</pre>
  */
 @Retention(RetentionPolicy.SOURCE)
-@Target({ ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.PARAMETER })
+@Target({ ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.PARAMETER, ElementType.TYPE_USE })
 public @interface PermuteDeclr {
     String type();
 

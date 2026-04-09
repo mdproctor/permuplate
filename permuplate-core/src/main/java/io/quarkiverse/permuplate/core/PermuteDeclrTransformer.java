@@ -68,6 +68,8 @@ public class PermuteDeclrTransformer {
         transformConstFields(classDecl, ctx);
         // Local variable initializer substitution via @PermuteConst (Task 3)
         transformConstLocals(classDecl, ctx);
+        // Object creation expressions — update constructor class name via @PermuteDeclr TYPE_USE
+        transformNewExpressions(classDecl, ctx);
         // Constructor parameters (scope = constructor body)
         transformConstructorParams(classDecl, ctx, messager);
         // For-each variables (narrowest scope — loop body only)
@@ -156,6 +158,46 @@ public class PermuteDeclrTransformer {
                         varDeclExpr.getVariables().get(0).setInitializer(newInit);
                         varDeclExpr.getAnnotations().remove(ann);
                     });
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // @PermuteDeclr on ObjectCreationExpr — TYPE_USE target
+    // -------------------------------------------------------------------------
+
+    /**
+     * Walks all {@code new X<>()} expressions in method and constructor bodies.
+     * When the instantiated type carries {@code @PermuteDeclr(type="...")}, evaluates
+     * the type expression and replaces the constructor class name. The annotation is
+     * removed from the new type node. Any diamond {@code <>} or type arguments on the
+     * {@code ObjectCreationExpr} itself are preserved unchanged.
+     *
+     * <p>
+     * This enables templates like:
+     *
+     * <pre>{@code
+     * return new @PermuteDeclr(type = "Join${i+1}First") Join3First<>(end(), rule);
+     * // Generated for i=3: new Join4First<>(end(), rule)
+     * }</pre>
+     */
+    private static void transformNewExpressions(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx) {
+        classDecl.walk(com.github.javaparser.ast.expr.ObjectCreationExpr.class, newExpr -> {
+            com.github.javaparser.ast.type.ClassOrInterfaceType type = newExpr.getType();
+            if (!hasPermuteDeclr(type.getAnnotations()))
+                return;
+
+            AnnotationExpr ann = getPermuteDeclr(type.getAnnotations());
+            String[] params = extractTwoParams(ann, null);
+            if (params == null)
+                return;
+
+            String newTypeName = ctx.evaluate(params[0]);
+            // Parse as a proper ClassOrInterfaceType — handles generic types correctly
+            com.github.javaparser.ast.type.ClassOrInterfaceType newType = StaticJavaParser.parseType(newTypeName)
+                    .asClassOrInterfaceType();
+            // Replace the type; @PermuteDeclr is removed since we replaced the whole node
+            newExpr.setType(newType);
         });
     }
 

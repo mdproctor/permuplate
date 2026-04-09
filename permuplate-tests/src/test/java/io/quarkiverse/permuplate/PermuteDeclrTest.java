@@ -444,4 +444,40 @@ public class PermuteDeclrTest {
         assertThat(type.getTypeArguments().isPresent()).isTrue();
         assertThat(type.getTypeArguments().get()).hasSize(4); // Context<DS>, B, C, D
     }
+
+    // -------------------------------------------------------------------------
+    // @PermuteDeclr on ObjectCreationExpr (TYPE_USE target)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies that @PermuteDeclr(type="Join${i+1}First") placed on a new expression
+     * updates the constructor class name — enabling join() method body templates like:
+     * return new @PermuteDeclr(type="Join${i+1}First") Join3First<>(end(), rule);
+     */
+    @Test
+    public void testPermuteDeclrOnNewExpression() {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                class Join2Second {
+                    public Object join() {
+                        return new @io.quarkiverse.permuplate.PermuteDeclr(type = "Join${i+1}First")
+                                Join3First<>();
+                    }
+                }
+                """);
+        ClassOrInterfaceDeclaration classDecl = cu.getClassByName("Join2Second").orElseThrow();
+        EvaluationContext ctx = new EvaluationContext(Map.of("i", 3));
+
+        PermuteDeclrTransformer.transform(classDecl, ctx, null);
+
+        // Find the ObjectCreationExpr in the method body
+        com.github.javaparser.ast.expr.ObjectCreationExpr newExpr = classDecl
+                .getMethods().get(0).getBody().orElseThrow()
+                .findFirst(com.github.javaparser.ast.expr.ObjectCreationExpr.class)
+                .orElseThrow();
+
+        // Constructor type must be updated from Join3First to Join4First
+        assertThat(newExpr.getType().getNameAsString()).isEqualTo("Join4First");
+        // @PermuteDeclr annotation must be removed from the type
+        assertThat(newExpr.getType().getAnnotations()).isEmpty();
+    }
 }
