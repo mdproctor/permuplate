@@ -7,7 +7,7 @@
 
 ## What I was trying to achieve: write the first @Permute templates for droolsvol2
 
-droolsvol2 compiles. That's been the blocker for weeks — ~14 files still referencing `drools-core` symbols that vol2 is removing. Someone finished the refactor. The Drools migration branch in Permuplate has been waiting.
+droolsvol2 compiles. That's been the blocker since we identified the migration path a couple of days ago — ~14 files still referencing `drools-core` symbols that vol2 is removing. Someone finished the refactor. The Drools migration branch in Permuplate has been waiting.
 
 I wanted to start with the functional interfaces. Consumer, Predicate, Function are already hand-written in droolsvol2's `function` package, up to arity 4 or 5. Low surface area, no dependencies, clean patterns. Get Permuplate generating them first, then tackle the JoinNFirst/Second hierarchy.
 
