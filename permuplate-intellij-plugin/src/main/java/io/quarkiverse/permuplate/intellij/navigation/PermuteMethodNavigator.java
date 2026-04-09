@@ -10,6 +10,7 @@ import com.intellij.psi.search.PsiShortNamesCache;
 import com.intellij.util.indexing.FileBasedIndex;
 import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
+import io.quarkiverse.permuplate.intellij.index.PermuteElementResolver;
 import io.quarkiverse.permuplate.intellij.index.PermuteFileDetector;
 import io.quarkiverse.permuplate.intellij.index.PermuteTemplateData;
 import io.quarkiverse.permuplate.intellij.index.PermuteTemplateIndex;
@@ -200,10 +201,6 @@ public class PermuteMethodNavigator implements GotoDeclarationHandler {
      * E.g., "join2" → "join", "c3" → "c".
      */
     private static String stripTrailingDigits(String name) {
-        int i = name.length();
-        while (i > 0 && Character.isDigit(name.charAt(i - 1))) {
-            i--;
-        }
-        return name.substring(0, i);
+        return PermuteElementResolver.stripTrailingDigits(name);
     }
 }

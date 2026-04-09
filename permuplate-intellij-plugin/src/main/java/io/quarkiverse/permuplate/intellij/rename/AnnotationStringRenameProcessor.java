@@ -285,7 +285,8 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
 
     // --- private helpers ---
 
-    static String stripTrailingDigits(String name) {
+    @NotNull
+    static String stripTrailingDigits(@NotNull String name) {
         return PermuteElementResolver.stripTrailingDigits(name);
     }
 
