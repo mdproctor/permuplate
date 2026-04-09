@@ -327,6 +327,9 @@ public class PermuteTypeParamTransformer {
             Messager messager,
             Element element) {
         for (MethodDeclaration method : classDecl.getMethods()) {
+            // @PermuteReturn explicitly handles return type transformation — R1 does not apply.
+            if (hasPermuteReturn(method))
+                continue;
             String returnType = method.getTypeAsString();
             for (String sentinel : expandingSentinels) {
                 if (containsTypeRef(returnType, sentinel)) {
@@ -338,6 +341,13 @@ public class PermuteTypeParamTransformer {
                 }
             }
         }
+    }
+
+    private static boolean hasPermuteReturn(MethodDeclaration method) {
+        return method.getAnnotations().stream().anyMatch(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn");
+        });
     }
 
     /** True if {@code text} contains {@code typeName} as a standalone Java identifier. */

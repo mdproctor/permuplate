@@ -9,6 +9,7 @@ import java.util.List;
 
 import org.junit.Test;
 
+import com.google.testing.compile.Compilation;
 import com.google.testing.compile.Compiler;
 
 import io.quarkiverse.permuplate.example.ContextJoin2;
@@ -298,6 +299,55 @@ public class PermuteParamTest {
         // Parameters expanded correctly
         assertThat(src).contains("void test(Object fact1, Object fact2, Object fact3)");
         assertThat(src).doesNotContain("@PermuteParam");
+    }
+
+    // -------------------------------------------------------------------------
+    // @PermuteParam on a typed lambda parameter
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testLambdaParamExpansion() {
+        // negate()-style: lambda param expands AND call site inside lambda body expands.
+        // @PermuteReturn updates the return type from Pred2<A,B> to Pred3<A,B,C>.
+        // Sentinel names use "o${j}" (literal "o" satisfies R4), giving o2, o3, ... .
+        var source = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.Pred2",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        import io.quarkiverse.permuplate.PermuteParam;
+                        import io.quarkiverse.permuplate.PermuteReturn;
+                        @Permute(varName="i", from=3, to=4, className="Pred${i}")
+                        public interface Pred2<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B> {
+                            boolean test(A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="o${j}") B o2);
+
+                            @PermuteReturn(className="Pred${i}", typeArgVarName="j", typeArgFrom="1", typeArgTo="${i}", typeArgName="${alpha(j)}")
+                            default Pred2<A, B> negate() {
+                                return (A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="o${j}") B o2) -> !test(a, o2);
+                            }
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+
+        String src3 = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Pred3").orElseThrow());
+        assertThat(src3).contains("Pred3<A, B, C>");
+        assertThat(src3).contains("boolean test(A a, B o2, C o3)");
+        // Lambda params expanded; call site anchor o2 expanded to o2, o3
+        assertThat(src3).contains("(A a, B o2, C o3) -> !test(a, o2, o3)");
+        // Return type updated by @PermuteReturn
+        assertThat(src3).contains("default Pred3<A, B, C> negate()");
+
+        String src4 = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Pred4").orElseThrow());
+        assertThat(src4).contains("(A a, B o2, C o3, D o4) -> !test(a, o2, o3, o4)");
+        assertThat(src4).contains("default Pred4<A, B, C, D> negate()");
     }
 
     // -------------------------------------------------------------------------

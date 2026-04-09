@@ -13,6 +13,7 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.stmt.Statement;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.visitor.ModifierVisitor;
 import com.github.javaparser.ast.visitor.Visitable;
@@ -57,6 +58,13 @@ public class PermuteParamTransformer {
             while ((sentinel = findNextSentinel(method)) != null) {
                 transformMethod(method, sentinel, ctx, messager);
             }
+            // Lambda-level sentinels — processed after method params are done
+            method.findAll(LambdaExpr.class).forEach(lambda -> {
+                Parameter lambdaSentinel;
+                while ((lambdaSentinel = findNextLambdaSentinel(lambda)) != null) {
+                    transformLambda(lambda, lambdaSentinel, ctx, messager);
+                }
+            });
         });
     }
 
@@ -113,6 +121,56 @@ public class PermuteParamTransformer {
         expandAnchorAtCallSites(method, anchorName, generatedArgNames);
     }
 
+    private static Parameter findNextLambdaSentinel(LambdaExpr lambda) {
+        return lambda.getParameters().stream()
+                .filter(p -> hasPermuteParam(p.getAnnotations()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static void transformLambda(LambdaExpr lambda,
+            Parameter sentinel,
+            EvaluationContext ctx,
+            Messager messager) {
+        AnnotationExpr ann = getPermuteParam(sentinel.getAnnotations());
+        PermuteParamValues values = extractValues(ann, messager);
+        if (values == null)
+            return;
+
+        String anchorName = sentinel.getNameAsString();
+
+        int fromVal = ctx.evaluateInt(values.from);
+        int toVal = ctx.evaluateInt(values.to);
+
+        // Build expanded parameter list for the lambda
+        NodeList<Parameter> newParams = new NodeList<>();
+        List<String> generatedArgNames = new ArrayList<>();
+        for (int j = fromVal; j <= toVal; j++) {
+            EvaluationContext innerCtx = ctx.withVariable(values.varName, j);
+            String paramType = innerCtx.evaluate(values.type);
+            String paramName = innerCtx.evaluate(values.name);
+            newParams.add(new Parameter(new ClassOrInterfaceType(null, paramType), paramName));
+            generatedArgNames.add(paramName);
+        }
+
+        // Rebuild lambda parameter list: params before sentinel + expanded + params after
+        NodeList<Parameter> origParams = lambda.getParameters();
+        int sentinelIdx = origParams.indexOf(sentinel);
+
+        NodeList<Parameter> allParams = new NodeList<>();
+        for (int k = 0; k < sentinelIdx; k++) {
+            allParams.add(origParams.get(k).clone());
+        }
+        allParams.addAll(newParams);
+        for (int k = sentinelIdx + 1; k < origParams.size(); k++) {
+            allParams.add(origParams.get(k).clone());
+        }
+        lambda.setParameters(allParams);
+
+        // Expand anchor call sites within the lambda body only
+        expandAnchorInStatement(lambda.getBody(), anchorName, generatedArgNames);
+    }
+
     /**
      * Walks all method call expressions in the method body. When an argument list
      * contains a {@link NameExpr} whose name matches {@code anchorName}, that single
@@ -125,7 +183,17 @@ public class PermuteParamTransformer {
     private static void expandAnchorAtCallSites(MethodDeclaration method,
             String anchorName,
             List<String> generatedArgNames) {
-        method.getBody().ifPresent(body -> body.accept(new ModifierVisitor<Void>() {
+        method.getBody().ifPresent(body -> expandAnchorInStatement(body, anchorName, generatedArgNames));
+    }
+
+    /**
+     * Expands anchor call sites within any {@link Statement} node (method body or lambda body).
+     * Replaces occurrences of {@code anchorName} in argument lists of {@link MethodCallExpr} nodes.
+     */
+    private static void expandAnchorInStatement(Statement body,
+            String anchorName,
+            List<String> generatedArgNames) {
+        body.accept(new ModifierVisitor<Void>() {
             @Override
             public Visitable visit(MethodCallExpr call, Void arg) {
                 // Let the visitor descend first (handles nested calls)
@@ -150,7 +218,7 @@ public class PermuteParamTransformer {
                 call.setArguments(newArgs);
                 return call;
             }
-        }, null));
+        }, null);
     }
 
     private static int indexOfAnchor(NodeList<Expression> args, String anchorName) {
