@@ -16,9 +16,13 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.IntegerLiteralExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
+import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
+import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.stmt.ForEachStmt;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.visitor.ModifierVisitor;
@@ -51,11 +55,18 @@ public class PermuteDeclrTransformer {
     private static final String ANNOTATION_SIMPLE = "PermuteDeclr";
     private static final String ANNOTATION_FQ = "io.quarkiverse.permuplate.PermuteDeclr";
 
+    private static final String CONST_ANNOTATION_SIMPLE = "PermuteConst";
+    private static final String CONST_ANNOTATION_FQ = "io.quarkiverse.permuplate.PermuteConst";
+
     public static void transform(ClassOrInterfaceDeclaration classDecl,
             EvaluationContext ctx,
             Messager messager) {
         // Fields first (broadest scope — entire class body)
         transformFields(classDecl, ctx, messager);
+        // Field initializer substitution via @PermuteConst
+        transformConstFields(classDecl, ctx);
+        // Local variable initializer substitution via @PermuteConst (Task 3)
+        transformConstLocals(classDecl, ctx);
         // Constructor parameters (scope = constructor body)
         transformConstructorParams(classDecl, ctx, messager);
         // For-each variables (narrowest scope — loop body only)
@@ -101,6 +112,63 @@ public class PermuteDeclrTransformer {
 
             // Propagate: rename all usages of oldName in the entire class body
             renameAllUsages(classDecl, oldName, newName);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // @PermuteConst — field initializer substitution
+    // -------------------------------------------------------------------------
+
+    private static void transformConstFields(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx) {
+        classDecl.getFields().forEach(field -> {
+            field.getAnnotations().stream()
+                    .filter(PermuteDeclrTransformer::isPermuteConst)
+                    .findFirst()
+                    .ifPresent(ann -> {
+                        String expr = extractConstExpr(ann);
+                        String evaluated = ctx.evaluate(expr);
+                        Expression newInit = toExpression(evaluated);
+                        field.getVariable(0).setInitializer(newInit);
+                        field.getAnnotations().remove(ann);
+                    });
+        });
+    }
+
+    private static void transformConstLocals(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx) {
+        // Implemented in Task 3
+    }
+
+    private static boolean isPermuteConst(AnnotationExpr ann) {
+        String name = ann.getNameAsString();
+        return name.equals(CONST_ANNOTATION_SIMPLE) || name.equals(CONST_ANNOTATION_FQ);
+    }
+
+    private static String extractConstExpr(AnnotationExpr ann) {
+        if (ann instanceof SingleMemberAnnotationExpr single) {
+            return stripQuotes(single.getMemberValue().toString());
+        }
+        if (ann instanceof NormalAnnotationExpr normal) {
+            for (MemberValuePair pair : normal.getPairs()) {
+                if (pair.getNameAsString().equals("value")) {
+                    return stripQuotes(pair.getValue().toString());
+                }
+            }
+        }
+        throw new IllegalStateException("@PermuteConst missing value");
+    }
+
+    /**
+     * Converts an evaluated JEXL string to a JavaParser Expression.
+     * Integers become IntegerLiteralExpr; everything else becomes StringLiteralExpr.
+     */
+    static Expression toExpression(String evaluated) {
+        try {
+            Integer.parseInt(evaluated);
+            return new IntegerLiteralExpr(evaluated);
+        } catch (NumberFormatException e) {
+            return new StringLiteralExpr(evaluated);
         }
     }
 
