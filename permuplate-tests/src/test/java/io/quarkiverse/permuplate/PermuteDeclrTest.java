@@ -7,12 +7,20 @@ import static io.quarkiverse.permuplate.ProcessorTestSupport.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Test;
 
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.google.testing.compile.Compiler;
 import com.google.testing.compile.JavaFileObjects;
 
+import io.quarkiverse.permuplate.core.EvaluationContext;
+import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.example.CtorDeclr2;
 import io.quarkiverse.permuplate.example.DualForEach2;
 import io.quarkiverse.permuplate.example.FieldDeclr2;
@@ -391,5 +399,49 @@ public class PermuteDeclrTest {
         assertThat(src).contains("String paramA");
         assertThat(src).contains("Integer paramB");
         assertThat(src).doesNotContain("@PermuteDeclr");
+    }
+
+    // -------------------------------------------------------------------------
+    // @PermuteDeclr.type with generic type expressions — AST correctness
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies that @PermuteDeclr(type="Consumer${i+1}<Context<DS>, ${typeArgList(2, i+1, 'alpha')}>")
+     * produces a properly structured ClassOrInterfaceType in the AST — not a flat identifier
+     * whose SimpleName happens to contain angle brackets.
+     *
+     * <p>
+     * The text output (toString) of both approaches is identical, so this test checks
+     * the AST structure directly: getName() should return "Consumer4" (the class name only),
+     * and getTypeArguments() should be populated with [Context<DS>, B, C, D].
+     *
+     * <p>
+     * This tests the transformer directly (not via compile-testing) because the bug
+     * is not visible in generated source text — it only manifests in the AST node structure.
+     */
+    @Test
+    public void testPermuteDeclrGenericTypeProducesProperAst() {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                class Fn2 {
+                    public void fn(
+                        @io.quarkiverse.permuplate.PermuteDeclr(
+                            type = "Consumer${i+1}<Context<DS>, ${typeArgList(2, i+1, 'alpha')}>")
+                        Object fn3) {}
+                }
+                """);
+        ClassOrInterfaceDeclaration classDecl = cu.getClassByName("Fn2").orElseThrow();
+        EvaluationContext ctx = new EvaluationContext(Map.of("i", 3));
+
+        PermuteDeclrTransformer.transform(classDecl, ctx, null);
+
+        Parameter param = classDecl.getMethods().get(0).getParameters().get(0);
+        ClassOrInterfaceType type = param.getType().asClassOrInterfaceType();
+
+        // getName() must be the bare class name — not "Consumer4<Context<DS>, B, C, D>"
+        assertThat(type.getNameAsString()).isEqualTo("Consumer4");
+
+        // Type arguments must be in the proper AST slot, not embedded in the name
+        assertThat(type.getTypeArguments().isPresent()).isTrue();
+        assertThat(type.getTypeArguments().get()).hasSize(4); // Context<DS>, B, C, D
     }
 }

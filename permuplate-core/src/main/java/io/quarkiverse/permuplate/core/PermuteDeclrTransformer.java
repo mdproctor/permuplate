@@ -8,6 +8,7 @@ import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
 import javax.tools.Diagnostic;
 
+import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -25,7 +26,6 @@ import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.ForEachStmt;
-import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.visitor.ModifierVisitor;
 import com.github.javaparser.ast.visitor.Visitable;
 
@@ -105,7 +105,7 @@ public class PermuteDeclrTransformer {
             String oldName = declarator.getNameAsString();
 
             // Update the declaration
-            declarator.setType(new ClassOrInterfaceType(null, newType));
+            declarator.setType(StaticJavaParser.parseType(newType));
             declarator.setName(newName);
 
             // Remove the annotation
@@ -216,7 +216,7 @@ public class PermuteDeclrTransformer {
                 String newName = ctx.evaluate(params[1]);
                 String oldName = param.getNameAsString();
 
-                param.setType(new ClassOrInterfaceType(null, newType));
+                param.setType(StaticJavaParser.parseType(newType));
                 param.setName(newName);
                 param.getAnnotations().remove(ann);
 
@@ -251,7 +251,7 @@ public class PermuteDeclrTransformer {
             String oldName = varDeclExpr.getVariables().get(0).getNameAsString();
 
             // Update declaration — type lives on the VariableDeclarator in JavaParser
-            varDeclExpr.getVariables().get(0).setType(new ClassOrInterfaceType(null, newType));
+            varDeclExpr.getVariables().get(0).setType(StaticJavaParser.parseType(newType));
             varDeclExpr.getVariables().get(0).setName(newName);
 
             // Remove annotation
@@ -286,7 +286,7 @@ public class PermuteDeclrTransformer {
                 String newType = ctx.evaluate(params[0]);
                 String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]); // "" = keep original name
 
-                param.setType(new ClassOrInterfaceType(null, newType));
+                param.setType(StaticJavaParser.parseType(newType));
                 param.getAnnotations().remove(ann);
 
                 if (!newName.isEmpty()) {
@@ -319,7 +319,7 @@ public class PermuteDeclrTransformer {
                 continue;
             String newType = ctx.evaluate(params[0]);
             String newName = params[1];
-            param.setType(new ClassOrInterfaceType(null, newType));
+            param.setType(StaticJavaParser.parseType(newType));
             param.getAnnotations().remove(ann);
             if (!newName.isEmpty()) {
                 String oldName = param.getNameAsString();
