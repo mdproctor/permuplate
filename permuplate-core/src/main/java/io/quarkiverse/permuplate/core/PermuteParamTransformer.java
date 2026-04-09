@@ -322,7 +322,11 @@ public class PermuteParamTransformer {
                             return;
                         }
                         String actualName = sentinel.getNameAsString();
-                        if (!PermuteDeclrTransformer.checkAnnotationString(
+                        // Pure-variable names like "${lower(j)}" or "${alpha(j)}" generate
+                        // fresh param names unrelated to the sentinel — no prefix matching
+                        // applies. Only validate when the template has at least one literal.
+                        boolean hasliteral = !values.name.replaceAll("\\$\\{[^}]*}", "").isEmpty();
+                        if (hasliteral && !PermuteDeclrTransformer.checkAnnotationString(
                                 "@PermuteParam name", values.name, "sentinel parameter name",
                                 actualName, messager, element, stringConstants)) {
                             valid[0] = false;

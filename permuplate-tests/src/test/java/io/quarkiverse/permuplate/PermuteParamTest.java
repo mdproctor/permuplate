@@ -451,6 +451,45 @@ public class PermuteParamTest {
     }
 
     // -------------------------------------------------------------------------
+    // Pure-variable name templates — ${lower(j)} and ${alpha(j)}
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testPureVariableNameTemplate() {
+        // name="${lower(j)}" has no static literal — R4 must NOT fire.
+        // name="${alpha(j)}" same. Both should compile cleanly and generate
+        // single-letter param names: a, b, c, d.
+        var source = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.PureName2",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        import io.quarkiverse.permuplate.PermuteParam;
+                        @Permute(varName="i", from=3, to=4, className="PureName${i}")
+                        public interface PureName2<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B> {
+                            void accept(A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="${lower(j)}") B b);
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+
+        String src3 = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.PureName3").orElseThrow());
+        assertThat(src3).contains("PureName3<A, B, C>");
+        assertThat(src3).contains("void accept(A a, B b, C c)");
+
+        String src4 = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.PureName4").orElseThrow());
+        assertThat(src4).contains("PureName4<A, B, C, D>");
+        assertThat(src4).contains("void accept(A a, B b, C c, D d)");
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
