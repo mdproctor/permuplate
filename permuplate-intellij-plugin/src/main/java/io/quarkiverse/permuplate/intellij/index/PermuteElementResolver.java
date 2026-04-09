@@ -50,6 +50,9 @@ public final class PermuteElementResolver {
         }
 
         // Fallback: PSI scan
+        // Note: this scan handles only the primary varName loop.
+        // Templates with extraVars (@PermuteVar) will not be matched here;
+        // those are expected to be found via the fast path (index) in production.
         PsiManager psiManager = PsiManager.getInstance(project);
         AtomicReference<PsiClass> found = new AtomicReference<>();
 

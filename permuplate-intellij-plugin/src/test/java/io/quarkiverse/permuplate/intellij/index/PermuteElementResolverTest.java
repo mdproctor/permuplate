@@ -27,7 +27,7 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
 
     // --- findTemplateClass ---
 
-    public void testFindTemplateClassViaFallbackPsiScan() throws Exception {
+    public void testFindTemplateClassViaFallbackPsiScan() {
         // A @Permute template exists in the project
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
@@ -42,7 +42,7 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         assertEquals("Join2", template.getName());
     }
 
-    public void testFindTemplateClassReturnsNullWhenNoTemplate() throws Exception {
+    public void testFindTemplateClassReturnsNullWhenNoTemplate() {
         // No @Permute template in project
         PsiClass result = PermuteElementResolver.findTemplateClass("Unknown3", getProject());
         assertNull("No template → must return null", result);
