@@ -351,6 +351,106 @@ public class PermuteParamTest {
     }
 
     // -------------------------------------------------------------------------
+    // Block-body lambda @PermuteParam expansion
+    // -------------------------------------------------------------------------
+
+    /**
+     * Block-body lambda with {@code @PermuteParam}: the lambda parameter expands
+     * and the call site anchor is rewritten. This tests the expansion behavior
+     * for the block form (vs. expression form) of lambda.
+     */
+    @Test
+    public void testLambdaParamExpansionBlockBody() {
+        // Block-body lambda: { return !test(a, b); } — same expansion, different lambda form
+        var source = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.BlockPred2",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        import io.quarkiverse.permuplate.PermuteParam;
+                        import io.quarkiverse.permuplate.PermuteReturn;
+                        @Permute(varName="i", from=3, to=3, className="BlockPred${i}")
+                        public interface BlockPred2<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B> {
+                            boolean test(A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="o${j}") B o2);
+
+                            @PermuteReturn(className="BlockPred${i}", typeArgVarName="j", typeArgFrom="1", typeArgTo="${i}", typeArgName="${alpha(j)}")
+                            default BlockPred2<A, B> negate() {
+                                return (A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="o${j}") B o2) -> {
+                                    return !test(a, o2);
+                                };
+                            }
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.BlockPred3").orElseThrow());
+        // Lambda params expanded (block body form)
+        assertThat(src).contains("(A a, B o2, C o3)");
+        assertThat(src).contains("!test(a, o2, o3)");
+        // Return type updated by @PermuteReturn
+        assertThat(src).contains("default BlockPred3<A, B, C> negate()");
+    }
+
+    // -------------------------------------------------------------------------
+    // Method and lambda @PermuteParam in same method with independent scoping
+    // -------------------------------------------------------------------------
+
+    /**
+     * Lambda with {@code @PermuteParam} inside a method that also has its own
+     * {@code @PermuteParam}: both expand independently, using different sentinel names.
+     * This verifies that anchor expansion respects method-body scope boundaries.
+     */
+    @Test
+    public void testMethodAndLambdaParamInSameMethod() {
+        // A method with @PermuteParam and a call site inside, plus a lambda with
+        // @PermuteParam and its own call site inside the lambda.
+        var source = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.Aggregator2",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteTypeParam;
+                        import io.quarkiverse.permuplate.PermuteParam;
+                        import io.quarkiverse.permuplate.PermuteReturn;
+                        @Permute(varName="i", from=3, to=3, className="Aggregator${i}")
+                        public interface Aggregator2<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B> {
+                            boolean process(A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="o${j}") B o2);
+
+                            @PermuteReturn(className="Aggregator${i}", typeArgVarName="j", typeArgFrom="1", typeArgTo="${i}", typeArgName="${alpha(j)}")
+                            default Aggregator2<A, B> collect() {
+                                return (A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="x${j}") B x2) -> process(a, x2);
+                            }
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Aggregator3").orElseThrow());
+        // Method process param expanded with sentinel o2 → (o2, o3)
+        assertThat(src).contains("boolean process(A a, B o2, C o3)");
+        // Lambda param expanded with different sentinel x2 → (x2, x3)
+        assertThat(src).contains("(A a, B x2, C x3)");
+        // Call inside lambda uses x anchor (not o anchor)
+        assertThat(src).contains("process(a, x2, x3)");
+        // Return type updated by @PermuteReturn
+        assertThat(src).contains("default Aggregator3<A, B, C> collect()");
+        // Verify annotations removed
+        assertThat(src).doesNotContain("@PermuteParam");
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
