@@ -5,6 +5,21 @@ Promote to an ADR when ready to decide; discard when no longer relevant.
 
 ---
 
+## 2026-04-09 — Transitive constructor limitation in @PermuteDeclr TYPE_USE
+
+**Priority:** medium
+**Status:** active
+
+When `@PermuteDeclr(type="Join${i+1}First")` is placed on a `new` expression (`TYPE_USE` target), Permuplate can update the constructor class name. But if the object is produced by a helper method, factory, or conditional branch rather than a direct `new`, there is nothing to annotate — the limitation is transitive and unresolvable by annotation. The user must restructure: use reflection, a factory on `BaseRuleBuilder`, or accept that the method cannot be templated as-is.
+
+Inference (auto-detecting a direct `return new X<>()` from the `@PermuteReturn` declaration) was considered but rejected as too risky — arbitrary code paths mean silent breakage when inference guesses wrong.
+
+**Context:** Arose during brainstorming for JoinNFirst/JoinNSecond Permuplate templates (2026-04-09). The `join()` and `extensionPoint()` methods in droolsvol2's RuleBuilder both use direct `new` — so the TYPE_USE annotation works there. The limitation matters for any future method that delegates creation to a helper.
+
+**Promoted to:**
+
+---
+
 ## 2026-04-09 — Automated end-to-end tests for rename cascade in IntelliJ and VS Code
 
 **Priority:** high
