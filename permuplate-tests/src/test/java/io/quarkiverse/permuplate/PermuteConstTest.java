@@ -98,4 +98,86 @@ public class PermuteConstTest {
         assertThat(src).doesNotContain("int n = 2");
         assertThat(src).contains("return n");
     }
+
+    // -------------------------------------------------------------------------
+    // @PermuteConst + @PermuteDeclr combined on the same field
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testConstAndDeclrCombined() {
+        // @PermuteDeclr renames ARITY_2 → ARITY_3 (type+name) and propagates to return stmt
+        // @PermuteConst updates initializer 2 → 3
+        // Result: int ARITY_3 = 3;  and  return ARITY_3;
+        var source = JavaFileObjects.forSourceString(
+                "io.permuplate.example.Audit2",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteConst;
+                        import io.quarkiverse.permuplate.PermuteDeclr;
+                        @Permute(varName="i", from=3, to=4, className="Audit${i}")
+                        public class Audit2 {
+                            @PermuteDeclr(type="int", name="ARITY_${i}")
+                            @PermuteConst("${i}")
+                            int ARITY_2 = 2;
+
+                            public int getArity() {
+                                return ARITY_2;
+                            }
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+
+        String src3 = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Audit3").orElseThrow());
+        // @PermuteDeclr renamed the field and propagated usages
+        assertThat(src3).contains("int ARITY_3");
+        assertThat(src3).contains("return ARITY_3");
+        assertThat(src3).doesNotContain("ARITY_2");
+        // @PermuteConst updated the initializer
+        assertThat(src3).contains("ARITY_3 = 3");
+        assertThat(src3).doesNotContain("ARITY_3 = 2");
+
+        String src4 = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Audit4").orElseThrow());
+        assertThat(src4).contains("int ARITY_4");
+        assertThat(src4).contains("ARITY_4 = 4");
+        assertThat(src4).contains("return ARITY_4");
+    }
+
+    @Test
+    public void testConstWithoutDeclrFieldNameUnchanged() {
+        // When @PermuteConst is used alone (no @PermuteDeclr), the field name stays the same
+        // across all generated classes — only the value changes.
+        var source = JavaFileObjects.forSourceString(
+                "io.permuplate.example.Store2",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteConst;
+                        @Permute(varName="i", from=3, to=3, className="Store${i}")
+                        public interface Store2 {
+                            @PermuteConst("${i}") int ARITY = 2;
+                            default int getArity() { return ARITY; }
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Store3").orElseThrow());
+        // Name unchanged, value updated
+        assertThat(src).contains("int ARITY = 3");
+        assertThat(src).doesNotContain("int ARITY = 2");
+        assertThat(src).contains("return ARITY");
+    }
 }
