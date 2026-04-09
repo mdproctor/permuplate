@@ -5,6 +5,21 @@ Promote to an ADR when ready to decide; discard when no longer relevant.
 
 ---
 
+## 2026-04-09 — Automated end-to-end tests for rename cascade in IntelliJ and VS Code
+
+**Priority:** high
+**Status:** active
+
+When a class in a Permuplate permutation family is renamed, the cascade must ripple correctly — constructor names, call sites, type references, annotation strings. This behaviour needs automated end-to-end tests in both IntelliJ and VS Code, not just manual verification. Without them, a plugin change could silently break the cascade and only be caught when a developer hits a broken rename in a real project.
+
+Scope: IntelliJ plugin tests (already have a Gradle test suite) should include a rename-cascade scenario covering the full chain. VS Code extension tests (when the port is built) must include the same scenario from day one.
+
+**Context:** Arose during brainstorming for JoinNFirst/JoinNSecond Permuplate templates in droolsvol2 (2026-04-09). The IntelliJ rename redirect is already implemented; the cascade correctness was assumed rather than tested. VS Code port is planned but not started.
+
+**Promoted to:**
+
+---
+
 ## 2026-04-07 — IDE refactoring safety for templates and generated code
 
 **Priority:** high
