@@ -161,4 +161,34 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         assertTrue("Expected PsiField", result instanceof PsiField);
         assertEquals("Expected c2 in template", "c2", ((PsiField) result).getName());
     }
+
+    // --- negative path tests ---
+
+    public void testReturnsElementForNonGeneratedFile() {
+        // A class in src/main/java — NOT a generated file
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "public class Join2 {}");
+
+        PsiClass join2 = ((PsiJavaFile) myFixture.getFile()).getClasses()[0];
+        PsiElement result = PermuteElementResolver.resolveToTemplateElement(join2, null);
+
+        assertSame("Non-generated file: must return element unchanged", join2, result);
+    }
+
+    public void testReturnsElementWhenNoTemplateInProject() throws Exception {
+        // Generated file path, but no @Permute template exists anywhere in project
+        VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Unknown3.java",
+                "package io.example;\npublic class Unknown3 {}");
+
+        PsiClass unknown3 = ((PsiJavaFile) PsiManager.getInstance(getProject())
+                .findFile(generatedVFile)).getClasses()[0];
+
+        PsiElement result = PermuteElementResolver.resolveToTemplateElement(unknown3, null);
+
+        assertSame("No template: must return element unchanged", unknown3, result);
+    }
 }
