@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.psi.*;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import io.quarkiverse.permuplate.intellij.index.PermuteElementResolver;
 
 import java.util.List;
 
@@ -14,21 +15,21 @@ public class PermuteFamilyFindUsagesActionTest extends BasePlatformTestCase {
     // -------------------------------------------------------------------------
 
     public void testStripTrailingDigitsRemovesDigits() {
-        assertEquals("join", PermuteFamilyFindUsagesAction.stripTrailingDigits("join2"));
-        assertEquals("c",    PermuteFamilyFindUsagesAction.stripTrailingDigits("c2"));
-        assertEquals("Join", PermuteFamilyFindUsagesAction.stripTrailingDigits("Join10"));
+        assertEquals("join", PermuteElementResolver.stripTrailingDigits("join2"));
+        assertEquals("c",    PermuteElementResolver.stripTrailingDigits("c2"));
+        assertEquals("Join", PermuteElementResolver.stripTrailingDigits("Join10"));
     }
 
     public void testStripTrailingDigitsNoDigits() {
-        assertEquals("join", PermuteFamilyFindUsagesAction.stripTrailingDigits("join"));
+        assertEquals("join", PermuteElementResolver.stripTrailingDigits("join"));
     }
 
     public void testStripTrailingDigitsAllDigits() {
-        assertEquals("", PermuteFamilyFindUsagesAction.stripTrailingDigits("123"));
+        assertEquals("", PermuteElementResolver.stripTrailingDigits("123"));
     }
 
     public void testStripTrailingDigitsEmptyString() {
-        assertEquals("", PermuteFamilyFindUsagesAction.stripTrailingDigits(""));
+        assertEquals("", PermuteElementResolver.stripTrailingDigits(""));
     }
 
     // -------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import com.intellij.usageView.UsageInfo;
 import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 import io.quarkiverse.permuplate.ide.RenameResult;
+import io.quarkiverse.permuplate.intellij.index.PermuteElementResolver;
 import io.quarkiverse.permuplate.intellij.index.PermuteFileDetector;
 import io.quarkiverse.permuplate.intellij.index.PermuteTemplateData;
 import org.jetbrains.annotations.NotNull;
@@ -285,9 +286,7 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
     // --- private helpers ---
 
     static String stripTrailingDigits(String name) {
-        int i = name.length();
-        while (i > 0 && Character.isDigit(name.charAt(i - 1))) i--;
-        return name.substring(0, i);
+        return PermuteElementResolver.stripTrailingDigits(name);
     }
 
     /**

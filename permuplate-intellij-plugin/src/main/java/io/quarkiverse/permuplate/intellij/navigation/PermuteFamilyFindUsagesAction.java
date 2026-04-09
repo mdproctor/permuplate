@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.*;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.PsiShortNamesCache;
+import io.quarkiverse.permuplate.intellij.index.PermuteElementResolver;
 import io.quarkiverse.permuplate.intellij.index.PermuteFileDetector;
 import io.quarkiverse.permuplate.intellij.index.PermuteTemplateData;
 import org.jetbrains.annotations.NotNull;
@@ -158,7 +159,7 @@ public class PermuteFamilyFindUsagesAction extends AnAction {
     static PsiElement findMatchingMember(@NotNull PsiClass cls,
                                           @NotNull String memberName,
                                           @NotNull PsiMember original) {
-        String baseName = stripTrailingDigits(memberName);
+        String baseName = PermuteElementResolver.stripTrailingDigits(memberName);
         if (original instanceof PsiMethod) {
             for (PsiMethod m : cls.getMethods()) {
                 if (memberName.equals(m.getName()) || m.getName().startsWith(baseName)) return m;
@@ -170,12 +171,6 @@ public class PermuteFamilyFindUsagesAction extends AnAction {
             }
         }
         return null;
-    }
-
-    static String stripTrailingDigits(@NotNull String name) {
-        int i = name.length();
-        while (i > 0 && Character.isDigit(name.charAt(i - 1))) i--;
-        return name.substring(0, i);
     }
 
     // --- PSI-annotation fallback helpers (used when FileBasedIndex is not yet populated) ---
