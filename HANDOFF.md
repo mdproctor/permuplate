@@ -34,6 +34,7 @@ Permuplate is already wired into `droolsvol2/pom.xml` (APT mode). A `drools-migr
 |---|---|---|
 | #5/#7 | Drools migration | Active — blocked on droolsvol2 refactor |
 | #4 | VS Code extension | Open — porting guide written, not started |
+| #6 | IDE Tooling Platform (parent epic) | Open — IntelliJ done, VS Code (#4) remaining |
 | apache/incubator-kie-drools#6639 | Drools DSL main epic | Open |
 | apache/incubator-kie-drools#6638 | DSL sub-epic (#6640–#6645) | Open |
 
