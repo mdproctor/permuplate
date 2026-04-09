@@ -162,7 +162,8 @@ public final class PermuteElementResolver {
             }
 
         } else if (element instanceof PsiParameter param) {
-            // Find the template method by base name match on the containing generated method
+            // Re-derive the containing method here (getContainingClass already called it,
+            // but PsiMember.getContainingClass() is not available for PsiParameter).
             PsiElement scope = param.getDeclarationScope();
             if (!(scope instanceof PsiMethod generatedMethod)) return element;
 
