@@ -103,8 +103,8 @@ public final class PermuteElementResolver {
      * Returns the original element unchanged if it is not in a generated file or no
      * template match is found (graceful fallthrough for all cases).
      *
-     * Handles: PsiClass (redirects to template). PsiMethod, PsiField, PsiParameter
-     * redirect to the placeholder — extended in Tasks 4 and 5.
+     * Handles: PsiClass (redirect to template class), PsiMethod and PsiField (base-name
+     * match in template). PsiParameter is a placeholder extended in Task 5.
      */
     @NotNull
     public static PsiElement resolveToTemplateElement(@NotNull PsiElement element,
@@ -146,6 +146,8 @@ public final class PermuteElementResolver {
             String baseName = stripTrailingDigits(name);
             for (PsiMethod m : templateClass.getMethods()) {
                 String mBase = stripTrailingDigits(m.getName());
+                // Exact-name match first (handles methods that don't use numeric suffix).
+                // Base-name match second (e.g., "join3" base "join" matches template "join2" base "join").
                 if (name.equals(m.getName()) || baseName.equals(mBase)) return m;
             }
 
