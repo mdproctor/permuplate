@@ -103,9 +103,10 @@ public final class PermuteElementResolver {
      * Returns the original element unchanged if it is not in a generated file or no
      * template match is found (graceful fallthrough for all cases).
      *
-     * Handles: PsiClass, PsiMethod, PsiField, PsiParameter.
+     * Handles: PsiClass (redirects to template). PsiMethod, PsiField, PsiParameter
+     * redirect to the placeholder — extended in Tasks 4 and 5.
      */
-    @Nullable
+    @NotNull
     public static PsiElement resolveToTemplateElement(@NotNull PsiElement element,
                                                        @Nullable Editor editor) {
         PsiClass containingClass = getContainingClass(element);
