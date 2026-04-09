@@ -23,6 +23,7 @@ import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
+import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.ForEachStmt;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.visitor.ModifierVisitor;
@@ -137,7 +138,25 @@ public class PermuteDeclrTransformer {
 
     private static void transformConstLocals(ClassOrInterfaceDeclaration classDecl,
             EvaluationContext ctx) {
-        // Implemented in Task 3
+        // Walk all method and constructor bodies looking for annotated local variable declarations.
+        // VariableDeclarationExpr covers local vars in method bodies; skip for-each variables
+        // (those are handled by transformForEachVars via ForEachStmt.getVariable()).
+        classDecl.walk(VariableDeclarationExpr.class, varDeclExpr -> {
+            // Skip for-each variables — their parent is a ForEachStmt
+            if (varDeclExpr.getParentNode().map(p -> p instanceof ForEachStmt).orElse(false))
+                return;
+
+            varDeclExpr.getAnnotations().stream()
+                    .filter(PermuteDeclrTransformer::isPermuteConst)
+                    .findFirst()
+                    .ifPresent(ann -> {
+                        String expr = extractConstExpr(ann);
+                        String evaluated = ctx.evaluate(expr);
+                        Expression newInit = toExpression(evaluated);
+                        varDeclExpr.getVariables().get(0).setInitializer(newInit);
+                        varDeclExpr.getAnnotations().remove(ann);
+                    });
+        });
     }
 
     private static boolean isPermuteConst(AnnotationExpr ann) {

@@ -64,4 +64,38 @@ public class PermuteConstTest {
         assertThat(src4).doesNotContain("int ARITY = 2");
         assertThat(src4).contains("void accept(Object arg1, Object arg2, Object arg3, Object arg4)");
     }
+
+    // -------------------------------------------------------------------------
+    // @PermuteConst on a local variable inside a method body
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testIntegerLocalVariableConst() {
+        var source = JavaFileObjects.forSourceString(
+                "io.permuplate.example.Tracker2",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteConst;
+                        @Permute(varName="i", from=3, to=3, className="Tracker${i}")
+                        public class Tracker2 {
+                            public int getArity() {
+                                @PermuteConst("${i}") int n = 2;
+                                return n;
+                            }
+                        }
+                        """);
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Tracker3").orElseThrow());
+        assertThat(src).contains("int n = 3");
+        assertThat(src).doesNotContain("int n = 2");
+        assertThat(src).contains("return n");
+    }
 }
