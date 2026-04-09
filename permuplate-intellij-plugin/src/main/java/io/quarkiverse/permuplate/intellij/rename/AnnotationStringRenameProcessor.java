@@ -20,7 +20,6 @@ import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 import io.quarkiverse.permuplate.ide.RenameResult;
 import io.quarkiverse.permuplate.intellij.index.PermuteElementResolver;
-import io.quarkiverse.permuplate.intellij.index.PermuteFileDetector;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -76,16 +75,7 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
     @Override
     public @Nullable PsiElement substituteElementToRename(@NotNull PsiElement element,
                                                           @Nullable Editor editor) {
-        if (!(element instanceof PsiClass cls)) return element;
-        VirtualFile vFile = cls.getContainingFile() != null
-                ? cls.getContainingFile().getVirtualFile() : null;
-        if (vFile == null || !PermuteFileDetector.isGeneratedFile(vFile)) return element;
-
-        String name = cls.getName();
-        if (name == null) return element;
-
-        PsiClass templateClass = PermuteElementResolver.findTemplateClass(name, cls.getProject());
-        return templateClass != null ? templateClass : element;
+        return PermuteElementResolver.resolveToTemplateElement(element, editor);
     }
 
     @Override

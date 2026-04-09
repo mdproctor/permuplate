@@ -1,5 +1,6 @@
 package io.quarkiverse.permuplate.intellij.index;
 
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -95,5 +96,51 @@ public final class PermuteElementResolver {
         });
 
         return found.get();
+    }
+
+    /**
+     * Given a PSI element in a generated file, returns the corresponding template element.
+     * Returns the original element unchanged if it is not in a generated file or no
+     * template match is found (graceful fallthrough for all cases).
+     *
+     * Handles: PsiClass, PsiMethod, PsiField, PsiParameter.
+     */
+    @Nullable
+    public static PsiElement resolveToTemplateElement(@NotNull PsiElement element,
+                                                       @Nullable Editor editor) {
+        PsiClass containingClass = getContainingClass(element);
+        if (containingClass == null) return element;
+
+        VirtualFile vFile = containingClass.getContainingFile() != null
+                ? containingClass.getContainingFile().getVirtualFile() : null;
+        if (vFile == null || !PermuteFileDetector.isGeneratedFile(vFile)) return element;
+
+        String generatedClassName = containingClass.getName();
+        if (generatedClassName == null) return element;
+
+        PsiClass templateClass = findTemplateClass(generatedClassName, element.getProject());
+        if (templateClass == null) return element;
+
+        if (element instanceof PsiClass) return templateClass;
+
+        return findMatchingTemplateElement(element, templateClass);
+    }
+
+    @Nullable
+    private static PsiClass getContainingClass(@NotNull PsiElement element) {
+        if (element instanceof PsiClass cls) return cls;
+        if (element instanceof PsiMember member) return member.getContainingClass();
+        if (element instanceof PsiParameter param) {
+            PsiElement scope = param.getDeclarationScope();
+            if (scope instanceof PsiMethod method) return method.getContainingClass();
+        }
+        return null;
+    }
+
+    // Placeholder — extended in Tasks 4 and 5
+    @NotNull
+    private static PsiElement findMatchingTemplateElement(@NotNull PsiElement element,
+                                                           @NotNull PsiClass templateClass) {
+        return element; // graceful fallthrough until member resolution is added
     }
 }
