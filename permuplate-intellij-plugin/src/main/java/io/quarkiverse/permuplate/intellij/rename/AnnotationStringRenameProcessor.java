@@ -8,7 +8,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.SmartPsiElementPointer;
@@ -22,12 +21,10 @@ import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 import io.quarkiverse.permuplate.ide.RenameResult;
 import io.quarkiverse.permuplate.intellij.index.PermuteElementResolver;
 import io.quarkiverse.permuplate.intellij.index.PermuteFileDetector;
-import io.quarkiverse.permuplate.intellij.index.PermuteTemplateData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Participates in IntelliJ's rename pipeline to update Permuplate annotation
@@ -75,9 +72,6 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
      * If the element being renamed is a Permuplate-generated class, silently redirect
      * the rename to the corresponding template class. This allows rename to "just work"
      * when triggered from inside a generated file — no blocking dialog needed.
-     *
-     * Strategy: try the fast FileBasedIndex lookup first; if the index is not yet
-     * populated (e.g., in tests), fall back to a PSI scan over project source files.
      */
     @Override
     public @Nullable PsiElement substituteElementToRename(@NotNull PsiElement element,
@@ -90,88 +84,8 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
         String name = cls.getName();
         if (name == null) return element;
 
-        Project project = cls.getProject();
-
-        // Fast path: use FileBasedIndex reverse lookup
-        String templateName = PermuteFileDetector.templateNameFor(name, project);
-        if (templateName != null) {
-            PermuteTemplateData data = PermuteFileDetector.templateDataFor(templateName, project);
-            if (data != null) {
-                VirtualFile templateVFile = LocalFileSystem.getInstance()
-                        .findFileByPath(data.templateFilePath);
-                if (templateVFile != null) {
-                    PsiFile templatePsiFile = PsiManager.getInstance(project).findFile(templateVFile);
-                    if (templatePsiFile instanceof PsiJavaFile templateJavaFile) {
-                        for (PsiClass templateClass : templateJavaFile.getClasses()) {
-                            if (templateName.equals(templateClass.getName())) {
-                                return templateClass;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Fallback: PSI scan — works when the FileBasedIndex is not yet populated
-        PsiClass template = findTemplateByPsiScan(name, project);
-        return template != null ? template : element;
-    }
-
-    /**
-     * Scans all project source files for a @Permute-annotated class whose className
-     * template evaluates to {@code generatedName} somewhere in its from..to range.
-     * O(source files) — used only when the FileBasedIndex lookup misses (e.g., in tests).
-     */
-    @Nullable
-    private static PsiClass findTemplateByPsiScan(@NotNull String generatedName,
-                                                   @NotNull Project project) {
-        PsiManager psiManager = PsiManager.getInstance(project);
-        AtomicReference<PsiClass> found = new AtomicReference<>();
-
-        ProjectFileIndex.getInstance(project).iterateContent(vFile -> {
-            if (!vFile.getName().endsWith(".java")) return true;
-            PsiFile psiFile = psiManager.findFile(vFile);
-            if (!(psiFile instanceof PsiJavaFile javaFile)) return true;
-
-            for (PsiClass cls : javaFile.getClasses()) {
-                if (cls.isAnnotationType()) continue;
-                for (PsiAnnotation ann : cls.getAnnotations()) {
-                    PsiJavaCodeReferenceElement ref = ann.getNameReferenceElement();
-                    if (ref == null || !"Permute".equals(ref.getReferenceName())) continue;
-
-                    String varName = getAnnotationStringAttr(ann, "varName");
-                    String className = getAnnotationStringAttr(ann, "className");
-                    int from = getAnnotationIntAttr(ann, "from", 1);
-                    int to = getAnnotationIntAttr(ann, "to", 1);
-                    if (varName == null || className == null) continue;
-
-                    String placeholder = "${" + varName + "}";
-                    for (int v = from; v <= to; v++) {
-                        if (generatedName.equals(className.replace(placeholder, String.valueOf(v)))) {
-                            found.set(cls);
-                            return false;
-                        }
-                    }
-                }
-            }
-            return true;
-        });
-
-        return found.get();
-    }
-
-    private static @Nullable String getAnnotationStringAttr(@NotNull PsiAnnotation ann,
-                                                             @NotNull String attr) {
-        PsiAnnotationMemberValue v = ann.findAttributeValue(attr);
-        if (v instanceof PsiLiteralExpression lit && lit.getValue() instanceof String s) return s;
-        return null;
-    }
-
-    private static int getAnnotationIntAttr(@NotNull PsiAnnotation ann,
-                                             @NotNull String attr, int defaultVal) {
-        PsiAnnotationMemberValue v = ann.findAttributeValue(attr);
-        if (v instanceof PsiLiteralExpression lit && lit.getValue() instanceof Integer i) return i;
-        return defaultVal;
+        PsiClass templateClass = PermuteElementResolver.findTemplateClass(name, cls.getProject());
+        return templateClass != null ? templateClass : element;
     }
 
     @Override
