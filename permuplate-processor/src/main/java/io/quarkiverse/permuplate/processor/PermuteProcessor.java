@@ -374,6 +374,9 @@ public class PermuteProcessor extends AbstractProcessor {
         // boundary omission. Runs AFTER applyPermuteReturn so explicit return types are already set.
         applyImplicitInference(classDecl, globalGeneratedNames, explicitReturnMethods);
 
+        // 5e. @PermuteCase — expand switch statement cases per permutation
+        io.quarkiverse.permuplate.core.PermuteCaseTransformer.transform(classDecl, ctx);
+
         // 6. Remove @Permute from the class
         classDecl.getAnnotations().removeIf(a -> {
             String name = a.getNameAsString();
