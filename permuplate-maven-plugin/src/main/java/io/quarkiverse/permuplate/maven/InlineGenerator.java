@@ -14,6 +14,7 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
+import io.quarkiverse.permuplate.core.PermuteCaseTransformer;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
@@ -118,6 +119,9 @@ public class InlineGenerator {
             // Apply implicit return type + parameter type inference (Mechanism 1)
             // Skip methods that had explicit @PermuteReturn (they were just processed above)
             applyImplicitInference(generated, ctx, allGeneratedNames, explicitReturnMethods);
+
+            // @PermuteCase — expand switch statement cases per permutation
+            PermuteCaseTransformer.transform(generated, ctx);
 
             // Extends/implements clause expansion (same-N formula)
             int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
@@ -893,7 +897,10 @@ public class InlineGenerator {
                 "PermuteTypeParam", "io.quarkiverse.permuplate.PermuteTypeParam",
                 "PermuteReturn", "io.quarkiverse.permuplate.PermuteReturn",
                 "PermuteMethod", "io.quarkiverse.permuplate.PermuteMethod",
-                "PermuteExtends", "io.quarkiverse.permuplate.PermuteExtends");
+                "PermuteExtends", "io.quarkiverse.permuplate.PermuteExtends",
+                "PermuteCase", "io.quarkiverse.permuplate.PermuteCase",
+                "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
+                "PermuteImports", "io.quarkiverse.permuplate.PermuteImports");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
