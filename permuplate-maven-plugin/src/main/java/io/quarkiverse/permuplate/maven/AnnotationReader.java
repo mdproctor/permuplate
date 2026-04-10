@@ -215,4 +215,62 @@ public class AnnotationReader {
         }
         return varName == null ? null : new PermuteMethodConfig(varName, from, to, name);
     }
+
+    /** Parsed {@code @PermuteExtends} configuration. */
+    public record PermuteExtendsConfig(
+            String className,
+            String typeArgVarName,
+            String typeArgFrom,
+            String typeArgTo,
+            String typeArgName,
+            String typeArgs,
+            int interfaceIndex) {
+
+        public boolean hasTypeArgLoop() {
+            return typeArgVarName != null && !typeArgVarName.isEmpty()
+                    && typeArgTo != null && !typeArgTo.isEmpty();
+        }
+
+        public boolean hasTypeArgsExpr() {
+            return typeArgs != null && !typeArgs.isEmpty();
+        }
+    }
+
+    /**
+     * Reads a {@code @PermuteExtends} annotation from a JavaParser {@link AnnotationExpr}.
+     * Returns {@code null} if not a {@link NormalAnnotationExpr} or {@code className} absent.
+     */
+    public static PermuteExtendsConfig readPermuteExtends(AnnotationExpr ann) {
+        if (!(ann instanceof NormalAnnotationExpr))
+            return null;
+        NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
+
+        String className = null, typeArgVarName = "", typeArgFrom = "1",
+                typeArgTo = "", typeArgName = "", typeArgs = "";
+        int interfaceIndex = 0;
+
+        for (MemberValuePair pair : normal.getPairs()) {
+            String name = pair.getNameAsString();
+            if (name.equals("interfaceIndex")) {
+                try {
+                    interfaceIndex = Integer.parseInt(pair.getValue().toString().trim());
+                } catch (NumberFormatException ignored) {
+                }
+            } else {
+                String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+                switch (name) {
+                    case "className" -> className = val;
+                    case "typeArgVarName" -> typeArgVarName = val;
+                    case "typeArgFrom" -> typeArgFrom = val;
+                    case "typeArgTo" -> typeArgTo = val;
+                    case "typeArgName" -> typeArgName = val;
+                    case "typeArgs" -> typeArgs = val;
+                }
+            }
+        }
+        if (className == null)
+            return null;
+        return new PermuteExtendsConfig(className, typeArgVarName, typeArgFrom,
+                typeArgTo, typeArgName, typeArgs, interfaceIndex);
+    }
 }

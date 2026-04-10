@@ -10,6 +10,7 @@ import javax.tools.Diagnostic;
 
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.*;
@@ -66,6 +67,16 @@ public class PermuteParamTransformer {
                 }
             });
         });
+
+        // Constructor-level @PermuteParam — expand constructor parameter lists.
+        // Anchor call-site expansion is skipped for constructors (constructors do not
+        // call themselves at argument positions), but parameter list expansion is identical.
+        classDecl.findAll(ConstructorDeclaration.class).forEach(constructor -> {
+            Parameter sentinel;
+            while ((sentinel = findNextConstructorSentinel(constructor)) != null) {
+                transformConstructor(constructor, sentinel, ctx, messager);
+            }
+        });
     }
 
     private static Parameter findNextSentinel(MethodDeclaration method) {
@@ -73,6 +84,59 @@ public class PermuteParamTransformer {
                 .filter(p -> hasPermuteParam(p.getAnnotations()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private static Parameter findNextConstructorSentinel(ConstructorDeclaration constructor) {
+        return constructor.getParameters().stream()
+                .filter(p -> hasPermuteParam(p.getAnnotations()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Expands a {@code @PermuteParam}-annotated constructor parameter.
+     *
+     * <p>
+     * Identical to {@link #transformMethod} for parameter-list expansion, but
+     * operates on a {@link ConstructorDeclaration}. Anchor call-site expansion
+     * is skipped because constructors do not appear at argument positions within
+     * their own body.
+     */
+    private static void transformConstructor(ConstructorDeclaration constructor,
+            Parameter sentinel,
+            EvaluationContext ctx,
+            Messager messager) {
+        AnnotationExpr ann = getPermuteParam(sentinel.getAnnotations());
+        PermuteParamValues values = extractValues(ann, messager);
+        if (values == null)
+            return;
+
+        // Evaluate inner range using outer context
+        int fromVal = ctx.evaluateInt(values.from);
+        int toVal = ctx.evaluateInt(values.to);
+
+        // Build expanded parameter list
+        NodeList<Parameter> newParams = new NodeList<>();
+        for (int j = fromVal; j <= toVal; j++) {
+            EvaluationContext innerCtx = ctx.withVariable(values.varName, j);
+            String paramType = innerCtx.evaluate(values.type);
+            String paramName = innerCtx.evaluate(values.name);
+            newParams.add(new Parameter(new ClassOrInterfaceType(null, paramType), paramName));
+        }
+
+        // Preserve parameters before and after the sentinel
+        NodeList<Parameter> origParams = constructor.getParameters();
+        int sentinelIdx = origParams.indexOf(sentinel);
+
+        NodeList<Parameter> allParams = new NodeList<>();
+        for (int k = 0; k < sentinelIdx; k++) {
+            allParams.add(origParams.get(k).clone());
+        }
+        allParams.addAll(newParams);
+        for (int k = sentinelIdx + 1; k < origParams.size(); k++) {
+            allParams.add(origParams.get(k).clone());
+        }
+        constructor.setParameters(allParams);
     }
 
     private static void transformMethod(MethodDeclaration method,

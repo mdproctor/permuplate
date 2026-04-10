@@ -22,7 +22,7 @@ This is genuinely novel. Every comparable tool (Vavr generators, Freemarker temp
 
 ```
 permuplate-parent/
-├── permuplate-annotations/     @Permute, @PermuteDeclr, @PermuteParam, @PermuteConst, @PermuteVar, @PermuteTypeParam, @PermuteReturn, @PermuteMethod, @PermuteExtends  (no runtime deps)
+├── permuplate-annotations/     All 14 annotations (no runtime deps)
 ├── permuplate-core/            shared transformation engine: EvaluationContext, transformers, PermuteConfig
 ├── permuplate-ide-support/     annotation string algorithm (matching, rename, validation); no IDE deps
 ├── permuplate-processor/       APT entry point only (thin shell depending on permuplate-core)
@@ -57,6 +57,26 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 
 ## The annotations
 
+### Complete roster (14 annotations)
+
+| Annotation | Target | Purpose |
+|---|---|---|
+| `@Permute` | class, interface, method | Master: declares the permutation loop |
+| `@PermuteVar` | (nested in @Permute) | Extra loop axes for cross-product generation |
+| `@PermuteDeclr` | field, parameter, for-each var | Rename type+name per permutation |
+| `@PermuteParam` | method/constructor parameter | Expand a sentinel parameter into a sequence |
+| `@PermuteConst` | field, local variable | Replace initializer with JEXL expression (backward-compat alias for @PermuteValue on fields) |
+| `@PermuteValue` | field, local variable, method, constructor | Replace initializer or method/constructor statement RHS by index |
+| `@PermuteStatements` | method, constructor | Insert statements at first/last position (inner loop optional) |
+| `@PermuteCase` | method | Accumulate switch cases per permutation (inner loop) |
+| `@PermuteImport` | type | Add JEXL-evaluated imports to each generated class |
+| `@PermuteTypeParam` | type parameter | Expand type parameters per permutation |
+| `@PermuteReturn` | method | Control return type per permutation |
+| `@PermuteMethod` | method | Generate multiple overloads per permutation |
+| `@PermuteExtends` | class | Set the extends/implements clause from JEXL expression (inline mode only) |
+
+---
+
 ### `@Permute` — on a class or interface (top-level or nested static), or on a method
 
 ```java
@@ -67,7 +87,7 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 
 **On a method:** for each value of `i`, clones and transforms the method via a temporary wrapper class, then collects all variants into ONE new class named `className`. The `className` should be fixed (no `${i}`). The `processMethodPermutation` path skips the className-prefix validation and the per-type `validatePrefixes` calls.
 
-### `@PermuteDeclr` — on a field or for-each variable
+### `@PermuteDeclr` — on a field, constructor param, for-each variable, or method param
 
 ```java
 private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;
@@ -79,10 +99,11 @@ Renames the declaration's type and identifier, then propagates the rename to all
 - **Field**: entire class body
 - **Constructor parameter**: constructor body only
 - **For-each variable**: loop body only
+- **Method parameter**: method body only; `name=""` (default) changes only the type, no rename propagation
 
 Transform order: fields first (broadest scope), then constructor params, then for-each variables.
 
-### `@PermuteParam` — on a single "sentinel" method parameter
+### `@PermuteParam` — on a method or constructor parameter
 
 ```java
 public void join(
@@ -95,6 +116,8 @@ The sentinel (`o1`) is replaced by a generated sequence (`Object o1, Object o2` 
 
 The sentinel's original name is registered as an **anchor**. Every method call in the body where the anchor appears as an argument has it replaced by the full generated sequence. This is how `c2.call(o1, o2)` becomes `c3.call(o1, o2, o3)` — there is no annotation on the call site because Java's syntax does not allow it.
 
+Works on **constructor parameters** as well as method parameters.
+
 ### `@PermuteVar` — nested annotation for extra integer loop axes
 
 ```java
@@ -104,6 +127,78 @@ The sentinel's original name is registered as an **anchor**. Every method call i
 ```
 
 Defines an additional integer loop variable for cross-product generation. Each `@PermuteVar` adds one axis; one output type is generated per combination of the primary variable and all extra variables. The primary variable (`varName` on `@Permute`) is the outermost loop; `extraVars` are inner loops in declaration order. Variable names must not conflict with `varName` or `strings` keys.
+
+### `@PermuteConst` — on a field or local variable
+
+```java
+@PermuteConst("${i}") int ARITY = 2;
+```
+
+Replaces the annotated field's or local variable's initializer with the evaluated JEXL expression. The existing initializer is kept only to make the template compile — it is substituted in every generated class. Integer expressions produce an `IntegerLiteralExpr`; all others a `StringLiteralExpr`.
+
+**Relationship to `@PermuteValue`:** `@PermuteConst` is a backward-compatible alias for `@PermuteValue` on fields and local variables. Both remain supported; prefer `@PermuteValue` in new code.
+
+May be combined with `@PermuteDeclr` on the same declaration: `@PermuteDeclr` updates type and name; `@PermuteConst` updates the value. The two are independent — order on the source element doesn't matter.
+
+```java
+@PermuteDeclr(type = "int", name = "ARITY_${i}")
+@PermuteConst("${i}")
+int ARITY_2 = 2;
+// Generated for i=3: int ARITY_3 = 3;  and  return ARITY_3; wherever ARITY_2 was referenced
+```
+
+### `@PermuteValue` — on a field, local variable, method, or constructor
+
+```java
+@PermuteValue("${i}") int ARITY = 2;            // field — replaces initializer (like @PermuteConst)
+
+@PermuteValue(index = 1, value = "${i}")          // method/constructor — replaces RHS at statement index
+public void init() {
+    this.name = "x";  // statement 0 — untouched
+    this.size = 1;    // statement 1 — becomes ${i}
+}
+```
+
+Superset of `@PermuteConst`. On fields/locals: replaces initializer. On methods/constructors: replaces the RHS of the assignment at `index` (0-based, in the ORIGINAL template body before any `@PermuteStatements` insertions). Works on **constructor declarations** in addition to methods.
+
+### `@PermuteStatements` — on a method or constructor
+
+```java
+@PermuteStatements(varName = "k", from = "1", to = "${i-1}",
+                   position = "first", body = "this.${lower(k)} = ${lower(k)};")
+public Tuple1(A a) {
+    this.a = a;
+    this.size = 1;
+}
+// Tuple3 gets: this.a=a; this.b=b; [original body: this.c=c; this.size=3;]
+```
+
+Inserts statements at `"first"` (before existing) or `"last"` (after existing). With `varName/from/to`: inserts one statement per loop value. Without loop: inserts once. Applied AFTER `@PermuteValue` so that `@PermuteValue` index positions refer to the original template body. Works on **constructor declarations** as well as methods.
+
+### `@PermuteCase` — on a method
+
+```java
+@PermuteCase(varName = "k", from = "1", to = "${i-1}",
+             index = "${k}", body = "return (T) ${lower(k+1)};")
+public <T> T get(int index) {
+    switch (index) {
+        case 0: return (T) a;
+        default: throw new IndexOutOfBoundsException(index);
+    }
+}
+```
+
+Inserts switch cases for each inner-loop value `k` before the `default` case. Seed case and `default` are preserved unchanged. No cases inserted when `from > to` (empty range). All cases inlined — no `super()` delegation.
+
+### `@PermuteImport` — on the template class
+
+```java
+@PermuteImport("org.drools.core.function.BaseTuple.Tuple${i}")
+@PermuteImport("org.drools.core.RuleOOPathBuilder.Path${i}")
+public static class Join2First<...> { ... }
+```
+
+Adds JEXL-evaluated import statements to each generated class's CompilationUnit. Repeatable via `@PermuteImports`. Stripped from the generated output. In inline mode, imports are added to the parent CU.
 
 ---
 
@@ -120,27 +215,6 @@ Named constants are resolved in this order (later overrides earlier):
 | Annotation `strings` constant | ✅ | ✅ | `strings={"max=10"}` → `${max}` |
 
 **Key difference:** APT options (`-A`) are javac-only — they work in the APT annotation processor but are **not available** to the Maven plugin Mojo. System properties (`-D`) work for both. When a property exists in multiple sources, annotation `strings` wins over APT options, which win over system properties.
-
-**Migration from int literals:** existing templates using `from=3, to=10` must be updated to `from="3", to="10"`. Expressions that were previously computed (e.g. `permute.to() - currentI`) now go through `ctx.evaluateInt(permute.to())`.
-
----
-
-### `@PermuteConst` — on a field or local variable
-
-```java
-@PermuteConst("${i}") int ARITY = 2;
-```
-
-Replaces the annotated field's or local variable's initializer with the evaluated JEXL expression. The existing initializer is kept only to make the template compile — it is substituted in every generated class. Integer expressions produce an `IntegerLiteralExpr`; all others a `StringLiteralExpr`.
-
-May be combined with `@PermuteDeclr` on the same declaration: `@PermuteDeclr` updates type and name; `@PermuteConst` updates the value. The two are independent — order on the source element doesn't matter.
-
-```java
-@PermuteDeclr(type = "int", name = "ARITY_${i}")
-@PermuteConst("${i}")
-int ARITY_2 = 2;
-// Generated for i=3: int ARITY_3 = 3;  and  return ARITY_3; wherever ARITY_2 was referenced
-```
 
 ---
 
@@ -162,10 +236,20 @@ int ARITY_2 = 2;
 1. Clone class declaration
 2. Strip static / ensure public
 3. Rename class  (ctx.evaluate(permute.className()))
-4. PermuteDeclrTransformer.transform()   — fields first (with @PermuteConst initializer substitution), then local vars (@PermuteConst), then for-each vars
-5. PermuteParamTransformer.transform()   — param expansion + anchor expansion
-6. Remove @Permute from class
-7. Build fresh CompilationUnit (copy package + non-permuplate imports)
+4. @PermuteExtends — explicit extends/implements override (inline mode only, before other transforms)
+5a. PermuteDeclrTransformer.transformFields()    — class-wide scope; @PermuteConst initializer substitution
+5b. PermuteDeclrTransformer.transformConstructorParams()   — constructor-body scope
+5c. PermuteDeclrTransformer.transformForEachVars()         — loop-body scope
+5d. PermuteDeclrTransformer.transformConstFields() / transformConstLocals()   — remaining @PermuteConst
+5e. PermuteParamTransformer.transform()          — param expansion + anchor expansion (methods + constructors)
+5f. PermuteTypeParamTransformer.transform()      — type parameter expansion
+5g. PermuteReturnTransformer.transform()         — return type control + boundary omission
+5h. PermuteMethodTransformer.transform()         — multiple overloads per class
+5i. PermuteCaseTransformer.transform()           — switch case expansion
+5j. PermuteValueTransformer.transform()          — field/local/method/constructor value replacement (BEFORE Statements)
+5k. PermuteStatementsTransformer.transform()     — statement insertion (AFTER Value)
+6. Remove @Permute from class; collect @PermuteImport entries
+7. Build fresh CompilationUnit (copy package + non-permuplate imports + @PermuteImport entries)
 8. Write via Filer
 ```
 
@@ -187,14 +271,39 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 
 ### `PermuteParamTransformer`
 
-- Processes ALL `@PermuteParam`-annotated parameters in each method via a while loop (not just the first); each `transformMethod` call removes one sentinel, so re-scanning finds the next
+- Processes ALL `@PermuteParam`-annotated parameters in each method and constructor via a while loop (not just the first); each `transformMethod` call removes one sentinel, so re-scanning finds the next
 - Records the sentinel's name as the anchor
 - Evaluates inner range (`from`/`to`) using outer context
 - Builds expanded `Parameter` list via inner `EvaluationContext` loop
-- Rebuilds method parameter list: params before sentinel + expanded params + params after sentinel (uses `origParams.indexOf(sentinel)`)
+- Rebuilds method/constructor parameter list: params before sentinel + expanded params + params after sentinel (uses `origParams.indexOf(sentinel)`)
 - `expandAnchorAtCallSites()`: delegates to `expandAnchorInStatement(body, anchor, names)` for the method body
 - `expandAnchorInStatement(Statement, anchor, names)`: shared `ModifierVisitor` over `MethodCallExpr` nodes; used by both method-body and lambda-body expansion
 - Lambda param support: after processing all method-level sentinels, walks `LambdaExpr` nodes in the method body via `findNextLambdaSentinel()`; `transformLambda()` applies the same expand/rebuild pattern as `transformMethod()` but scoped to the lambda's parameter list and body. Call-site expansion inside the lambda uses `expandAnchorInStatement` scoped to `lambda.getBody()` — the method-body anchor is not expanded inside the lambda and vice versa.
+
+### `PermuteValueTransformer`
+
+- Handles `@PermuteValue` on fields, local variables, methods, and constructors
+- On fields: replaces the initializer (same mechanism as `@PermuteConst`)
+- On local variables: walks `VariableDeclarationExpr` nodes, skipping for-each vars (which are for-each stmt children)
+- On methods: finds the statement at `index` in the body and replaces the RHS of the `AssignExpr`
+- On constructors: same as methods; uses `constructor.getBody()` (always present, no Optional)
+- Runs BEFORE `PermuteStatementsTransformer` so `index` refers to the original template body
+
+### `PermuteStatementsTransformer`
+
+- Handles `@PermuteStatements` on both `MethodDeclaration` and `ConstructorDeclaration`
+- With loop (`varName/from/to`): inserts one statement per inner-loop value via `buildInsertList`
+- Without loop: inserts once using the outer context
+- `"first"` inserts reversed to preserve order; `"last"` appends directly
+- Runs AFTER `PermuteValueTransformer`
+
+### `PermuteCaseTransformer`
+
+- Finds the `switch` statement in the annotated method body via `body.findFirst(SwitchStmt.class)`
+- Evaluates loop bounds; empty range (`from > to`) silently produces no cases
+- Inserts cases BEFORE `default` (identified by empty label list)
+- Case body is parsed as a block `"{" + bodyStr + "}"` to support multiple statements
+- The seed case is preserved in the template; only new cases are inserted
 
 ---
 
@@ -216,7 +325,7 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | `annotationProcessorPaths` | Must list processor + javaparser-core + commons-jexl3 explicitly — maven-compiler-plugin 3.x isolates the processor classloader |
 | Inline generation uses Maven plugin, not APT | APT can only CREATE new files; it cannot modify existing parent class files. `inline = true` therefore requires `permuplate-maven-plugin` (runs in `generate-sources`, reads source files directly with JavaParser). The APT errors on `inline = true` with a migration message. |
 | Template directory not on compile path | `src/main/permuplate/` (inline templates) is never added as a Maven compile source root. The Maven plugin reads it at `generate-sources` time and writes augmented parent classes to `target/generated-sources/permuplate/`. Javac compiles only the output dir. IDE users mark `src/main/permuplate` as a source root manually. |
-| InlineGenerator strips all permuplate annotations | When `keepTemplate = true`, the retained template class must have `@Permute`, `@PermuteDeclr`, and `@PermuteParam` all stripped — not just `@Permute` — otherwise javac cannot compile the annotations that reference types from `permuplate-annotations`. |
+| InlineGenerator strips all permuplate annotations | When `keepTemplate = true`, the retained template class must have all Permuplate annotations stripped — otherwise javac cannot compile the annotations that reference types from `permuplate-annotations`. |
 | permuplate-core null-checks Messager | `PermuteDeclrTransformer` and `PermuteParamTransformer` take `Messager` as a parameter. The Maven plugin passes `null` (no Messager in Maven). All `messager.printMessage(...)` calls are guarded with `if (messager != null)`. |
 | Annotation string validation | All string attributes (`@PermuteDeclr type/name`, `@PermuteParam name`, `@Permute className`) are validated using `AnnotationStringAlgorithm.validate()` from `permuplate-ide-support`. The old `checkPrefix` (leading-literal + `startsWith`) is replaced by full substring matching (R2), orphan variable detection (R3), and no-anchor detection (R4). |
 | R1 applies only to @Permute.className | Inner annotations (`@PermuteDeclr`, `@PermuteParam`) may have attributes with no variable (e.g. `type = "Object"`) when the type genuinely does not vary. R1 (no variables error) is enforced only for `@Permute.className` in `PermuteProcessor`, not by the transformers. |
@@ -234,6 +343,14 @@ Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `M
 | `@PermuteDeclr` method parameter (G2a) | `name=""` (default) changes only the type, no rename propagation. When name is non-empty, type AND name change and the new name is propagated through the method body via `renameAllUsages`. Method params are NOT validated in `validatePrefixes()` because the sentinel type (`Object`) deliberately doesn't match the annotation string (the actual generated type). |
 | `@PermuteConst` initializer substitution | `toExpression()` tries `Integer.parseInt` first; non-integer strings become `StringLiteralExpr`. Processed in `PermuteDeclrTransformer` after field rename so `@PermuteDeclr` renames are already visible. |
 | `@PermuteConst` + `@PermuteDeclr` on same field | Order of annotations on the source element does not matter — `transformFields()` (`@PermuteDeclr`) runs before `transformConstFields()` (`@PermuteConst`), so the rename is applied first and the `@PermuteConst` annotation is still present on the (already renamed) field. |
+| `@PermuteValue` on constructors | `PermuteValueTransformer` processes `ConstructorDeclaration` via `classDecl.findAll(ConstructorDeclaration.class)`. `constructor.getBody()` returns `BlockStmt` directly (not Optional). |
+| `@PermuteStatements` on constructors | `PermuteStatementsTransformer` processes both `MethodDeclaration` and `ConstructorDeclaration` even though `@Target` is `ElementType.METHOD`. The annotation is applied at the source level on methods that also include constructor-like syntax; the transformer walks constructors explicitly. |
+| `@PermuteValue` vs `@PermuteConst` | `@PermuteConst` is a semantic alias — backward-compatible, same `toExpression()` path. `@PermuteValue` is the preferred form in new code. Both are stripped from the generated output. |
+| `@PermuteValue` `index` semantics | Statement positions in the original template body (0-based), evaluated BEFORE `@PermuteStatements` insertions. If `@PermuteStatements` runs first the index would shift — the transformer ordering (Value before Statements) preserves this invariant. |
+| `@PermuteCase` empty range | `from > to` after evaluation: annotation is removed but no cases are inserted. Not an error. |
+| `@PermuteImport` in inline mode | Imports are added to the parent CU (not to a per-generated-class CU) because inline classes share the parent's import list. Duplicate-check before adding prevents duplicate imports when multiple permutations share the same base import. |
+| `@PermuteExtends` blocks automatic expansion | When `@PermuteExtends` is present, `applyExtendsExpansion()` is skipped entirely for that class — the explicit override takes precedence. The annotation is always stripped from the generated output. |
+| `@PermuteExtends` `interfaceIndex` | `0` = extends clause; `1+` = implements interface at `(interfaceIndex - 1)` in the `implementedTypes` list (0-indexed among implements). |
 | Lambda `@PermuteParam` — scoped anchor expansion | `@PermuteParam` on a typed lambda parameter (valid Java syntax) expands the lambda's param list and expands call sites **within the lambda body only** via `expandAnchorInStatement`. Method-body anchors do not bleed into lambdas; lambda anchors do not bleed into the outer method body. |
 | Pure-variable `@PermuteParam.name` — R4 exemption | `name="${lower(j)}"` and `name="${alpha(j)}"` have no static literal, which would normally trigger R4. For `@PermuteParam.name`, if the template has no static literals the R4/R2/R3 check is skipped entirely — the generated param names are fresh and have no obligation to match the sentinel's placeholder name. Literal+variable names like `name="o${j}"` still receive full R2/R3 validation. |
 | `@PermuteTypeParam` R1 skips `@PermuteReturn` methods | `validateR1()` in `PermuteTypeParamTransformer` skips methods annotated with `@PermuteReturn` — such methods explicitly manage their own return type, so the restriction against expanding type params in the return type is inapplicable. |

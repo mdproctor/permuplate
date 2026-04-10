@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Permuplate — One Template. Infinite Arities.</title>
+  <meta name="description" content="Permuplate is a Java annotation processor that generates type-safe arity permutations from a single compilable template. No external tools. Full IDE support." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Highlight.js -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/material-darker.min.css" />
+
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+       NAVIGATION
+       ============================================================ -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">Permu<span>plate</span></a>
+      <ul class="nav-links">
+        <li><a href="docs.html">Docs</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="https://github.com/mdproctor/permuplate" target="_blank">GitHub</a></li>
+        <li><a href="docs.html" class="nav-cta">Get Started →</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="hero">
+    <div class="hero-mark-tl"></div>
+    <div class="container">
+      <div class="hero-eyebrow">Java Annotation Processor</div>
+
+      <h1 class="hero-headline">
+        One Template.
+        <span class="line2">Infinite Arities.</span>
+      </h1>
+
+      <p class="hero-sub">
+        Permuplate is a Java annotation processor that generates type-safe arity
+        permutations from a single compilable template. No separate build step.
+        No broken IDE navigation. No committed generated files.
+        Just annotate and generate.
+      </p>
+
+      <div class="hero-actions">
+        <a href="docs.html" class="btn btn-primary">Get Started →</a>
+        <a href="https://github.com/mdproctor/permuplate" target="_blank" class="btn btn-ghost">View on GitHub →</a>
+      </div>
+
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-num">1</div>
+          <div class="hero-stat-label">Template file</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">8</div>
+          <div class="hero-stat-label">Classes generated</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">0</div>
+          <div class="hero-stat-label">Files committed</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">13</div>
+          <div class="hero-stat-label">Annotations</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       THE BOILERPLATE TAX
+       ============================================================ -->
+  <section class="section tax-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">The Problem</div>
+        <h2>The Boilerplate Tax</h2>
+      </div>
+
+      <div class="tax-grid">
+        <div class="tax-col">
+          <span class="tax-col-num">01</span>
+          <h3>You Write</h3>
+          <p>Eight files. Identical except for the number.</p>
+          <ul class="file-list">
+            <li>Join3.java</li>
+            <li>Join4.java</li>
+            <li>Join5.java</li>
+            <li>Join6.java</li>
+            <li>Join7.java</li>
+            <li>Join8.java</li>
+            <li>Join9.java</li>
+            <li>Join10.java</li>
+          </ul>
+        </div>
+
+        <div class="tax-col">
+          <span class="tax-col-num">02</span>
+          <h3>All Identical Except</h3>
+          <p>The number. That's it. Every declaration. Every parameter. Every call site.</p>
+          <div class="diff-block">
+            <span class="diff-old">- private Callable2 c2;</span>
+            <span class="diff-new">+ private Callable3 c3;</span>
+            <br>
+            <span class="diff-old">- void join(Object o1) {</span>
+            <span class="diff-new">+ void join(Object o1, Object o2) {</span>
+            <br>
+            <span class="diff-old">-   c2.call(o1, o2);</span>
+            <span class="diff-new">+   c3.call(o1, o2, o3);</span>
+          </div>
+        </div>
+
+        <div class="tax-col">
+          <span class="tax-col-num">03</span>
+          <h3>Every Change</h3>
+          <p>
+            Fix a bug in <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Join3</code>?
+            Fix it in <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Join4</code>,
+            <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Join5</code>...
+            <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Join10</code>.
+            Every time. The tax compounds with every arity added.
+          </p>
+          <p style="margin-top:16px">Permuplate is the fourth option — the one that doesn't hurt.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       KILLER EXAMPLE — SPLIT SCREEN
+       ============================================================ -->
+  <section class="section example-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">The Killer Example</div>
+        <h2>One Plate, Eight Prints</h2>
+      </div>
+
+      <div class="example-meta">
+        <p style="color:var(--muted);max-width:500px;font-size:0.9rem">
+          The template is a real, compilable Java class. Your IDE can navigate it,
+          refactor it, and type-check it. At compile time, <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">javac</code>
+          generates eight complete, correct classes — field renames, parameter
+          expansions, call-site rewrites, all of it.
+        </p>
+        <div class="example-ratio">
+          <span>1</span>
+          <span class="arrow">→</span>
+          <span>8</span>
+        </div>
+      </div>
+
+      <div class="split-screen">
+        <!-- Template panel -->
+        <div class="split-panel panel-template">
+          <div class="split-label">
+            <span class="split-label-text">The Template</span>
+            <span class="split-label-file">Join2.java</span>
+          </div>
+          <pre><code class="language-java">@Permute(varName = "i", from = "3", to = "10",
+         className = "Join${i}")
+public class Join2 {
+
+    private @PermuteDeclr(
+        type = "Callable${i}",
+        name = "c${i}") Callable2 c2;
+
+    private List&lt;Object&gt; right;
+
+    public void join(
+        @PermuteParam(varName = "j",
+            from = "1", to = "${i-1}",
+            type = "Object",
+            name = "o${j}") Object o1,
+        List&lt;Object&gt; results) {
+
+        for (@PermuteDeclr(
+                 type = "Object",
+                 name = "o${i}") Object o2 : right) {
+            c2.call(o1, o2);
+            results.add(o2);
+        }
+    }
+}</code></pre>
+        </div>
+
+        <!-- Generated panel with tabs -->
+        <div class="split-panel panel-generated">
+          <div class="split-label">
+            <span class="split-label-text">Generates</span>
+          </div>
+          <div class="gen-tabs">
+            <button class="gen-tab active" data-pane="join3">Join3.java</button>
+            <button class="gen-tab" data-pane="join4">Join4.java</button>
+            <button class="gen-tab" data-pane="join10">Join10.java</button>
+            <span class="gen-more">+5 more</span>
+          </div>
+          <div class="gen-content">
+            <div class="gen-pane active" id="join3">
+              <pre><code class="language-java">public class Join3 {
+
+    private Callable3 c3;
+    private List&lt;Object&gt; right;
+
+    public void join(
+            Object o1, Object o2,
+            List&lt;Object&gt; results) {
+
+        for (Object o3 : right) {
+            c3.call(o1, o2, o3);
+            results.add(o3);
+        }
+    }
+}</code></pre>
+            </div>
+            <div class="gen-pane" id="join4">
+              <pre><code class="language-java">public class Join4 {
+
+    private Callable4 c4;
+    private List&lt;Object&gt; right;
+
+    public void join(
+            Object o1, Object o2, Object o3,
+            List&lt;Object&gt; results) {
+
+        for (Object o4 : right) {
+            c4.call(o1, o2, o3, o4);
+            results.add(o4);
+        }
+    }
+}</code></pre>
+            </div>
+            <div class="gen-pane" id="join10">
+              <pre><code class="language-java">public class Join10 {
+
+    private Callable10 c10;
+    private List&lt;Object&gt; right;
+
+    public void join(
+            Object o1, Object o2, Object o3,
+            Object o4, Object o5, Object o6,
+            Object o7, Object o8, Object o9,
+            List&lt;Object&gt; results) {
+
+        for (Object o10 : right) {
+            c10.call(o1, o2, o3, o4, o5,
+                     o6, o7, o8, o9, o10);
+            results.add(o10);
+        }
+    }
+}</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       GETTING STARTED
+       ============================================================ -->
+  <section class="section install-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">Get Started</div>
+        <h2>Clone &amp; Build</h2>
+        <p class="section-intro">Permuplate is not yet on Maven Central — a public release is coming soon. For now, clone and install locally.</p>
+      </div>
+
+      <div class="install-steps">
+        <div class="install-step">
+          <div class="install-step-num">01</div>
+          <div class="install-step-body">
+            <h3>Clone and install</h3>
+            <pre><code class="language-bash">git clone https://github.com/mdproctor/permuplate.git
+cd permuplate
+mvn install -DskipTests</code></pre>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <div class="install-step-num">02</div>
+          <div class="install-step-body">
+            <h3>Add the processor to your Maven build</h3>
+            <pre><code class="language-xml">&lt;plugin&gt;
+  &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+  &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+  &lt;configuration&gt;
+    &lt;annotationProcessorPaths&gt;
+      &lt;path&gt;
+        &lt;groupId&gt;io.quarkiverse.permuplate&lt;/groupId&gt;
+        &lt;artifactId&gt;permuplate-processor&lt;/artifactId&gt;
+        &lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;
+      &lt;/path&gt;
+    &lt;/annotationProcessorPaths&gt;
+  &lt;/configuration&gt;
+&lt;/plugin&gt;</code></pre>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <div class="install-step-num">03</div>
+          <div class="install-step-body">
+            <h3>Add the annotations dependency</h3>
+            <pre><code class="language-xml">&lt;dependency&gt;
+  &lt;groupId&gt;io.quarkiverse.permuplate&lt;/groupId&gt;
+  &lt;artifactId&gt;permuplate-annotations&lt;/artifactId&gt;
+  &lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;
+  &lt;scope&gt;provided&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+          </div>
+        </div>
+
+        <div class="install-step install-step--coming-soon">
+          <div class="install-step-num">—</div>
+          <div class="install-step-body">
+            <h3>Maven Central <span class="badge-soon">Coming Soon</span></h3>
+            <p>A public release on Maven Central is planned. Watch the <a href="https://github.com/mdproctor/permuplate" target="_blank">GitHub repo</a> for updates.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       WHY IT'S DIFFERENT
+       ============================================================ -->
+  <section class="section why-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">The Differentiator</div>
+        <h2>Still Valid Java</h2>
+      </div>
+
+      <p style="color:var(--muted);max-width:620px;font-size:0.95rem;line-height:1.7;margin-bottom:var(--space-xl)">
+        Every other solution — Freemarker templates, Python scripts, Groovy generators —
+        uses a template that is <em>not</em> valid Java. Your IDE can't navigate it.
+        Permuplate templates ARE valid, compilable Java. The compiler, the IDE, the
+        refactoring tools — all of them work, because the template is the same Java
+        they already understand.
+      </p>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Approach</th>
+            <th>Template is valid Java?</th>
+            <th>IDE refactor support?</th>
+            <th>No committed generated files?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Vavr / RxJava scripts</td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>Freemarker + Maven</td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>JavaPoet</td>
+            <td><span class="check-no">—</span></td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-yes">✓</span></td>
+          </tr>
+          <tr>
+            <td>Lombok</td>
+            <td><span class="check-yes">✓</span></td>
+            <td><span class="check-no">Partial</span></td>
+            <td><span class="check-yes">✓</span></td>
+          </tr>
+          <tr class="highlight">
+            <td>Permuplate</td>
+            <td><span class="check-yes">✓ Yes</span></td>
+            <td><span class="check-yes">✓ Yes</span></td>
+            <td><span class="check-yes">✓ Yes</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="features-grid mt-xl">
+        <div class="feature-item">
+          <span class="feature-tag">01</span>
+          <h3>IDE Native</h3>
+          <p>
+            Full IntelliJ and VS Code support. Navigate the template like any Java file.
+            Set breakpoints. Use Find Usages. Rename a field and Permuplate propagates
+            the change through every generated arity automatically.
+          </p>
+        </div>
+        <div class="feature-item">
+          <span class="feature-tag">02</span>
+          <h3>Zero Runtime</h3>
+          <p>
+            Pure compile-time generation via standard <code>javac</code>.
+            No runtime dependencies. No classpath pollution. Generated classes live
+            in <code>target/</code> — never committed to source control.
+          </p>
+        </div>
+        <div class="feature-item">
+          <span class="feature-tag">03</span>
+          <h3>JEXL Expressions</h3>
+          <p>
+            Fully programmable loop bounds. <code>from="${min}"</code>,
+            <code>to="${max * 2}"</code>. Inject from system properties at build time.
+            Named string constants, built-in functions <code>alpha()</code>,
+            <code>lower()</code>, cross-product generation — all in the annotation.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ANNOTATION ROSTER
+       ============================================================ -->
+  <section class="section roster-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">The Toolbox</div>
+        <h2>Thirteen Tools. One Goal.</h2>
+      </div>
+
+      <div class="annotation-roster">
+        <div class="roster-header">
+          <div class="roster-col-head">Annotation</div>
+          <div class="roster-col-head">Placed on</div>
+          <div class="roster-col-head">What it does</div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@Permute</span></div>
+          <div class="roster-cell"><span class="roster-on">class / method</span></div>
+          <div class="roster-cell"><span class="roster-desc">Declares the permutation loop. The master switch — drives the outer <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">i</code> iteration from <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">from</code> to <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">to</code>, generating one class per value.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteVar</span></div>
+          <div class="roster-cell"><span class="roster-on">nested on @Permute</span></div>
+          <div class="roster-cell"><span class="roster-desc">Adds extra integer loop axes for cross-product generation. <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">BiCallable${i}x${k}</code> produces 9 classes from one template.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteDeclr</span></div>
+          <div class="roster-cell"><span class="roster-on">field / param / for-each</span></div>
+          <div class="roster-cell"><span class="roster-desc">Renames type and identifier per permutation value. Scope-aware: field renames propagate class-wide; for-each variable renames are contained to the loop body.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteParam</span></div>
+          <div class="roster-cell"><span class="roster-on">method / constructor param</span></div>
+          <div class="roster-cell"><span class="roster-desc">Expands one sentinel parameter into a full generated sequence. Automatically rewrites every call site where the sentinel appears as an argument — no annotation at the call site required.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteTypeParam</span></div>
+          <div class="roster-cell"><span class="roster-on">type parameter</span></div>
+          <div class="roster-cell"><span class="roster-desc">Expands a sentinel type parameter into a sequence. <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">&lt;A&gt;</code> becomes <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">&lt;A, B, C&gt;</code>. Implicit when using <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">T${j}</code> naming convention.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteConst</span></div>
+          <div class="roster-cell"><span class="roster-on">field / local var</span></div>
+          <div class="roster-cell"><span class="roster-desc">Replaces an initializer with the evaluated JEXL expression. <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">@PermuteConst("${i}") int ARITY = 2;</code> becomes <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">int ARITY = 3;</code> in Join3.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteValue</span></div>
+          <div class="roster-cell"><span class="roster-on">field / var / method</span></div>
+          <div class="roster-cell"><span class="roster-desc">Superset of @PermuteConst. Replaces the RHS of any assignment statement at a given index position in a method body — not just initializers.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteReturn</span></div>
+          <div class="roster-cell"><span class="roster-on">method</span></div>
+          <div class="roster-cell"><span class="roster-desc">Controls the return type per permutation value. Enables stateful builder chains where each <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">.join()</code> returns the next step type with an additional type parameter.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteMethod</span></div>
+          <div class="roster-cell"><span class="roster-on">method</span></div>
+          <div class="roster-cell"><span class="roster-desc">Generates multiple overloads from one method using an inner loop variable. Leaf classes automatically drop the method when the range is empty — no compile error.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteExtends</span></div>
+          <div class="roster-cell"><span class="roster-on">class</span></div>
+          <div class="roster-cell"><span class="roster-desc">Explicit control over the extends/implements clause. Implicit same-N expansion fires automatically for standard <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">T${j}</code> naming — use this only when inference doesn't apply.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteCase</span></div>
+          <div class="roster-cell"><span class="roster-on">method / constructor</span></div>
+          <div class="roster-cell"><span class="roster-desc">Expands a switch statement by inserting new cases per inner-loop value, fully inlined. The seed case and default are preserved; new cases appear before default.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteStatements</span></div>
+          <div class="roster-cell"><span class="roster-on">method / constructor</span></div>
+          <div class="roster-cell"><span class="roster-desc">Inserts generated statements at the first or last position in a method body. Works with or without an inner loop. Applied after @PermuteValue.</span></div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteImport</span></div>
+          <div class="roster-cell"><span class="roster-on">class (repeatable)</span></div>
+          <div class="roster-cell"><span class="roster-desc">Adds a JEXL-evaluated import statement to each generated class. Essential when generated types reference classes whose import can't be derived from the template's own imports.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       BLOG PREVIEW
+       ============================================================ -->
+  <section class="section blog-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">Development Diary</div>
+        <h2>From the Press</h2>
+      </div>
+
+      <div class="blog-grid">
+        <a href="https://github.com/mdproctor/permuplate/blob/main/docs/blog/2026-04-09-mdp02-building-tools-to-build-dsl.md" target="_blank" class="blog-card">
+          <span class="blog-card-date">Apr 9, 2026</span>
+          <div class="blog-card-title">Building the Tools to Build the DSL</div>
+          <p class="blog-card-excerpt">
+            Two new annotations — @PermuteConst and lambda @PermuteParam — unblocked
+            the Drools migration. The literal that Permuplate couldn't touch, and
+            lambda params that already were legal Java.
+          </p>
+          <span class="blog-card-link">Read →</span>
+        </a>
+
+        <a href="https://github.com/mdproctor/permuplate/blob/main/docs/blog/2026-04-09-mdp01-rename-redirect-every-element-type.md" target="_blank" class="blog-card">
+          <span class="blog-card-date">Apr 9, 2026</span>
+          <div class="blog-card-title">Rename Redirect for Every Element Type</div>
+          <p class="blog-card-excerpt">
+            Shift+F6 on a generated method now redirects to the template. Methods,
+            fields, parameters — all redirect correctly. A shared PermuteElementResolver
+            eliminated three duplicate implementations in one pass.
+          </p>
+          <span class="blog-card-link">Read →</span>
+        </a>
+
+        <a href="https://github.com/mdproctor/permuplate/blob/main/docs/blog/2026-04-08-mdp02-plugin-complete-drools-waits.md" target="_blank" class="blog-card">
+          <span class="blog-card-date">Apr 8, 2026</span>
+          <div class="blog-card-title">The Plugin, Complete; Drools, More Complex Than Expected</div>
+          <p class="blog-card-excerpt">
+            Rename redirect and Find Usages in Permutation Family closed out the
+            IntelliJ plugin. Then we discovered droolsvol2 doesn't compile standalone
+            — mid-refactor, 14 files still referencing removed packages.
+          </p>
+          <span class="blog-card-link">Read →</span>
+        </a>
+      </div>
+
+      <div class="blog-all-link">
+        <a href="blog.html" class="btn btn-ghost">All 17 entries →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="footer-logo">Permuplate</span>
+      <div class="footer-tagline">Press once. Print many.</div>
+
+      <div class="footer-links">
+        <a href="docs.html">Docs</a>
+        <a href="blog.html">Blog</a>
+        <a href="https://github.com/mdproctor/permuplate" target="_blank">GitHub</a>
+        <a href="https://github.com/mdproctor/permuplate/blob/main/OVERVIEW.md" target="_blank">Architecture</a>
+        <a href="https://github.com/mdproctor/permuplate/blob/main/LICENSE" target="_blank">Apache 2.0</a>
+      </div>
+
+      <div class="footer-bottom">
+        <span class="footer-copy">Permuplate — Java annotation processor for arity permutations.</span>
+        <span class="footer-license">Apache-2.0</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Highlight.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+
+  <script>
+    // Syntax highlighting
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('pre code').forEach(function(el) {
+        hljs.highlightElement(el);
+      });
+
+      // Tab switcher for generated panel
+      const tabs = document.querySelectorAll('.gen-tab');
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          const paneId = this.dataset.pane;
+
+          // Deactivate all tabs and panes
+          tabs.forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.gen-pane').forEach(p => p.classList.remove('active'));
+
+          // Activate clicked tab and its pane
+          this.classList.add('active');
+          const pane = document.getElementById(paneId);
+          if (pane) {
+            pane.classList.add('active');
+            // Re-highlight if not done yet
+            pane.querySelectorAll('code:not(.hljs)').forEach(el => hljs.highlightElement(el));
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

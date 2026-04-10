@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentation — Permuplate</title>
+  <meta name="description" content="Permuplate documentation: quick start, architecture, annotation reference, and contributor guide." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/material-darker.min.css" />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">Permu<span>plate</span></a>
+      <ul class="nav-links">
+        <li><a href="docs.html">Docs</a></li>
+        <li><a href="blog.html">Blog</a></li>
+        <li><a href="https://github.com/mdproctor/permuplate" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/mdproctor/permuplate" target="_blank" class="nav-cta">View Source →</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="docs-hero section" style="border-top:none;">
+    <div class="container">
+      <div class="section-label">Reference</div>
+      <h1 style="font-size:clamp(4rem,12vw,8rem)">Documentation</h1>
+      <p style="color:var(--muted);font-size:0.95rem;max-width:520px;margin-top:var(--space-md);line-height:1.7">
+        Full documentation lives in the GitHub repository as versioned Markdown.
+        The links below take you directly to the rendered source. Start with
+        the Quick Start, then reach for the Architecture deep-dive when you need
+        to understand what the processor is doing under the hood.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       DOC CARDS
+       ============================================================ -->
+  <section class="section">
+    <div class="container">
+      <div class="section-label">Where to Start</div>
+      <h2>Guides</h2>
+
+      <div class="docs-grid mt-xl">
+        <a href="https://github.com/mdproctor/permuplate/blob/main/README.md" target="_blank" class="doc-card">
+          <span class="doc-card-tag">01 — Quick Start</span>
+          <h3>README</h3>
+          <p>
+            Installation, pom.xml configuration for both APT and Maven plugin modes,
+            the killer example, all annotations with full parameter reference,
+            and expression syntax.
+          </p>
+        </a>
+
+        <a href="https://github.com/mdproctor/permuplate/blob/main/OVERVIEW.md" target="_blank" class="doc-card">
+          <span class="doc-card-tag">02 — Architecture</span>
+          <h3>OVERVIEW</h3>
+          <p>
+            Deep-dive into the annotation processor pipeline, transformation engine,
+            JavaParser AST machinery, market comparison, non-obvious decisions, and
+            the full roadmap.
+          </p>
+        </a>
+
+        <a href="https://github.com/mdproctor/permuplate/blob/main/permuplate-mvn-examples/DROOLS-DSL.md" target="_blank" class="doc-card">
+          <span class="doc-card-tag">03 — Real-World Use</span>
+          <h3>Drools DSL</h3>
+          <p>
+            Six phases of type-safe rule-builder API generation — the fullest
+            real-world demonstration of what Permuplate can do when pushed hard.
+          </p>
+        </a>
+      </div>
+
+      <div class="docs-grid mt-lg" style="margin-top:var(--space-lg)">
+        <a href="https://github.com/mdproctor/permuplate/tree/main/docs/design-snapshots" target="_blank" class="doc-card">
+          <span class="doc-card-tag">04 — Architecture Snapshots</span>
+          <h3>Design Snapshots</h3>
+          <p>
+            Frozen state records of the architecture at key points in development.
+            The 2026-04-06 snapshot is the current reference for the DSL sandbox.
+          </p>
+        </a>
+
+        <a href="https://github.com/mdproctor/permuplate/tree/main/docs/adr" target="_blank" class="doc-card">
+          <span class="doc-card-tag">05 — Decision Log</span>
+          <h3>ADRs</h3>
+          <p>
+            Formal architectural decision records — ADR-0001 through ADR-0004 cover
+            the DSL sandbox: type-safe tuples, END phantom type, NegationScope,
+            and OOPath runtime.
+          </p>
+        </a>
+
+        <a href="https://github.com/mdproctor/permuplate/blob/main/CLAUDE.md" target="_blank" class="doc-card">
+          <span class="doc-card-tag">06 — Contributors</span>
+          <h3>CLAUDE.md</h3>
+          <p>
+            Full contributor context: module layout, processor internals, key
+            non-obvious decisions, error reporting standards, and test structure.
+            Aimed at anyone working inside the processor.
+          </p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       QUICK START CODE
+       ============================================================ -->
+  <section class="section" style="background:var(--press)">
+    <div class="container">
+      <div class="section-label">Step by Step</div>
+      <h2>Quick Start</h2>
+
+      <div style="margin-top:var(--space-xl);display:grid;grid-template-columns:1fr 1fr;gap:var(--space-lg)">
+        <div>
+          <p class="sub" style="margin-bottom:var(--space-md);color:var(--orange)">Step 1 — Add the processor</p>
+          <pre style="background:var(--plate);border:1px solid var(--rule);padding:var(--space-md);overflow-x:auto"><code class="language-xml">&lt;annotationProcessorPaths&gt;
+  &lt;path&gt;
+    &lt;groupId&gt;io.quarkiverse.permuplate&lt;/groupId&gt;
+    &lt;artifactId&gt;quarkus-permuplate-processor&lt;/artifactId&gt;
+    &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
+  &lt;/path&gt;
+  &lt;path&gt;
+    &lt;groupId&gt;com.github.javaparser&lt;/groupId&gt;
+    &lt;artifactId&gt;javaparser-core&lt;/artifactId&gt;
+    &lt;version&gt;3.25.9&lt;/version&gt;
+  &lt;/path&gt;
+  &lt;path&gt;
+    &lt;groupId&gt;org.apache.commons&lt;/groupId&gt;
+    &lt;artifactId&gt;commons-jexl3&lt;/artifactId&gt;
+    &lt;version&gt;3.3&lt;/version&gt;
+  &lt;/path&gt;
+&lt;/annotationProcessorPaths&gt;</code></pre>
+        </div>
+
+        <div>
+          <p class="sub" style="margin-bottom:var(--space-md);color:var(--orange)">Step 2 — Write a template</p>
+          <pre style="background:var(--tpl-bg);border:1px solid var(--tpl-border);padding:var(--space-md);overflow-x:auto"><code class="language-java">@Permute(varName = "i",
+         from = "3", to = "10",
+         className = "Join${i}")
+public class Join2 {
+
+    private @PermuteDeclr(
+        type = "Callable${i}",
+        name = "c${i}") Callable2 c2;
+
+    public void join(
+        @PermuteParam(varName = "j",
+            from = "1", to = "${i-1}",
+            type = "Object",
+            name = "o${j}") Object o1) {
+        c2.call(o1, o2);
+    }
+}</code></pre>
+        </div>
+      </div>
+
+      <div style="margin-top:var(--space-lg);background:var(--plate);border:1px solid var(--rule);border-left:3px solid var(--orange);padding:var(--space-lg)">
+        <p class="sub" style="color:var(--orange);margin-bottom:var(--space-sm)">Step 3 — Run mvn compile</p>
+        <pre style="overflow-x:auto"><code class="language-bash">mvn compile
+# Join3.java, Join4.java ... Join10.java appear in target/generated-sources/annotations/
+# No scripts. No committed generated files. Just javac.</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       ANNOTATION REFERENCE (condensed)
+       ============================================================ -->
+  <section class="section roster-section">
+    <div class="container">
+      <div class="section-label">Reference</div>
+      <h2>Annotation Reference</h2>
+
+      <div class="annotation-roster mt-xl">
+        <div class="roster-header">
+          <div class="roster-col-head">Annotation</div>
+          <div class="roster-col-head">Placed on</div>
+          <div class="roster-col-head">What it does</div>
+        </div>
+
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@Permute</span></div>
+          <div class="roster-cell"><span class="roster-on">class / method</span></div>
+          <div class="roster-cell"><span class="roster-desc">Outer loop. Generates N types or collects N method overloads into one class. Supports <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">from</code>/<code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">to</code> as JEXL expressions, string constants, cross-product via <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">extraVars</code>, and inline mode via Maven plugin.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteVar</span></div>
+          <div class="roster-cell"><span class="roster-on">nested on @Permute</span></div>
+          <div class="roster-cell"><span class="roster-desc">Additional integer loop axis. One class per combination of primary variable and all extra variables — cross-product generation with a single template.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteDeclr</span></div>
+          <div class="roster-cell"><span class="roster-on">field / param / for-each</span></div>
+          <div class="roster-cell"><span class="roster-desc">Scope-aware rename: field → class-wide, constructor param → constructor body, for-each variable → loop body only. <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">name=""</code> changes type only (method params).</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteParam</span></div>
+          <div class="roster-cell"><span class="roster-on">method / constructor param</span></div>
+          <div class="roster-cell"><span class="roster-desc">Sentinel expansion. Inner loop generates <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">o1..o(i-1)</code>. Call-site anchor expansion rewrites every call in the body — including inside lambdas, with proper scoping.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteTypeParam</span></div>
+          <div class="roster-cell"><span class="roster-on">type parameter</span></div>
+          <div class="roster-cell"><span class="roster-desc">Expands a sentinel type parameter. Implicit when <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">@PermuteParam</code> uses <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">T${j}</code> naming. Bounds propagated: <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">T1 extends Comparable&lt;T1&gt;</code> → each generated <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">Tk extends Comparable&lt;Tk&gt;</code>.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteConst</span></div>
+          <div class="roster-cell"><span class="roster-on">field / local var</span></div>
+          <div class="roster-cell"><span class="roster-desc">Replaces initializer with evaluated JEXL expression. Combinable with <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">@PermuteDeclr</code> on the same field — rename first, substitute value second.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteValue</span></div>
+          <div class="roster-cell"><span class="roster-on">field / var / method</span></div>
+          <div class="roster-cell"><span class="roster-desc">Superset of @PermuteConst. Also replaces the RHS of the assignment statement at <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">index</code> (0-based) in a method or constructor body.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteReturn</span></div>
+          <div class="roster-cell"><span class="roster-on">method</span></div>
+          <div class="roster-cell"><span class="roster-desc">Controls return type per permutation. Methods are silently omitted when the evaluated return type is not in the generated set — the leaf-class pattern. <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">when="true"</code> overrides.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteMethod</span></div>
+          <div class="roster-cell"><span class="roster-on">method</span></div>
+          <div class="roster-cell"><span class="roster-desc">Inner loop generates one overload per value. <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">to</code> defaults to <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">@Permute.to - i</code> (inferred). Empty range = leaf class; method omitted silently.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteExtends</span></div>
+          <div class="roster-cell"><span class="roster-on">class</span></div>
+          <div class="roster-cell"><span class="roster-desc">Explicit extends/implements clause control. Implicit same-N expansion fires automatically for standard naming — use this only when inference doesn't apply. Maven plugin inline mode only.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteCase</span></div>
+          <div class="roster-cell"><span class="roster-on">method / constructor</span></div>
+          <div class="roster-cell"><span class="roster-desc">Inserts switch cases from an inner loop. Seed case and default preserved. New cases inserted before default. Empty range = no cases inserted.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteStatements</span></div>
+          <div class="roster-cell"><span class="roster-on">method / constructor</span></div>
+          <div class="roster-cell"><span class="roster-desc">Inserts generated statements at <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">position="first"</code> or <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">position="last"</code>. Applied after @PermuteValue.</span></div>
+        </div>
+        <div class="roster-row">
+          <div class="roster-cell"><span class="annot-name">@PermuteImport</span></div>
+          <div class="roster-cell"><span class="roster-on">class (repeatable)</span></div>
+          <div class="roster-cell"><span class="roster-desc">Adds a JEXL-evaluated import to each generated class. Stripped from output. Use when generated types reference classes the template's own imports can't cover.</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       EXPRESSION FUNCTIONS
+       ============================================================ -->
+  <section class="section" style="background:var(--press)">
+    <div class="container">
+      <div class="section-label">Expressions</div>
+      <h2>Built-in Functions</h2>
+
+      <p style="color:var(--muted);max-width:580px;font-size:0.9rem;line-height:1.7;margin-top:var(--space-md);margin-bottom:var(--space-xl)">
+        All annotation string attributes are evaluated by Apache Commons JEXL3.
+        These built-in functions are available in every <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">${...}</code>
+        expression without any prefix or import.
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--rule)">
+        <div style="padding:var(--space-lg);border-right:1px solid var(--rule)">
+          <div class="annot-name" style="font-size:1rem;margin-bottom:var(--space-sm)">alpha(n)</div>
+          <p style="font-size:0.85rem;color:var(--muted);line-height:1.6">Integer → uppercase letter, 1-indexed. 1=A, 26=Z. Out of range throws at generation time.</p>
+          <pre style="margin-top:var(--space-md);background:var(--plate);border:1px solid var(--rule);padding:var(--space-sm)"><code class="language-java">${alpha(j)} → A, B, C</code></pre>
+        </div>
+        <div style="padding:var(--space-lg);border-right:1px solid var(--rule)">
+          <div class="annot-name" style="font-size:1rem;margin-bottom:var(--space-sm)">lower(n)</div>
+          <p style="font-size:0.85rem;color:var(--muted);line-height:1.6">Integer → lowercase letter, 1-indexed. 1=a, 26=z. Same range as alpha.</p>
+          <pre style="margin-top:var(--space-md);background:var(--plate);border:1px solid var(--rule);padding:var(--space-sm)"><code class="language-java">${lower(j)} → a, b, c</code></pre>
+        </div>
+        <div style="padding:var(--space-lg)">
+          <div class="annot-name" style="font-size:1rem;margin-bottom:var(--space-sm)">typeArgList(from, to, style)</div>
+          <p style="font-size:0.85rem;color:var(--muted);line-height:1.6">Comma-separated type argument list. Styles: <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">"T"</code>, <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">"alpha"</code>, <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">"lower"</code>. Returns <code style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--orange)">""</code> when from &gt; to.</p>
+          <pre style="margin-top:var(--space-md);background:var(--plate);border:1px solid var(--rule);padding:var(--space-sm)"><code class="language-java">${typeArgList(1,i,'T')}
+→ T1, T2, T3</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="footer-logo">Permuplate</span>
+      <div class="footer-tagline">Press once. Print many.</div>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="blog.html">Blog</a>
+        <a href="https://github.com/mdproctor/permuplate" target="_blank">GitHub</a>
+        <a href="https://github.com/mdproctor/permuplate/blob/main/LICENSE" target="_blank">Apache 2.0</a>
+      </div>
+      <div class="footer-bottom">
+        <span class="footer-copy">Permuplate — Java annotation processor for arity permutations.</span>
+        <span class="footer-license">Apache-2.0</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('pre code').forEach(function(el) {
+        hljs.highlightElement(el);
+      });
+    });
+  </script>
+</body>
+</html>

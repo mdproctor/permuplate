@@ -18,7 +18,9 @@ import io.quarkiverse.permuplate.core.PermuteCaseTransformer;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteStatementsTransformer;
 import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteValueTransformer;
 
 /**
  * Generates an augmented parent {@link CompilationUnit} containing all permuted
@@ -123,6 +125,12 @@ public class InlineGenerator {
             // @PermuteCase — expand switch statement cases per permutation
             PermuteCaseTransformer.transform(generated, ctx);
 
+            // @PermuteValue — replace field initializers and method statement RHS
+            PermuteValueTransformer.transform(generated, ctx);
+
+            // @PermuteStatements — insert accumulated statements into method bodies
+            PermuteStatementsTransformer.transform(generated, ctx);
+
             // @PermuteImport — add evaluated imports to the parent CU
             for (String importStr : collectInlinePermuteImports(generated, ctx)) {
                 boolean alreadyPresent = outputCu.getImports().stream()
@@ -138,12 +146,20 @@ public class InlineGenerator {
                         || n.equals("PermuteImports") || n.equals("io.quarkiverse.permuplate.PermuteImports");
             });
 
-            // Extends/implements clause expansion (same-N formula)
-            int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
-            int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
-            if (templateEmbeddedNum >= 0 && currentEmbeddedNum >= 0) {
-                applyExtendsExpansion(generated, templateClassName, templateEmbeddedNum, currentEmbeddedNum,
-                        postG1TypeParams);
+            // @PermuteExtends — explicit override of extends/implements clause.
+            // When @PermuteExtends fires, skip the automatic same-N expansion to avoid
+            // overriding the explicit clause.
+            boolean permuteExtendsApplied = hasPermuteExtendsAnnotation(generated);
+            applyPermuteExtendsAnnotation(generated, ctx);
+
+            // Extends/implements clause expansion (same-N formula) — only when no explicit override
+            if (!permuteExtendsApplied) {
+                int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
+                int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
+                if (templateEmbeddedNum >= 0 && currentEmbeddedNum >= 0) {
+                    applyExtendsExpansion(generated, templateClassName, templateEmbeddedNum, currentEmbeddedNum,
+                            postG1TypeParams);
+                }
             }
 
             // Strip @Permute
@@ -425,6 +441,120 @@ public class InlineGenerator {
             end++;
         int num = Integer.parseInt(name.substring(start, end));
         return name.substring(0, start) + (num + offset) + name.substring(end);
+    }
+
+    /** Returns {@code true} if the class has a {@code @PermuteExtends} annotation. */
+    private static boolean hasPermuteExtendsAnnotation(ClassOrInterfaceDeclaration classDecl) {
+        return classDecl.getAnnotations().stream()
+                .anyMatch(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteExtends") || n.equals("io.quarkiverse.permuplate.PermuteExtends");
+                });
+    }
+
+    /**
+     * Applies explicit {@code @PermuteExtends} annotation to override the extends or
+     * implements clause of the generated class.
+     *
+     * <p>
+     * Evaluates {@code className} using the current permutation context, then builds
+     * the type argument list either via a loop ({@code typeArgVarName}/{@code typeArgFrom}/
+     * {@code typeArgTo}/{@code typeArgName}) or a full expression ({@code typeArgs}).
+     * Sets the extends clause (index 0) or the specified implements clause
+     * ({@code interfaceIndex} ≥ 0 selects which implements entry).
+     *
+     * <p>
+     * Strips the {@code @PermuteExtends} annotation after processing. The annotation
+     * was previously only stripped without being acted on — this method provides the
+     * missing implementation.
+     */
+    private static void applyPermuteExtendsAnnotation(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx) {
+
+        java.util.Optional<com.github.javaparser.ast.expr.AnnotationExpr> annOpt = classDecl.getAnnotations()
+                .stream()
+                .filter(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteExtends")
+                            || n.equals("io.quarkiverse.permuplate.PermuteExtends");
+                })
+                .findFirst();
+
+        if (annOpt.isEmpty())
+            return;
+
+        com.github.javaparser.ast.expr.AnnotationExpr ann = annOpt.get();
+        AnnotationReader.PermuteExtendsConfig cfg = AnnotationReader.readPermuteExtends(ann);
+        if (cfg == null) {
+            classDecl.getAnnotations().remove(ann);
+            return;
+        }
+
+        // Evaluate the base class name
+        String evaluatedClass;
+        try {
+            evaluatedClass = ctx.evaluate(cfg.className());
+        } catch (Exception ignored) {
+            classDecl.getAnnotations().remove(ann);
+            return;
+        }
+
+        // Build type argument list
+        String typeArgStr = "";
+        if (cfg.hasTypeArgsExpr()) {
+            try {
+                typeArgStr = ctx.evaluate("${" + cfg.typeArgs() + "}");
+            } catch (Exception ignored) {
+            }
+        } else if (cfg.hasTypeArgLoop()) {
+            try {
+                int fromVal = ctx.evaluateInt(cfg.typeArgFrom());
+                int toVal = ctx.evaluateInt(cfg.typeArgTo());
+                StringBuilder sb = new StringBuilder();
+                for (int k = fromVal; k <= toVal; k++) {
+                    if (k > fromVal)
+                        sb.append(", ");
+                    EvaluationContext innerCtx = ctx.withVariable(cfg.typeArgVarName(), k);
+                    sb.append(innerCtx.evaluate(cfg.typeArgName()));
+                }
+                typeArgStr = sb.toString();
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Build the full type expression string
+        String newTypeStr = typeArgStr.isEmpty()
+                ? evaluatedClass
+                : evaluatedClass + "<" + typeArgStr + ">";
+
+        try {
+            com.github.javaparser.ast.type.ClassOrInterfaceType newType = StaticJavaParser
+                    .parseClassOrInterfaceType(newTypeStr);
+
+            int idx = cfg.interfaceIndex();
+            if (idx == 0) {
+                // interfaceIndex 0: target the extends clause
+                if (!classDecl.getExtendedTypes().isEmpty()) {
+                    classDecl.getExtendedTypes().set(0, newType);
+                } else {
+                    classDecl.addExtendedType(newType);
+                }
+            } else {
+                // interfaceIndex 1+: target the (idx-1)th implements entry (0-indexed)
+                int implIdx = idx - 1;
+                com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> implemented = classDecl
+                        .getImplementedTypes();
+                if (implIdx < implemented.size()) {
+                    implemented.set(implIdx, newType);
+                } else {
+                    implemented.add(newType);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        // Remove @PermuteExtends from the generated class
+        classDecl.getAnnotations().remove(ann);
     }
 
     /**
@@ -963,6 +1093,8 @@ public class InlineGenerator {
                 "PermuteExtends", "io.quarkiverse.permuplate.PermuteExtends",
                 "PermuteConst", "io.quarkiverse.permuplate.PermuteConst",
                 "PermuteCase", "io.quarkiverse.permuplate.PermuteCase",
+                "PermuteValue", "io.quarkiverse.permuplate.PermuteValue",
+                "PermuteStatements", "io.quarkiverse.permuplate.PermuteStatements",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
                 "PermuteImports", "io.quarkiverse.permuplate.PermuteImports");
 

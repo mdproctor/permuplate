@@ -114,7 +114,7 @@ See [`permuplate-mvn-examples/DROOLS-DSL.md`](permuplate-mvn-examples/DROOLS-DSL
 **Step 2: Write a template class**
 
 ```java
-@Permute(varName = "i", from = 3, to = 5, className = "Join${i}")
+@Permute(varName = "i", from = "3", to = "5", className = "Join${i}")
 public class Join2 {
 
     private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;
@@ -258,7 +258,7 @@ The best way to see why this is different is to look at what the template *is* v
 ### The template (one file, ~20 lines)
 
 ```java
-@Permute(varName = "i", from = 3, to = 10, className = "Join${i}")
+@Permute(varName = "i", from = "3", to = "10", className = "Join${i}")
 public class Join2 {
 
     private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;
@@ -335,7 +335,7 @@ One template. Eight generated classes. Every field rename, parameter expansion, 
 Real methods have context parameters that don't permute. Permuplate handles them naturally — annotate only the sentinel parameter, and everything else stays in place:
 
 ```java
-@Permute(varName = "i", from = 3, to = 5, className = "ContextJoin${i}")
+@Permute(varName = "i", from = "3", to = "5", className = "ContextJoin${i}")
 public class ContextJoin2 {
 
     private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;
@@ -391,7 +391,7 @@ If you want generated classes to live alongside a related class without pollutin
 ```java
 public class JoinLibrary {
 
-    @Permute(varName = "i", from = 3, to = 5, className = "FilterJoin${i}")
+    @Permute(varName = "i", from = "3", to = "5", className = "FilterJoin${i}")
     public static class FilterJoin2 {
 
         private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;
@@ -427,11 +427,11 @@ Drives the outer loop. Supported in two positions:
 | Parameter | Type | Meaning |
 |---|---|---|
 | `varName` | `String` | The integer loop variable name (e.g. `"i"`) |
-| `from` | `int` | Inclusive lower bound |
-| `to` | `int` | Inclusive upper bound |
+| `from` | `String` | Inclusive lower bound — JEXL expression (e.g. `"3"`, `"${start}"`) |
+| `to` | `String` | Inclusive upper bound — JEXL expression (e.g. `"10"`, `"${max}"`) |
 | `className` | `String` | Output type/class name. For type permutation: a template evaluated per-i (e.g. `"Join${i}"`). For method permutation: a fixed class name (e.g. `"MultiJoin"`) containing all overloads. |
 | `strings` | `String[]` | Named string constants available in all `${...}` expressions alongside `varName`. Each entry is `"key=value"`. Example: `strings = {"prefix=Buffered"}` makes `${prefix}` expand to `"Buffered"` in `className`, `@PermuteDeclr`, and `@PermuteParam`. See [Expression syntax — String variables](#string-variables). |
-| `extraVars` | `@PermuteVar[]` | Additional integer loop variables for cross-product generation. Each `@PermuteVar(varName="k", from=2, to=4)` adds one axis; one output type is generated per combination. Primary variable is the outermost loop; `extraVars` are inner loops in declaration order. Variable names must not conflict with `varName` or `strings` keys. See [Expression syntax — Multiple permutation variables](#multiple-permutation-variables). |
+| `extraVars` | `@PermuteVar[]` | Additional integer loop variables for cross-product generation. Each `@PermuteVar(varName="k", from="2", to="4")` adds one axis; one output type is generated per combination. Primary variable is the outermost loop; `extraVars` are inner loops in declaration order. Variable names must not conflict with `varName` or `strings` keys. See [Expression syntax — Multiple permutation variables](#multiple-permutation-variables). |
 | `inline` | `boolean` | Default `false`. When `true`, generates permuted classes as nested siblings inside the parent class rather than separate top-level files. Only valid on nested static classes. Requires `permuplate-maven-plugin`; the APT annotation processor reports a compile error if set. Template must be in `src/main/permuplate/`. |
 | `keepTemplate` | `boolean` | Default `false`. When `true` and `inline = true`, retains the template class itself in the output alongside the permuted classes. When `false`, the template class is removed. Has no effect when `inline = false`. |
 
@@ -441,7 +441,7 @@ Drives the outer loop. Supported in two positions:
 
 ```java
 public class Handlers {
-    @Permute(varName = "i", from = 2, to = 5,
+    @Permute(varName = "i", from = "2", to = "5",
              className = "Handler${i}",
              inline = true,
              keepTemplate = true)
@@ -482,7 +482,7 @@ public Object join(@PermuteDeclr(type="Source<T${i+1}>") Object src) { ... }
 
 ### `@PermuteParam`
 
-Expands a sentinel parameter into a generated sequence, and rewrites call sites in the method body where the sentinel's name appears as an argument. A method may have **multiple** `@PermuteParam` sentinels — each is expanded independently in declaration order, with both anchors rewritten at any shared call sites.
+Expands a sentinel parameter into a generated sequence, and rewrites call sites in the method or constructor body where the sentinel's name appears as an argument. A method or constructor may have **multiple** `@PermuteParam` sentinels — each is expanded independently in declaration order, with both anchors rewritten at any shared call sites.
 
 | Parameter | Meaning |
 |---|---|
@@ -492,7 +492,7 @@ Expands a sentinel parameter into a generated sequence, and rewrites call sites 
 | `type` | Generated parameter type (e.g. `"Object"`) |
 | `name` | Generated parameter name template (e.g. `"o${j}"`) |
 
-Parameters not annotated with `@PermuteParam` are preserved in their original positions before and after each expanded sequence.
+Parameters not annotated with `@PermuteParam` are preserved in their original positions before and after each expanded sequence. Works on both method and constructor parameters.
 
 **Dual-sentinel example:** two independent ranges in one method:
 
@@ -505,6 +505,126 @@ public void merge(
 ```
 
 For `i=3` generates `merge(Object left1, Object left2, Object right1, Object right2)` with the call site expanded to `Collections.addAll(results, left1, left2, right1, right2)`.
+
+---
+
+### `@PermuteConst`
+
+Replaces the initializer of a field or local variable with the evaluated result of a JEXL expression. The existing initializer is kept only to make the template compile — it is substituted in every generated class.
+
+```java
+@PermuteConst("${i}")
+int ARITY = 2;
+// Generated for i=3: int ARITY = 3;
+```
+
+May be combined with `@PermuteDeclr` on the same field — `@PermuteDeclr` updates type and name; `@PermuteConst` updates the value:
+
+```java
+@PermuteDeclr(type = "int", name = "ARITY_${i}")
+@PermuteConst("${i}")
+int ARITY_2 = 2;
+// Generated for i=3: int ARITY_3 = 3; and references updated to ARITY_3
+```
+
+> **`@PermuteConst` vs `@PermuteValue`:** `@PermuteConst` is a backward-compatible alias for `@PermuteValue` on fields and local variables. Prefer `@PermuteValue` in new code; `@PermuteConst` remains supported.
+
+---
+
+### `@PermuteValue`
+
+A superset of `@PermuteConst`. Replaces:
+- On a **field or local variable**: the initializer (same as `@PermuteConst`)
+- On a **method or constructor**: the RHS of the assignment statement at position `index` (0-based, counting from the first statement in the original template body)
+
+| Parameter | Meaning |
+|---|---|
+| `value` | JEXL expression for the replacement value (e.g. `"${i}"`, `"${i * 2}"`) |
+| `index` | 0-based index of the statement in the method/constructor body (only for method/constructor target). |
+
+```java
+@PermuteValue("${i}")
+int ARITY = 2;
+// Same as @PermuteConst on a field
+
+@PermuteValue(index = 1, value = "${i}")
+public void init() {
+    this.name = "x";  // statement 0 — untouched
+    this.size = 1;    // statement 1 — RHS "1" becomes ${i}
+}
+```
+
+---
+
+### `@PermuteStatements`
+
+Inserts statements into a **method or constructor** body at a specified position. Works with or without an inner loop.
+
+| Parameter | Meaning |
+|---|---|
+| `varName` | Inner loop variable (omit for single-statement insertion) |
+| `from` | Inner loop lower bound |
+| `to` | Inner loop upper bound |
+| `position` | `"first"` — before all existing statements; `"last"` — after all existing statements |
+| `body` | JEXL template for the statement(s) to insert |
+
+Applied **after** `@PermuteValue`, so `@PermuteValue` indices refer to the original template body positions.
+
+```java
+@PermuteStatements(varName = "k", from = "1", to = "${i-1}",
+                   position = "first", body = "this.${lower(k)} = ${lower(k)};")
+public Tuple1(A a) {
+    this.a = a;
+    this.size = 1;
+}
+// Tuple3 gets: this.a=a; this.b=b; [original body: this.c=c; this.size=3;]
+```
+
+---
+
+### `@PermuteCase`
+
+Expands a `switch` statement in the annotated method by inserting new cases per inner-loop value — fully inlined, no inheritance delegation.
+
+| Parameter | Meaning |
+|---|---|
+| `varName` | Inner loop variable |
+| `from` | Inner loop lower bound |
+| `to` | Inner loop upper bound (empty range = no cases inserted) |
+| `index` | JEXL expression for the case label integer (e.g. `"${k}"`) |
+| `body` | JEXL template for the case body statements |
+
+The seed case and `default` case in the template are preserved unchanged. New cases are inserted immediately before `default`.
+
+```java
+@PermuteCase(varName = "k", from = "1", to = "${i-1}",
+             index = "${k}", body = "return (T) ${lower(k+1)};")
+public <T> T get(int index) {
+    switch (index) {
+        case 0:
+            return (T) a;  // seed case — unchanged in all generated classes
+        default:
+            throw new IndexOutOfBoundsException(index);
+    }
+}
+// Tuple3 (i=3): switch with cases 0, 1, 2 — all inlined, no super() calls
+```
+
+---
+
+### `@PermuteImport`
+
+Adds a JEXL-evaluated import statement to each generated class. Placed on the template class. Repeatable (`@PermuteImport` / `@PermuteImports`).
+
+```java
+@Permute(varName = "i", from = "3", to = "10", className = "Join${i}First", inline = true)
+@PermuteImport("org.drools.core.function.BaseTuple.Tuple${i}")
+@PermuteImport("org.drools.core.RuleOOPathBuilder.Path${i}")
+public static class Join2First<...> { ... }
+// Generated Join4First gets: import BaseTuple.Tuple4; import RuleOOPathBuilder.Path4;
+```
+
+The annotation and its imports are stripped from the generated output. Useful when generated types reference classes whose import cannot be derived from the template's own imports.
 
 ---
 
@@ -525,7 +645,7 @@ In the common case with `@PermuteParam` and `T${j}` naming, this annotation is *
 
 **Type-safe Consumer family — implicit expansion (no `@PermuteTypeParam` needed):**
 ```java
-@Permute(varName="i", from=2, to=5, className="Consumer${i}")
+@Permute(varName="i", from="2", to="5", className="Consumer${i}")
 public interface Consumer1<T1> {
     void accept(
         @PermuteParam(varName="j", from="1", to="${i}", type="T${j}", name="arg${j}") T1 arg1);
@@ -536,7 +656,7 @@ public interface Consumer1<T1> {
 
 **Phantom type — explicit `@PermuteTypeParam` (no method parameters):**
 ```java
-@Permute(varName="i", from=2, to=5, className="Step${i}", inline=true, keepTemplate=true)
+@Permute(varName="i", from="2", to="5", className="Step${i}", inline=true, keepTemplate=true)
 public class Step1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="T${j}") T1> { }
 // Generates: Step2<T1,T2>, Step3<T1,T2,T3>, etc.
 ```
@@ -586,7 +706,7 @@ public class Step1<T1> {
 
 **APT mode (explicit annotations required):**
 ```java
-@Permute(varName="i", from=1, to=4, className="Step${i}")
+@Permute(varName="i", from="1", to="4", className="Step${i}")
 public class Step1<T1> {
     @PermuteReturn(className="Step${i+1}",
                    typeArgVarName="j", typeArgFrom="1", typeArgTo="${i+1}", typeArgName="T${j}")
@@ -612,7 +732,7 @@ Generates **multiple method overloads** per class using an inner loop variable. 
 
 **Join chain with multiple overloads — inline mode (zero annotations):**
 ```java
-@Permute(varName="i", from=1, to=5, className="Join${i}Second", inline=true, keepTemplate=true)
+@Permute(varName="i", from="1", to="5", className="Join${i}Second", inline=true, keepTemplate=true)
 public class Join1Second<T1> {
     // @PermuteMethod.to inferred as @Permute.to - i = 5 - i
     // i=1: j=1..4 → 4 join() overloads; i=5: j=1..0 → leaf, 0 overloads
@@ -623,7 +743,7 @@ public class Join1Second<T1> {
 
 **Named method series:**
 ```java
-@PermuteMethod(varName="k", from=2, to=4, name="path${k}")
+@PermuteMethod(varName="k", from="2", to="4", name="path${k}")
 public <@PermuteTypeParam(varName="j", from="1", to="${k-1}", name="P${j}") PB>
        Object path2() { ... }
 // Generates: path2<PB>(), path3<PB,PC>(), path4<PB,PC,PD>()
@@ -635,14 +755,23 @@ public <@PermuteTypeParam(varName="j", from="1", to="${k-1}", name="P${j}") PB>
 
 Explicit control over `extends`/`implements` clause expansion. In the common case — same `T${j}` naming, type args matching the class's declared type params in order — extends/implements expansion is **automatic** without this annotation.
 
-Use `@PermuteExtends` only when implicit inference doesn't apply (non-standard naming, subset of type args).
+Use `@PermuteExtends` only when implicit inference doesn't apply (non-standard naming, subset of type args, or targeting `implements` rather than `extends`). **Inline mode (Maven plugin) only.**
+
+When `@PermuteExtends` is present, the automatic same-N extends expansion is skipped for that class.
 
 | Parameter | Meaning |
 |---|---|
-| `className` | New extends class name template |
+| `className` | New extends class name template (evaluated with current context) |
 | `typeArgVarName` / `typeArgFrom` / `typeArgTo` / `typeArgName` | Loop-based type argument generation |
-| `typeArgs` | Full JEXL expression for type argument list |
-| `interfaceIndex` | `0` (default) = `extends` clause; `1+` = nth `implements` interface |
+| `typeArgs` | Full JEXL expression for type argument list (alternative to loop) |
+| `interfaceIndex` | `0` (default) = `extends` clause; `1+` = nth `implements` interface (0-indexed) |
+
+```java
+@PermuteExtends(className="Join${i}Second",
+                typeArgVarName="k", typeArgFrom="1", typeArgTo="${i}", typeArgName="T${k}")
+public class Join1First<T1> extends Join1Second<T1> { ... }
+// Join3First extends Join3Second<T1, T2, T3>
+```
 
 ---
 
@@ -659,12 +788,36 @@ Callable${i} → Callable3   (string interpolation)
 o${j}        → o2          (inner loop variable)
 ```
 
+### External property injection
+
+Named constants can be injected from outside the annotation — useful for making templates configurable at build time without modifying source.
+
+| Source | APT | Maven | Example |
+|---|---|---|---|
+| System property with `permuplate.` prefix | Yes | Yes | `-Dpermuplate.max=10` → `${max}` |
+| APT option with `permuplate.` prefix | Yes | No | `-Apermuplate.max=10` → `${max}` |
+| Annotation `strings` constant | Yes | Yes | `strings={"max=10"}` → `${max}` |
+
+Resolution order: `strings` overrides APT options, which override system properties. Prefer `strings` for values fixed per template; prefer `-D` system properties for build-time configuration shared across templates.
+
+**Example — configurable upper bound:**
+```java
+// In template:
+@Permute(varName = "i", from = "3", to = "${max}", className = "Join${i}First")
+
+// At build time (both APT and Maven plugin):
+// mvn compile -Dpermuplate.max=10
+
+// APT-only alternative (not available to Maven plugin):
+// <compilerArgs><arg>-Apermuplate.max=10</arg></compilerArgs>
+```
+
 ### String variables
 
 The `strings` attribute on `@Permute` defines named string constants that are available alongside the integer variable in every `${...}` expression:
 
 ```java
-@Permute(varName = "i", from = 3, to = 5,
+@Permute(varName = "i", from = "3", to = "5",
          className = "${prefix}Join${i}",
          strings = { "prefix=Buffered" })
 public class BufferedJoin2 { ... }
@@ -679,9 +832,9 @@ Each entry in `strings` must be in `"key=value"` format. The separator is the **
 `extraVars` adds additional integer axes. One output type is generated per combination (cross-product):
 
 ```java
-@Permute(varName = "i", from = 2, to = 4,
+@Permute(varName = "i", from = "2", to = "4",
          className = "BiCallable${i}x${k}",
-         extraVars = { @PermuteVar(varName = "k", from = 2, to = 4) })
+         extraVars = { @PermuteVar(varName = "k", from = "2", to = "4") })
 public interface BiCallable1x1 {
     void call(
         @PermuteParam(varName="j", from="1", to="${i}", type="Object", name="left${j}") Object left1,
@@ -735,7 +888,7 @@ Three paths to generating typed APIs. The annotation burden varies:
 
 **Why does `T${j}` naming enable inference?** The processor identifies the growing type parameter tip by finding type variables that are NOT declared on the class AND match a `T+number` pattern. Single-letter names like `A`, `B`, `C` have no numeric pattern — the processor cannot determine that `B` is second in a growing series.
 
-The `alpha(j)` function (N4) produces `A, B, C` output and works fully with explicit `@PermuteReturn` — it only disables *implicit* inference, not the feature itself.
+The `alpha(j)` function produces `A, B, C` output and works fully with explicit `@PermuteReturn` — it only disables *implicit* inference, not the feature itself.
 
 ---
 
@@ -746,15 +899,15 @@ Permuplate validates your templates at compile time and reports precise, actiona
 **Invalid range:**
 ```
 error: @Permute has invalid range: from=5 is greater than to=3 — no classes will be generated
-       @Permute(varName = "i", from = 5, to = 3, className = "Join${i}")
+       @Permute(varName = "i", from = "5", to = "3", className = "Join${i}")
                                ^^^^^
 ```
 
 **`className` doesn't share the template's base name:**
 ```
 error: @Permute className literal part "Bar" is not a prefix of the template class name "Join2"
-       @Permute(varName = "i", from = 3, to = 5, className = "Bar${i}")
-                                                              ^^^^^^^^^
+       @Permute(varName = "i", from = "3", to = "5", className = "Bar${i}")
+                                                                  ^^^^^^^^^
 ```
 
 **`@PermuteDeclr` annotation string doesn't match the actual declaration:**

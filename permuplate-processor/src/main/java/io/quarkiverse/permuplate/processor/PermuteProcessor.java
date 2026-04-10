@@ -38,7 +38,9 @@ import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteStatementsTransformer;
 import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteValueTransformer;
 import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 
@@ -376,6 +378,12 @@ public class PermuteProcessor extends AbstractProcessor {
 
         // 5e. @PermuteCase — expand switch statement cases per permutation
         io.quarkiverse.permuplate.core.PermuteCaseTransformer.transform(classDecl, ctx);
+
+        // 5f. @PermuteValue — replace field initializers and method statement RHS (before insertions)
+        PermuteValueTransformer.transform(classDecl, ctx);
+
+        // 5g. @PermuteStatements — insert accumulated statements into method bodies
+        PermuteStatementsTransformer.transform(classDecl, ctx);
 
         // 6. Remove @Permute from the class
         classDecl.getAnnotations().removeIf(a -> {
