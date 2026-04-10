@@ -62,13 +62,34 @@ public class PermuteTypeParamTransformer {
             EvaluationContext ctx,
             Messager messager,
             Element element) {
+        return transform(classDecl, ctx, messager, element, java.util.Collections.emptySet());
+    }
+
+    /**
+     * Entry point. Expands class type parameters and validates constraints.
+     *
+     * @param classDecl the cloned class declaration being transformed
+     * @param ctx the outer permutation context (contains {@code i}, string vars, etc.)
+     * @param messager for error reporting; {@code null} in Maven plugin mode
+     * @param element the annotated element for error location; {@code null} in Maven plugin mode
+     * @param implicitInferenceNames class names that implicit return type inference will handle —
+     *        methods whose return type base class is in this set are excluded from R1 validation
+     * @return names of the sentinel type parameters that were expanded
+     */
+    public static Set<String> transform(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            Messager messager,
+            Element element,
+            Set<String> implicitInferenceNames) {
 
         // Detect which type params will expand — needed for R1 pre-check
         Set<String> willExpand = detectExpansions(classDecl, ctx);
 
-        // R1: return type must not reference expanding type params
+        // R1: return type must not reference expanding type params.
+        // Skipped for methods that implicit inference will handle (return type base class
+        // is in implicitInferenceNames — those methods will be updated later in the pipeline).
         if (messager != null && !willExpand.isEmpty()) {
-            validateR1(classDecl, willExpand, messager, element);
+            validateR1(classDecl, willExpand, messager, element, implicitInferenceNames);
         }
 
         // Expand explicit @PermuteTypeParam annotations
@@ -326,11 +347,35 @@ public class PermuteTypeParamTransformer {
             Set<String> expandingSentinels,
             Messager messager,
             Element element) {
+        validateR1(classDecl, expandingSentinels, messager, element, java.util.Collections.emptySet());
+    }
+
+    private static void validateR1(ClassOrInterfaceDeclaration classDecl,
+            Set<String> expandingSentinels,
+            Messager messager,
+            Element element,
+            Set<String> implicitInferenceNames) {
         for (MethodDeclaration method : classDecl.getMethods()) {
             // @PermuteReturn explicitly handles return type transformation — R1 does not apply.
             if (hasPermuteReturn(method))
                 continue;
             String returnType = method.getTypeAsString();
+            // Implicit inference will handle methods whose return type is from the same
+            // generated class family. The template return type (e.g. "Chain2<T1,T2>") has base
+            // class "Chain2" — same prefix as generated "Chain3", "Chain4". Skip R1 when the
+            // return type base class prefix matches any generated name prefix in the family.
+            if (!implicitInferenceNames.isEmpty()) {
+                String baseClass = returnType.contains("<")
+                        ? returnType.substring(0, returnType.indexOf('<')).trim()
+                        : returnType.trim();
+                String basePrefix = prefixBeforeDigits(baseClass);
+                if (!basePrefix.isEmpty()) {
+                    boolean familyMatch = implicitInferenceNames.stream()
+                            .anyMatch(n -> prefixBeforeDigits(n).equals(basePrefix));
+                    if (familyMatch)
+                        continue;
+                }
+            }
             for (String sentinel : expandingSentinels) {
                 if (containsTypeRef(returnType, sentinel)) {
                     messager.printMessage(Diagnostic.Kind.ERROR,
@@ -629,6 +674,15 @@ public class PermuteTypeParamTransformer {
             }
         }
         return sb.toString();
+    }
+
+    /** Returns the substring of name up to (but not including) its first digit. */
+    private static String prefixBeforeDigits(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i)))
+                return name.substring(0, i);
+        }
+        return name;
     }
 
     /**

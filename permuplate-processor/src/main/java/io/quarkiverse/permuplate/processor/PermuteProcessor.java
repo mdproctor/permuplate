@@ -309,8 +309,10 @@ public class PermuteProcessor extends AbstractProcessor {
         // Note: @PermuteTypeParam is on TypeParameters (not the class annotation list).
         // The transformer replaces each sentinel TypeParameter with j expanded TypeParameters
         // that carry no annotations — so @PermuteTypeParam disappears by construction.
+        // Pass globalGeneratedNames so R1 validation skips methods that implicit inference
+        // will handle later (step 5d).
         PermuteTypeParamTransformer.transform(classDecl, ctx,
-                processingEnv.getMessager(), typeElement);
+                processingEnv.getMessager(), typeElement, globalGeneratedNames);
 
         // 1c. Extends clause expansion — update base class name to same-N sibling.
         // Must run after @PermuteTypeParam so postG1TypeParams reflects the expanded list.
@@ -336,8 +338,16 @@ public class PermuteProcessor extends AbstractProcessor {
         // 5b. @PermuteMethod — generate overloads with explicit @PermuteReturn
         applyPermuteMethodApt(classDecl, ctx, permute, typeElement);
 
-        // 5c. @PermuteReturn — replace Object sentinel return type + boundary omission
+        // 5c. @PermuteReturn — replace Object sentinel return type + boundary omission.
+        // Collect explicit-return method keys BEFORE applyPermuteReturn removes annotations,
+        // so that step 5d can exclude them from implicit inference.
+        java.util.Set<String> explicitReturnMethods = collectExplicitReturnMethods(classDecl);
         applyPermuteReturn(classDecl, ctx, generatedSet, typeElement);
+
+        // 5d. Implicit return type inference — fires on methods with T+number growing tips
+        // that have no explicit @PermuteReturn. Uses globalGeneratedNames for cross-template
+        // boundary omission. Runs AFTER applyPermuteReturn so explicit return types are already set.
+        applyImplicitInference(classDecl, globalGeneratedNames, explicitReturnMethods);
 
         // 6. Remove @Permute from the class
         classDecl.getAnnotations().removeIf(a -> {
@@ -1043,6 +1053,166 @@ public class PermuteProcessor extends AbstractProcessor {
                 return false;
         }
         return true;
+    }
+
+    /** Record holding parsed return type info: base class name and type arguments. */
+    private record ReturnTypeInfo(String baseClass, java.util.List<String> typeArgs) {
+    }
+
+    /**
+     * Parses "Step2<T1, T2>" into ReturnTypeInfo("Step2", ["T1","T2"]).
+     * Handles nested generics via depth-aware comma splitting.
+     */
+    private static ReturnTypeInfo parseReturnTypeInfo(String returnType) {
+        int lt = returnType.indexOf('<');
+        if (lt < 0)
+            return new ReturnTypeInfo(returnType.trim(), java.util.List.of());
+        String base = returnType.substring(0, lt).trim();
+        String argsStr = returnType.substring(lt + 1, returnType.lastIndexOf('>')).trim();
+        if (argsStr.isEmpty())
+            return new ReturnTypeInfo(base, java.util.List.of());
+        java.util.List<String> args = new java.util.ArrayList<>();
+        int depth = 0, start = 0;
+        for (int i = 0; i < argsStr.length(); i++) {
+            char c = argsStr.charAt(i);
+            if (c == '<')
+                depth++;
+            else if (c == '>')
+                depth--;
+            else if (c == ',' && depth == 0) {
+                args.add(argsStr.substring(start, i).trim());
+                start = i + 1;
+            }
+        }
+        args.add(argsStr.substring(start).trim());
+        return new ReturnTypeInfo(base, args);
+    }
+
+    /** Extracts numeric suffix from class name (e.g. "Chain3" → 3). Returns -1 if none. */
+    private static int classNameSuffix(String name) {
+        int i = name.length() - 1;
+        if (i < 0 || !Character.isDigit(name.charAt(i)))
+            return -1;
+        while (i > 0 && Character.isDigit(name.charAt(i - 1)))
+            i--;
+        try {
+            return Integer.parseInt(name.substring(i));
+        } catch (Exception ignored) {
+            return -1;
+        }
+    }
+
+    /** Strips numeric suffix from class name (e.g. "Chain3" → "Chain"). */
+    private static String stripNumericSuffix(String name) {
+        int i = name.length() - 1;
+        if (i < 0 || !Character.isDigit(name.charAt(i)))
+            return name;
+        while (i > 0 && Character.isDigit(name.charAt(i - 1)))
+            i--;
+        return name.substring(0, i);
+    }
+
+    /** Collects method keys that already have explicit @PermuteReturn (to exclude from inference). */
+    private static java.util.Set<String> collectExplicitReturnMethods(
+            com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classDecl) {
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        classDecl.getMethods().forEach(m -> m.getAnnotations().stream()
+                .filter(a -> a.getNameAsString().equals("PermuteReturn")
+                        || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteReturn"))
+                .findFirst()
+                .ifPresent(a -> keys.add(m.getNameAsString() + m.getParameters().toString())));
+        return keys;
+    }
+
+    /**
+     * Applies implicit return type inference to methods without @PermuteReturn.
+     *
+     * <p>
+     * Designed for APT mode where {@code @PermuteTypeParam} has already expanded the class type
+     * parameters. After expansion, the generated class (e.g. {@code Chain3<T1,T2,T3>}) has more type
+     * params than the template ({@code Chain2<T1,T2>}), but the method return type still reflects
+     * the template's arity (e.g. {@code Chain2<T1,T2>}).
+     *
+     * <p>
+     * Fires when BOTH conditions hold:
+     * <ol>
+     * <li>The return type base class belongs to the same family as the generated classes
+     * (same name prefix before the trailing digits, e.g. "Chain" for "Chain2"/"Chain3").</li>
+     * <li>The return type has fewer type args than the current class has type parameters —
+     * indicating the return type still reflects the pre-expansion arity.</li>
+     * </ol>
+     *
+     * <p>
+     * When inference fires, the return type is updated to the CURRENT class (self-referential)
+     * with all current type params as arguments. Boundary omission: if the NEXT class in the
+     * family (currentSuffix + 1) is not in allGeneratedNames, the method is removed — this is
+     * the leaf-node pattern (last class in the range has the self-returning method omitted).
+     */
+    private static void applyImplicitInference(
+            com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classDecl,
+            java.util.Set<String> allGeneratedNames,
+            java.util.Set<String> explicitReturnMethods) {
+
+        // All declared type parameter names for the generated class (after @PermuteTypeParam expansion)
+        java.util.List<String> currentTypeParams = new java.util.ArrayList<>();
+        classDecl.getTypeParameters().forEach(tp -> currentTypeParams.add(tp.getNameAsString()));
+
+        int currentSuffix = classNameSuffix(classDecl.getNameAsString());
+        if (currentSuffix < 0)
+            return; // Generated class has no numeric suffix — inference does not apply
+
+        String currentClassName = classDecl.getNameAsString();
+        String currentFamilyPrefix = stripNumericSuffix(currentClassName);
+
+        java.util.List<com.github.javaparser.ast.body.MethodDeclaration> toRemove = new java.util.ArrayList<>();
+
+        classDecl.getMethods().forEach(method -> {
+            String methodKey = method.getNameAsString() + method.getParameters().toString();
+            if (explicitReturnMethods.contains(methodKey))
+                return;
+
+            String returnTypeStr = method.getTypeAsString();
+            if (returnTypeStr.equals("void") || returnTypeStr.equals("Object"))
+                return;
+
+            ReturnTypeInfo info = parseReturnTypeInfo(returnTypeStr);
+            if (info == null)
+                return;
+
+            // Condition 1: return type base class must be in the same family as the generated
+            // classes (same name prefix before trailing digits).
+            // E.g. "Chain2" has prefix "Chain"; matches generated "Chain3", "Chain4".
+            String returnBasePrefix = stripNumericSuffix(info.baseClass());
+            if (returnBasePrefix.isEmpty() || returnBasePrefix.equals(info.baseClass()))
+                return; // base class has no numeric suffix — not a numbered family
+            if (!returnBasePrefix.equals(currentFamilyPrefix))
+                return; // different family
+
+            // Condition 2: the return type has fewer type args than the current class has type
+            // params. This indicates the return type still reflects the pre-expansion arity and
+            // should be updated to the expanded form.
+            if (info.typeArgs().size() >= currentTypeParams.size())
+                return;
+
+            // Boundary omission: the NEXT class in the family must exist in the generated set.
+            // The current class is the "self" return. If there is no next class, this class
+            // is the leaf node and the method is omitted (same leaf-node pattern as @PermuteReturn).
+            String nextClassName = currentFamilyPrefix + (currentSuffix + 1);
+            if (!allGeneratedNames.contains(nextClassName)) {
+                toRemove.add(method);
+                return;
+            }
+
+            // Update return type to the CURRENT class with all current type params (self-referential)
+            String newReturnType = currentClassName + "<" + String.join(", ", currentTypeParams) + ">";
+            try {
+                method.setType(com.github.javaparser.StaticJavaParser.parseType(newReturnType));
+            } catch (Exception ignored) {
+                return;
+            }
+        });
+
+        toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
     }
 
     /**
