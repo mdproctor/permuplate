@@ -23,7 +23,35 @@
        ============================================================ -->
   <nav class="nav">
     <div class="nav-inner">
-      <a href="index.html" class="nav-logo">Permu<span>plate</span></a>
+      <a href="index.html" class="nav-logo">
+        Permu<span>plate</span>
+        <svg class="nav-logo-glyph" viewBox="0 0 160 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- template plate -->
+          <rect x="1" y="2" width="32" height="40" fill="#111" stroke="#e85d04" stroke-width="1.5"/>
+          <rect x="7" y="8"  width="2" height="12" fill="#e85d04" opacity="0.9"/>
+          <rect x="11" y="9"  width="18" height="2" rx="0.5" fill="#e85d04" opacity="0.55"/>
+          <rect x="11" y="13" width="14" height="2" rx="0.5" fill="#e85d04" opacity="0.35"/>
+          <rect x="11" y="17" width="16" height="2" rx="0.5" fill="#e85d04" opacity="0.22"/>
+          <rect x="7" y="26" width="22" height="2" rx="0.5" fill="#3a3a3a"/>
+          <rect x="7" y="30" width="2"  height="8"  fill="#e85d04" opacity="0.75"/>
+          <rect x="11" y="31" width="18" height="2" rx="0.5" fill="#e85d04" opacity="0.4"/>
+          <rect x="11" y="35" width="14" height="2" rx="0.5" fill="#2e2e2e"/>
+          <!-- press arrow -->
+          <rect x="37" y="20" width="26" height="4" fill="#e85d04"/>
+          <polygon points="63,14 74,22 63,30" fill="#e85d04"/>
+          <!-- output cascade (5 cards) — bottoms aligned with plate bottom (y=42) -->
+          <rect x="80"  y="6"  width="20" height="28" fill="#101010" stroke="#222"    stroke-width="0.75"/>
+          <rect x="86"  y="8"  width="20" height="28" fill="#131313" stroke="#262626" stroke-width="0.75"/>
+          <rect x="92"  y="10" width="20" height="28" fill="#161616" stroke="#2c2c2c" stroke-width="0.75"/>
+          <rect x="98"  y="12" width="20" height="28" fill="#191919" stroke="#333"    stroke-width="0.75"/>
+          <rect x="104" y="14" width="20" height="28" fill="#1c1c1c" stroke="#484848" stroke-width="1"/>
+          <!-- code lines on front card -->
+          <rect x="107" y="19" width="14" height="2" rx="0.5" fill="#2c2c2c"/>
+          <rect x="107" y="23" width="11" height="2" rx="0.5" fill="#282828"/>
+          <rect x="107" y="27" width="13" height="2" rx="0.5" fill="#2c2c2c"/>
+          <rect x="107" y="31" width="9"  height="2" rx="0.5" fill="#282828"/>
+        </svg>
+      </a>
       <ul class="nav-links">
         <li><a href="docs.html">Docs</a></li>
         <li><a href="blog.html">Blog</a></li>
@@ -77,6 +105,97 @@
         </div>
       </div>
     </div>
+
+    <!-- ONE PLATE, EIGHT PRINTS — full-bleed graphic -->
+    <div class="hero-graphic">
+      <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" aria-label="One template plate on the left, a compile arrow in the centre, eight generated class files cascading to the right">
+
+        <!-- ── TEMPLATE PLATE ─────────────────────────────── -->
+        <text x="119" y="24" font-family="JetBrains Mono,monospace" font-size="11"
+              fill="#555" text-anchor="middle">Join2.java</text>
+
+        <rect x="28" y="32" width="182" height="232" fill="#111" stroke="#e85d04" stroke-width="2.5"/>
+
+        <!-- corner registration marks -->
+        <path d="M28,32 h18 M28,32 v18"       stroke="#e85d04" stroke-width="1.2" fill="none" opacity="0.45"/>
+        <path d="M210,264 h-18 M210,264 v-18"  stroke="#e85d04" stroke-width="1.2" fill="none" opacity="0.45"/>
+
+        <!-- @Permute block -->
+        <rect x="44" y="52" width="3" height="58" fill="#e85d04" opacity="0.95"/>
+        <rect x="52" y="55"  width="125" height="5" rx="1" fill="#e85d04" opacity="0.55"/>
+        <rect x="52" y="65"  width="100" height="5" rx="1" fill="#e85d04" opacity="0.38"/>
+        <rect x="52" y="75"  width="115" height="5" rx="1" fill="#e85d04" opacity="0.26"/>
+        <rect x="52" y="85"  width="85"  height="5" rx="1" fill="#e85d04" opacity="0.17"/>
+
+        <!-- class declaration -->
+        <rect x="44" y="122" width="155" height="5" rx="1" fill="#3a3a3a"/>
+
+        <!-- @PermuteDeclr block -->
+        <rect x="44" y="136" width="3" height="28" fill="#e85d04" opacity="0.85"/>
+        <rect x="52" y="139" width="130" height="5" rx="1" fill="#e85d04" opacity="0.45"/>
+        <rect x="52" y="149" width="95"  height="5" rx="1" fill="#323232"/>
+
+        <!-- @PermuteParam block -->
+        <rect x="58" y="167" width="3" height="38" fill="#e85d04" opacity="0.75"/>
+        <rect x="66" y="170" width="118" height="5" rx="1" fill="#e85d04" opacity="0.4"/>
+        <rect x="66" y="180" width="96"  height="5" rx="1" fill="#e85d04" opacity="0.28"/>
+        <rect x="66" y="190" width="72"  height="5" rx="1" fill="#2e2e2e"/>
+
+        <!-- body -->
+        <rect x="44" y="216" width="138" height="5" rx="1" fill="#363636"/>
+        <rect x="58" y="228" width="108" height="5" rx="1" fill="#2c2c2c"/>
+        <rect x="44" y="240" width="22"  height="5" rx="1" fill="#363636"/>
+
+        <text x="119" y="256" font-family="Barlow Condensed,sans-serif" font-size="9"
+              font-weight="600" fill="#e85d04" text-anchor="middle" letter-spacing="0.22em">TEMPLATE</text>
+
+        <!-- ── PRESS ARROW ─────────────────────────────────── -->
+        <g transform="translate(244,116)">
+          <rect x="0" y="26" width="148" height="20" fill="#e85d04"/>
+          <polygon points="148,0 196,36 148,72" fill="#e85d04"/>
+          <line x1="28"  y1="20" x2="28"  y2="6" stroke="#e85d04" stroke-width="2" stroke-linecap="round" opacity="0.45"/>
+          <line x1="64"  y1="20" x2="64"  y2="6" stroke="#e85d04" stroke-width="2" stroke-linecap="round" opacity="0.45"/>
+          <line x1="100" y1="20" x2="100" y2="6" stroke="#e85d04" stroke-width="2" stroke-linecap="round" opacity="0.45"/>
+          <line x1="136" y1="20" x2="136" y2="6" stroke="#e85d04" stroke-width="2" stroke-linecap="round" opacity="0.45"/>
+          <text x="74" y="108" font-family="JetBrains Mono,monospace" font-size="10"
+                fill="#555" text-anchor="middle">mvn compile</text>
+        </g>
+
+        <!-- ── OUTPUT CASCADE (back → front) ──────────────── -->
+        <rect x="565" y="30"  width="125" height="162" fill="#0e0e0e" stroke="#222"    stroke-width="1"/>
+        <rect x="549" y="44"  width="125" height="162" fill="#101010" stroke="#242424" stroke-width="1"/>
+        <rect x="533" y="58"  width="125" height="162" fill="#111"    stroke="#262626" stroke-width="1"/>
+        <rect x="517" y="72"  width="125" height="162" fill="#121212" stroke="#282828" stroke-width="1"/>
+        <rect x="501" y="86"  width="125" height="162" fill="#141414" stroke="#2c2c2c" stroke-width="1"/>
+        <rect x="485" y="100" width="125" height="162" fill="#161616" stroke="#303030" stroke-width="1"/>
+
+        <!-- card 2 — Join4 -->
+        <rect x="469" y="114" width="125" height="162" fill="#191919" stroke="#393939" stroke-width="1"/>
+        <text x="531" y="109" font-family="JetBrains Mono,monospace" font-size="9"
+              fill="#3e3e3e" text-anchor="middle">Join4.java</text>
+
+        <!-- card 1 — Join3 (frontmost) -->
+        <rect x="453" y="128" width="125" height="162" fill="#1c1c1c" stroke="#585858" stroke-width="1.5"/>
+        <text x="515" y="123" font-family="JetBrains Mono,monospace" font-size="9"
+              fill="#777" text-anchor="middle">Join3.java</text>
+
+        <rect x="466" y="145" width="99" height="5" rx="1" fill="#2c2c2c"/>
+        <rect x="466" y="157" width="82" height="5" rx="1" fill="#282828"/>
+        <rect x="466" y="172" width="94" height="5" rx="1" fill="#2c2c2c"/>
+        <rect x="466" y="184" width="72" height="5" rx="1" fill="#282828"/>
+        <rect x="480" y="196" width="62" height="4" rx="1" fill="#252525"/>
+        <rect x="480" y="207" width="50" height="4" rx="1" fill="#252525"/>
+        <rect x="466" y="218" width="32" height="4" rx="1" fill="#2c2c2c"/>
+
+        <!-- "8 CLASSES" callout -->
+        <text x="694" y="26" font-family="Bebas Neue,sans-serif" font-size="26"
+              fill="#e85d04" text-anchor="end" letter-spacing="0.04em">8 CLASSES</text>
+        <text x="694" y="42" font-family="Barlow Condensed,sans-serif" font-size="10"
+              font-weight="600" fill="#444" text-anchor="end" letter-spacing="0.2em">GENERATED</text>
+
+      </svg>
+    </div>
+
   </section>
 
   <!-- ============================================================

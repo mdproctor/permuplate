@@ -146,9 +146,23 @@ a:hover { color: var(--amber); }
   color: var(--text);
   text-decoration: none;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .nav-logo span {
   color: var(--orange);
+}
+.nav-logo-glyph {
+  width: 130px;
+  height: 36px;
+  opacity: 0.75;
+  flex-shrink: 0;
+  position: relative;
+  top: 1px;
+}
+.nav-logo:hover .nav-logo-glyph {
+  opacity: 1;
 }
 
 .nav-links {
@@ -337,6 +351,22 @@ a:hover { color: var(--amber); }
   text-transform: uppercase;
   color: var(--muted);
   margin-top: 4px;
+}
+
+/* Hero graphic — full-bleed below the stat strip */
+.hero-graphic {
+  margin-top: var(--space-3xl);
+  border-top: 1px solid var(--rule);
+  padding-top: var(--space-xl);
+  width: 100%;
+}
+
+.hero-graphic svg {
+  display: block;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  opacity: 0.92;
 }
 
 /* ============================================================
