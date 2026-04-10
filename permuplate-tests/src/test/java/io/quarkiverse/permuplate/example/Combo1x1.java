@@ -8,8 +8,8 @@ import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteParam;
 import io.quarkiverse.permuplate.PermuteVar;
 
-@Permute(varName = "i", from = 2, to = 3, className = "Combo${i}x${k}", extraVars = {
-        @PermuteVar(varName = "k", from = 2, to = 3) })
+@Permute(varName = "i", from = "2", to = "3", className = "Combo${i}x${k}", extraVars = {
+        @PermuteVar(varName = "k", from = "2", to = "3") })
 public class Combo1x1 {
 
     public final List<Object> results = new ArrayList<>();

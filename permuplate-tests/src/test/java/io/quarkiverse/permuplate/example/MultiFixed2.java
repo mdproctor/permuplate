@@ -11,7 +11,7 @@ import io.quarkiverse.permuplate.PermuteParam;
  * after it. Verifies that all four fixed params are preserved in position regardless
  * of arity, and that only the sentinel is replaced by the expanded sequence.
  */
-@Permute(varName = "i", from = 3, to = 4, className = "MultiFixed${i}")
+@Permute(varName = "i", from = "3", to = "4", className = "MultiFixed${i}")
 public class MultiFixed2 {
 
     private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;

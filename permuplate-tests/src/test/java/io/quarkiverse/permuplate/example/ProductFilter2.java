@@ -36,7 +36,7 @@ import io.quarkiverse.permuplate.PermuteParam;
  * filter.search("Electronics", 500.00, "Sony", 4.0, matches);
  * }</pre>
  */
-@Permute(varName = "i", from = 3, to = 7, className = "ProductFilter${i}")
+@Permute(varName = "i", from = "3", to = "7", className = "ProductFilter${i}")
 public class ProductFilter2 {
 
     /**

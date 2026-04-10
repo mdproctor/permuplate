@@ -8,7 +8,7 @@ import io.quarkiverse.permuplate.PermuteParam;
 
 public class JoinLibrary {
 
-    @Permute(varName = "i", from = 3, to = 5, className = "FilterJoin${i}")
+    @Permute(varName = "i", from = "3", to = "5", className = "FilterJoin${i}")
     public static class FilterJoin2 {
 
         private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;

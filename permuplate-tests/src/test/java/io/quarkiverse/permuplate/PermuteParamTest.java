@@ -157,7 +157,7 @@ public class PermuteParamTest {
 
         var loader = classLoaderFor(compilation);
 
-        // --- DualParam3: each sentinel expands to 2 params (from=1, to=i-1=2) ---
+        // --- DualParam3: each sentinel expands to 2 params (from="1", to=i-1=2) ---
         var src3 = sourceOf(compilation.generatedSourceFile(generatedClassName(DualParam2.class, 3)).orElseThrow());
 
         // Both sentinels expanded in declaration order
@@ -172,7 +172,7 @@ public class PermuteParamTest {
         invokeMethod(instance3, "merge", "L1", "L2", "R1", "R2");
         assertThat(readMergedField(instance3)).containsExactly("L1", "L2", "R1", "R2").inOrder();
 
-        // --- DualParam4: each sentinel expands to 3 params (from=1, to=i-1=3) ---
+        // --- DualParam4: each sentinel expands to 3 params (from="1", to=i-1=3) ---
         var src4 = sourceOf(compilation.generatedSourceFile(generatedClassName(DualParam2.class, 4)).orElseThrow());
         assertThat(src4).contains(
                 "void merge(Object left1, Object left2, Object left3, Object right1, Object right2, Object right3)");
@@ -239,12 +239,12 @@ public class PermuteParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=3, className="EmptyRange${i}")
+                        @Permute(varName="i", from="3", to="3", className="EmptyRange${i}")
                         public class EmptyRange2 {
                             public void method(
                                 @PermuteParam(varName="j", from="1", to="0", type="Object", name="o${j}")
                                 Object o1) {
-                                // empty inner range: from=1, to=0 → sentinel removed, 0 params generated
+                                // empty inner range: from="1", to=0 → sentinel removed, 0 params generated
                             }
                         }
                         """);
@@ -280,7 +280,7 @@ public class PermuteParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=3, className="AbstractParam${i}")
+                        @Permute(varName="i", from="3", to="3", className="AbstractParam${i}")
                         public interface AbstractParam2 {
                             void test(
                                 @PermuteParam(varName="j", from="1", to="${i}", type="Object", name="fact${j}")
@@ -318,7 +318,7 @@ public class PermuteParamTest {
                         import io.quarkiverse.permuplate.PermuteTypeParam;
                         import io.quarkiverse.permuplate.PermuteParam;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=3, to=4, className="Pred${i}")
+                        @Permute(varName="i", from="3", to="4", className="Pred${i}")
                         public interface Pred2<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B> {
                             boolean test(A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="o${j}") B o2);
 
@@ -370,7 +370,7 @@ public class PermuteParamTest {
                         import io.quarkiverse.permuplate.PermuteTypeParam;
                         import io.quarkiverse.permuplate.PermuteParam;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=3, to=3, className="BlockPred${i}")
+                        @Permute(varName="i", from="3", to="3", className="BlockPred${i}")
                         public interface BlockPred2<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B> {
                             boolean test(A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="o${j}") B o2);
 
@@ -419,7 +419,7 @@ public class PermuteParamTest {
                         import io.quarkiverse.permuplate.PermuteTypeParam;
                         import io.quarkiverse.permuplate.PermuteParam;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=3, to=3, className="Aggregator${i}")
+                        @Permute(varName="i", from="3", to="3", className="Aggregator${i}")
                         public interface Aggregator2<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B> {
                             boolean process(A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="o${j}") B o2);
 
@@ -466,7 +466,7 @@ public class PermuteParamTest {
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=4, className="PureName${i}")
+                        @Permute(varName="i", from="3", to="4", className="PureName${i}")
                         public interface PureName2<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B> {
                             void accept(A a, @PermuteParam(varName="j", from="2", to="${i}", type="${alpha(j)}", name="${lower(j)}") B b);
                         }

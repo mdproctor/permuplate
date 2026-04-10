@@ -6,7 +6,7 @@ import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteParam;
 
-@Permute(varName = "i", from = 3, to = 12, className = "WideJoin${i}")
+@Permute(varName = "i", from = "3", to = "12", className = "WideJoin${i}")
 public class WideJoin2 {
 
     private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;

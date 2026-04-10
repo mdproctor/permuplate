@@ -47,7 +47,7 @@ public class OrphanVariableTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "async${i}Cache") Object asyncDiskHandler2;
                         }
@@ -65,7 +65,7 @@ public class OrphanVariableTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "async${i}Handler") Object asyncDiskHandler2;
                         }
@@ -87,7 +87,7 @@ public class OrphanVariableTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "${v1}c${i}") Object c2;
                         }
@@ -106,7 +106,7 @@ public class OrphanVariableTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
                                  strings = {"v1=my"})
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "${v1}c${i}") Object myc2;
@@ -124,7 +124,7 @@ public class OrphanVariableTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "${v1}Foo${v2}") Object c2;
                         }
@@ -147,7 +147,7 @@ public class OrphanVariableTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "${v1}${v2}") Object c2;
                         }
@@ -167,7 +167,7 @@ public class OrphanVariableTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
                                  strings = {"prefix=Object"})
                         public class Foo2 {
                             private @PermuteDeclr(type = "${prefix}", name = "c${i}") Object c2;

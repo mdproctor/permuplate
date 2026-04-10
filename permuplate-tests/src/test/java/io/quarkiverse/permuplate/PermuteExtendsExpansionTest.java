@@ -22,7 +22,7 @@ public class PermuteExtendsExpansionTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="Step${i}Second")
+                        @Permute(varName="i", from="3", to="3", className="Step${i}Second")
                         public class Step2Second<@PermuteTypeParam(varName="j", from="1", to="${i}", name="T${j}") T1> {}
                         """);
         var firstTemplate = com.google.testing.compile.JavaFileObjects.forSourceString(
@@ -31,7 +31,7 @@ public class PermuteExtendsExpansionTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="Step${i}First")
+                        @Permute(varName="i", from="3", to="3", className="Step${i}First")
                         public class Step2First<@PermuteTypeParam(varName="j", from="1", to="${i}", name="T${j}") T1>
                                 extends Step2Second<T1> {}
                         """);
@@ -56,7 +56,7 @@ public class PermuteExtendsExpansionTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="Alpha${i}Second")
+                        @Permute(varName="i", from="3", to="3", className="Alpha${i}Second")
                         public class Alpha2Second<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B>
                                 extends Object {}
                         """);
@@ -66,7 +66,7 @@ public class PermuteExtendsExpansionTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="Alpha${i}First")
+                        @Permute(varName="i", from="3", to="3", className="Alpha${i}First")
                         public class Alpha2First<A, @PermuteTypeParam(varName="j", from="2", to="${i}", name="${alpha(j)}") B>
                                 extends Alpha2Second<A, B> {}
                         """);
@@ -91,7 +91,7 @@ public class PermuteExtendsExpansionTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="Widget${i}")
+                        @Permute(varName="i", from="3", to="3", className="Widget${i}")
                         public class Widget2<@PermuteTypeParam(varName="j", from="1", to="${i}", name="T${j}") T1>
                                 extends java.util.ArrayList<T1> {}
                         """);

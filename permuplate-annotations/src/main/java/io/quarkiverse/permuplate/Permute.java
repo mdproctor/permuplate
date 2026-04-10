@@ -23,7 +23,7 @@ import java.lang.annotation.Target;
  *
  * <pre>{@code
  * public class Handlers {
- *     &#64;Permute(varName = "i", from = 2, to = 5,
+ *     &#64;Permute(varName = "i", from = "2", to = "5",
  *              className = "Handler${i}",
  *              inline = true,
  *              keepTemplate = true)
@@ -49,6 +49,65 @@ import java.lang.annotation.Target;
  * <p>
  * <b>String variables:</b> {@code strings} entries are {@code "key=value"} pairs
  * providing fixed named string constants in all {@code ${...}} expressions.
+ *
+ * <h2>Expression-based {@code from} and {@code to}</h2>
+ *
+ * <p>
+ * Both {@code from} and {@code to} are JEXL expression strings. They may be plain
+ * integer literals ({@code "3"}), arithmetic expressions ({@code "${max - 1}"}), or
+ * references to named constants injected from outside the annotation.
+ *
+ * <p>
+ * <b>Sources of named constants</b> (in resolution order, later overrides earlier):
+ * <ol>
+ * <li><b>External properties</b> — resolved by stripping the {@code permuplate.}
+ * prefix from the property key:
+ * <ul>
+ * <li><b>APT mode only</b> — annotation processor options passed via
+ * {@code -Apermuplate.max=10} on the javac command line (e.g. in
+ * {@code maven-compiler-plugin}). This mechanism is specific to the APT
+ * processor and is not available to the Maven plugin.
+ * <li><b>Both APT and Maven plugin</b> — system properties passed via
+ * {@code -Dpermuplate.max=10}. Works uniformly across all build tools.
+ * </ul>
+ * After stripping the prefix, the property {@code permuplate.max=10} is available
+ * as {@code ${max}} in {@code from}/{@code to} expressions.
+ * <li><b>Annotation {@code strings}</b> — {@code strings = {"max=10"}} adds
+ * {@code max} to the expression context and overrides any external property with
+ * the same name. Prefer {@code strings} for values that are fixed per template;
+ * prefer external properties for build-time configuration.
+ * </ol>
+ *
+ * <p>
+ * <b>Example — hardcoded:</b>
+ *
+ * <pre>{@code
+ * &#64;Permute(varName = "i", from = "3", to = "10", className = "Join${i}First")
+ * }</pre>
+ *
+ * <b>Example — configured via strings constant:</b>
+ *
+ * <pre>{@code
+ * &#64;Permute(varName = "i", from = "3", to = "${max}", className = "Join${i}First",
+ *          strings = {"max=10"})
+ * }</pre>
+ *
+ * <b>Example — configured via system property (both APT and Maven plugin):</b>
+ *
+ * <pre>{@code
+ * // In template:
+ * &#64;Permute(varName = "i", from = "3", to = "${max}", className = "Join${i}First")
+ * // At build time: mvn compile -Dpermuplate.max=10
+ * }</pre>
+ *
+ * <b>Example — configured via APT option (APT only, not Maven plugin):</b>
+ *
+ * <pre>{@code
+ * // In template:
+ * &#64;Permute(varName = "i", from = "3", to = "${max}", className = "Join${i}First")
+ * // In pom.xml maven-compiler-plugin:
+ * // <compilerArgs><arg>-Apermuplate.max=10</arg></compilerArgs>
+ * }</pre>
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target({ ElementType.TYPE, ElementType.METHOD })
@@ -56,11 +115,28 @@ public @interface Permute {
     /** The primary integer loop variable name (e.g. {@code "i"}). */
     String varName();
 
-    /** Inclusive lower bound for the primary variable. */
-    int from();
+    /**
+     * Inclusive lower bound for the primary variable, as a JEXL expression string.
+     * Plain integer literals ({@code "3"}) and expressions referencing named
+     * constants ({@code "${start}"}) are both supported. Named constants come from
+     * {@code strings}, system properties ({@code -Dpermuplate.start=3}), or APT
+     * options ({@code -Apermuplate.start=3}, APT mode only).
+     */
+    String from();
 
-    /** Inclusive upper bound for the primary variable. Must be &gt;= {@code from}. */
-    int to();
+    /**
+     * Inclusive upper bound for the primary variable, as a JEXL expression string.
+     * Must evaluate to a value &gt;= {@code from}. Supports the same sources as
+     * {@code from}: plain literals, {@code strings} constants, system properties
+     * ({@code -Dpermuplate.max=10}), and APT options ({@code -Apermuplate.max=10},
+     * APT mode only).
+     *
+     * <p>
+     * <b>APT vs Maven plugin:</b> APT options ({@code -A}) are only available in
+     * the APT annotation processor, not in the Maven plugin. Use system properties
+     * ({@code -D}) for configuration that must work in both modes.
+     */
+    String to();
 
     /**
      * Output type/class name template. For type permutation, evaluated per combination
@@ -73,6 +149,10 @@ public @interface Permute {
      * Named string constants available in all {@code ${...}} expressions alongside
      * {@code varName}. Each entry must be in {@code "key=value"} format.
      * Keys must not match {@code varName} or any {@code extraVars} variable name.
+     *
+     * <p>
+     * Constants defined here override any external property (system property or APT
+     * option) with the same name after prefix stripping.
      */
     String[] strings() default {};
 

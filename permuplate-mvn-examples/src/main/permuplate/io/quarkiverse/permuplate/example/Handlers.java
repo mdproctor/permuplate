@@ -34,7 +34,7 @@ public class Handlers {
      * alongside the generated classes — a single-argument handler is useful
      * in its own right and not merely a scaffold.
      */
-    @Permute(varName = "i", from = 2, to = 5,
+    @Permute(varName = "i", from = "2", to = "5",
             className = "Handler${i}",
             inline = true,
             keepTemplate = true)

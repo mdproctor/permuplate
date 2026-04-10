@@ -5,7 +5,7 @@ import java.util.List;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 
-@Permute(varName = "i", from = 3, to = 3, className = "ForEachDeclr${i}")
+@Permute(varName = "i", from = "3", to = "3", className = "ForEachDeclr${i}")
 public class ForEachDeclr2 {
 
     private List<Object> items;

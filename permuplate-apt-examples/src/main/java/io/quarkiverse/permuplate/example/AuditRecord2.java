@@ -36,7 +36,7 @@ import io.quarkiverse.permuplate.PermuteParam;
  * audit.record("RECORD_DELETED", tenantId, userId, resourceId, "WARN");
  * }</pre>
  */
-@Permute(varName = "i", from = 3, to = 6, className = "AuditRecord${i}")
+@Permute(varName = "i", from = "3", to = "6", className = "AuditRecord${i}")
 public class AuditRecord2 {
 
     /**

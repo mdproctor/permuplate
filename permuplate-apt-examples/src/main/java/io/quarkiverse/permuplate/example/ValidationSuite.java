@@ -53,7 +53,7 @@ public class ValidationSuite {
      * {@code FieldValidator6}. Each variant accepts a different number of field
      * values so the call site's field count is verified at compile time.
      */
-    @Permute(varName = "i", from = 3, to = 6, className = "FieldValidator${i}")
+    @Permute(varName = "i", from = "3", to = "6", className = "FieldValidator${i}")
     public static class FieldValidator2 {
 
         /**

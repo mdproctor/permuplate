@@ -3,7 +3,7 @@ package io.quarkiverse.permuplate.example;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 
-@Permute(varName = "i", from = 3, to = 3, className = "CtorDeclr${i}")
+@Permute(varName = "i", from = "3", to = "3", className = "CtorDeclr${i}")
 public class CtorDeclr2 {
 
     private String label;

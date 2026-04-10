@@ -105,7 +105,7 @@ public class PermuteFamilyFindUsagesActionTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    public void join2() {}\n" +
                 "}");
@@ -157,7 +157,7 @@ public class PermuteFamilyFindUsagesActionTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    public void join2() {}\n" +
                 "}");
@@ -182,7 +182,7 @@ public class PermuteFamilyFindUsagesActionTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2Work.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    public void join2() {}\n" +
                 "}");
@@ -224,7 +224,7 @@ public class PermuteFamilyFindUsagesActionTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    public Object c2;\n" +
                 "}");

@@ -34,6 +34,19 @@ public class InlineGenerator {
     private static final String PM_SIMPLE = "PermuteMethod";
     private static final String PM_FQ = "io.quarkiverse.permuplate.PermuteMethod";
 
+    /**
+     * External properties injected into JEXL contexts for {@code from}/{@code to} evaluation.
+     * Set by {@link io.quarkiverse.permuplate.maven.PermuteMojo} at the start of each build.
+     * In the Maven plugin, only system properties ({@code -Dpermuplate.*}) are available —
+     * APT options ({@code -Apermuplate.*}) are not accessible outside the javac pipeline.
+     */
+    private static java.util.Map<String, Object> externalProperties = java.util.Collections.emptyMap();
+
+    /** Sets the external properties for this generation run (called by PermuteMojo). */
+    public static void setExternalProperties(java.util.Map<String, Object> props) {
+        externalProperties = props != null ? props : java.util.Collections.emptyMap();
+    }
+
     private InlineGenerator() {
     }
 
@@ -151,7 +164,7 @@ public class InlineGenerator {
     }
 
     private static void addNamesFromConfig(PermuteConfig config, Set<String> names) {
-        for (Map<String, Object> vars : PermuteConfig.buildAllCombinations(config)) {
+        for (Map<String, Object> vars : PermuteConfig.buildAllCombinations(config, externalProperties)) {
             try {
                 names.add(new EvaluationContext(vars).evaluate(config.className));
             } catch (Exception ignored) {
@@ -202,7 +215,8 @@ public class InlineGenerator {
             int toVal;
             if (!pmCfg.hasExplicitTo()) {
                 int currentI = ((Number) vars.get(config.varName)).intValue();
-                toVal = config.to - currentI;
+                int outerTo = ctx.evaluateInt(config.to);
+                toVal = outerTo - currentI;
             } else {
                 try {
                     toVal = ctx.evaluateInt(pmCfg.to());
@@ -888,12 +902,33 @@ public class InlineGenerator {
         classDecl.findAll(FieldDeclaration.class)
                 .forEach(field -> field.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
 
-        // Strip from method annotations and method parameters
+        // Strip from class type parameters (e.g. @PermuteTypeParam on sentinel C)
+        classDecl.getTypeParameters()
+                .forEach(tp -> tp.getAnnotations()
+                        .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+
+        // Strip from method annotations, method type parameters, and method parameters
         classDecl.findAll(MethodDeclaration.class).forEach(method -> {
             method.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
-            method.getParameters()
-                    .forEach(param -> param.getAnnotations()
+            method.getTypeParameters()
+                    .forEach(tp -> tp.getAnnotations()
                             .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+            method.getParameters()
+                    .forEach(param -> {
+                        param.getAnnotations()
+                                .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
+                        // Strip TYPE_USE annotations on the parameter's type (e.g. @PermuteDeclr on new expr types)
+                        if (param.getType() instanceof com.github.javaparser.ast.type.ClassOrInterfaceType) {
+                            ((com.github.javaparser.ast.type.ClassOrInterfaceType) param.getType())
+                                    .getAnnotations()
+                                    .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
+                        }
+                    });
         });
+
+        // Strip TYPE_USE annotations from ObjectCreationExpr types (e.g. new @PermuteDeclr(...) Join3First<>())
+        classDecl.findAll(com.github.javaparser.ast.expr.ObjectCreationExpr.class)
+                .forEach(newExpr -> newExpr.getType().getAnnotations()
+                        .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
     }
 }

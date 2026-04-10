@@ -34,13 +34,13 @@ public class AnnotationReader {
     public static PermuteConfig readPermute(AnnotationExpr ann) throws MojoAnnotationException {
         if (!(ann instanceof NormalAnnotationExpr)) {
             throw new MojoAnnotationException(
-                    "@Permute must use named parameters (e.g. varName=\"i\", from=2, to=4, ...)");
+                    "@Permute must use named parameters (e.g. varName=\"i\", from=\"2\", to=\"4\", ...)");
         }
         NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
 
         String varName = requireString(normal, "varName");
-        int from = requireInt(normal, "from");
-        int to = requireInt(normal, "to");
+        String from = requireStringOrInt(normal, "from");
+        String to = requireStringOrInt(normal, "to");
         String className = requireString(normal, "className");
         String[] strings = readStringArray(normal, "strings");
         PermuteVarConfig[] extraVars = readExtraVars(normal);
@@ -60,16 +60,18 @@ public class AnnotationReader {
         throw new MojoAnnotationException("@Permute is missing required attribute: " + name);
     }
 
-    private static int requireInt(NormalAnnotationExpr ann, String name)
+    /**
+     * Reads an attribute that is either a String literal ({@code "3"}, {@code "${max}"})
+     * or a bare integer literal ({@code 3}). Returns the value as a String in both cases.
+     * Used for {@code from} and {@code to} which changed from {@code int} to {@code String}.
+     */
+    private static String requireStringOrInt(NormalAnnotationExpr ann, String name)
             throws MojoAnnotationException {
         for (MemberValuePair pair : ann.getPairs()) {
             if (pair.getNameAsString().equals(name)) {
-                try {
-                    return Integer.parseInt(pair.getValue().toString().trim());
-                } catch (NumberFormatException e) {
-                    throw new MojoAnnotationException(
-                            "@Permute attribute '" + name + "' is not an integer: " + pair.getValue());
-                }
+                String raw = pair.getValue().toString().trim();
+                // Strip quotes if it's a string literal, otherwise return bare int as string
+                return PermuteDeclrTransformer.stripQuotes(raw);
             }
         }
         throw new MojoAnnotationException("@Permute is missing required attribute: " + name);
@@ -114,8 +116,8 @@ public class AnnotationReader {
                     if (e instanceof NormalAnnotationExpr) {
                         NormalAnnotationExpr varAnn = (NormalAnnotationExpr) e;
                         String varName = requireString(varAnn, "varName");
-                        int from = requireInt(varAnn, "from");
-                        int to = requireInt(varAnn, "to");
+                        String from = requireStringOrInt(varAnn, "from");
+                        String to = requireStringOrInt(varAnn, "to");
                         result.add(new PermuteVarConfig(varName, from, to));
                     }
                 }

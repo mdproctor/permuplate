@@ -53,7 +53,7 @@ public class AptInlineGuardTest {
                         package %s;
                         import %s;
                         public class Foo2 {
-                            @Permute(varName = "i", from = 3, to = 5,
+                            @Permute(varName = "i", from = "3", to = "5",
                                      className = "Foo${i}", inline = true)
                             public static class FooNested {}
                         }
@@ -76,7 +76,7 @@ public class AptInlineGuardTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5,
+                        @Permute(varName = "i", from = "3", to = "5",
                                  className = "Foo${i}", inline = true)
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
@@ -98,7 +98,7 @@ public class AptInlineGuardTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5,
+                        @Permute(varName = "i", from = "3", to = "5",
                                  className = "Foo${i}", keepTemplate = true)
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));

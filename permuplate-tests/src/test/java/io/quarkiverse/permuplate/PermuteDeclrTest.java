@@ -307,7 +307,7 @@ public class PermuteDeclrTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteDeclr;
-                        @Permute(varName="i", from=3, to=4, className="ChainStep${i}")
+                        @Permute(varName="i", from="3", to="4", className="ChainStep${i}")
                         public class ChainStep2 {
                             public Object join(@PermuteDeclr(type="String") Object src) {
                                 return src;
@@ -344,7 +344,7 @@ public class PermuteDeclrTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteDeclr;
-                        @Permute(varName="i", from=3, to=3, className="RenameParam${i}")
+                        @Permute(varName="i", from="3", to="3", className="RenameParam${i}")
                         public class RenameParam2 {
                             public String process(
                                     @PermuteDeclr(type="Object", name="item${i}") Object item2) {
@@ -379,7 +379,7 @@ public class PermuteDeclrTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteDeclr;
-                        @Permute(varName="i", from=3, to=3, className="MultiParam${i}")
+                        @Permute(varName="i", from="3", to="3", className="MultiParam${i}")
                         public class MultiParam2 {
                             public void process(
                                     @PermuteDeclr(type="String") Object paramA,

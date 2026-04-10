@@ -55,7 +55,7 @@ public class DegenerateInputTest {
     // -------------------------------------------------------------------------
 
     /**
-     * {@code @Permute(from=5, to=3)} is an empty range — no classes can be
+     * {@code @Permute(from="5", to="3")} is an empty range — no classes can be
      * generated. The processor must report an error rather than silently doing
      * nothing, which would leave callers confused about why expected types are
      * missing.
@@ -66,7 +66,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 5, to = 3, className = "Foo${i}")
+                        @Permute(varName = "i", from = "5", to = "3", className = "Foo${i}")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -89,7 +89,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 3, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "3", className = "Foo${i}")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -114,7 +114,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "FixedName")
+                        @Permute(varName = "i", from = "3", to = "5", className = "FixedName")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -140,7 +140,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Bar${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Bar${i}")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -165,7 +165,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 3, className = "Foo${i +}")
+                        @Permute(varName = "i", from = "3", to = "3", className = "Foo${i +}")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -189,7 +189,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
                                  strings = {"badformat"})
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
@@ -210,7 +210,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
                                  strings = {"=value"})
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
@@ -229,7 +229,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
                                  strings = {"i=conflict"})
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
@@ -254,7 +254,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 5, to = 3, className = "Foo${i}")
+                        @Permute(varName = "i", from = "5", to = "3", className = "Foo${i}")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -272,7 +272,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Bar${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Bar${i}")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -285,7 +285,7 @@ public class DegenerateInputTest {
     // -------------------------------------------------------------------------
 
     /**
-     * {@code @Permute(from=5, to=3)} on a method is the same invalid range as on
+     * {@code @Permute(from="5", to="3")} on a method is the same invalid range as on
      * a class — the processor must report a clear error identifying the bad range
      * rather than silently generating nothing or crashing.
      */
@@ -296,7 +296,7 @@ public class DegenerateInputTest {
                         package %s;
                         import %s;
                         public class Foo {
-                            @Permute(varName = "i", from = 5, to = 3, className = "FooUtils")
+                            @Permute(varName = "i", from = "5", to = "3", className = "FooUtils")
                             public void process(Object o1) {}
                         }
                         """.formatted(PKG, PERMUTE_FQN));
@@ -319,7 +319,7 @@ public class DegenerateInputTest {
                         package %s;
                         import %s;
                         public class Foo {
-                            @Permute(varName = "i", from = 2, to = 4, className = "Foo${i +}")
+                            @Permute(varName = "i", from = "2", to = "4", className = "Foo${i +}")
                             public void process(Object o1) {}
                         }
                         """.formatted(PKG, PERMUTE_FQN));
@@ -344,8 +344,8 @@ public class DegenerateInputTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
-                                 extraVars = { @PermuteVar(varName = "k", from = 5, to = 3) })
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
+                                 extraVars = { @PermuteVar(varName = "k", from = "5", to = "3") })
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
 
@@ -366,8 +366,8 @@ public class DegenerateInputTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
-                                 extraVars = { @PermuteVar(varName = "i", from = 2, to = 4) })
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
+                                 extraVars = { @PermuteVar(varName = "i", from = "2", to = "4") })
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
 
@@ -386,9 +386,9 @@ public class DegenerateInputTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
-                                 extraVars = { @PermuteVar(varName = "k", from = 2, to = 4),
-                                               @PermuteVar(varName = "k", from = 2, to = 4) })
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
+                                 extraVars = { @PermuteVar(varName = "k", from = "2", to = "4"),
+                                               @PermuteVar(varName = "k", from = "2", to = "4") })
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
 
@@ -407,9 +407,9 @@ public class DegenerateInputTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
                                  strings = { "k=fixed" },
-                                 extraVars = { @PermuteVar(varName = "k", from = 2, to = 4) })
+                                 extraVars = { @PermuteVar(varName = "k", from = "2", to = "4") })
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
 
@@ -422,7 +422,7 @@ public class DegenerateInputTest {
     // -------------------------------------------------------------------------
 
     /**
-     * {@code className = "FixedName"} with {@code from=3, to=5} produces a duplicate
+     * {@code className = "FixedName"} with {@code from="3", to=5} produces a duplicate
      * class error via the Filer today, but R1 should catch it first with a clearer message.
      */
     @Test
@@ -431,7 +431,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "FixedName")
+                        @Permute(varName = "i", from = "3", to = "5", className = "FixedName")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -441,7 +441,7 @@ public class DegenerateInputTest {
     }
 
     /**
-     * {@code className = "FixedName"} with {@code from=3, to=3}: only one iteration,
+     * {@code className = "FixedName"} with {@code from="3", to=3}: only one iteration,
      * so the Filer never fires a duplicate error. R1 must catch this case.
      */
     @Test
@@ -450,7 +450,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 3, className = "FixedName")
+                        @Permute(varName = "i", from = "3", to = "3", className = "FixedName")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -468,7 +468,7 @@ public class DegenerateInputTest {
                 """
                         package %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 3, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "3", className = "Foo${i}")
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN));
 
@@ -490,8 +490,8 @@ public class DegenerateInputTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 2, to = 3, className = "Foo${i}",
-                                 extraVars = { @PermuteVar(varName = "k", from = 2, to = 3) })
+                        @Permute(varName = "i", from = "2", to = "3", className = "Foo${i}",
+                                 extraVars = { @PermuteVar(varName = "k", from = "2", to = "3") })
                         public class Foo2 {}
                         """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
 
@@ -510,8 +510,8 @@ public class DegenerateInputTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 2, to = 3, className = "Foo${i}x${k}",
-                                 extraVars = { @PermuteVar(varName = "k", from = 2, to = 3) })
+                        @Permute(varName = "i", from = "2", to = "3", className = "Foo${i}x${k}",
+                                 extraVars = { @PermuteVar(varName = "k", from = "2", to = "3") })
                         public class Foo2x {}
                         """.formatted(PKG, PERMUTE_FQN, PERMUTE_VAR_FQN));
 

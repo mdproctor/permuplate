@@ -12,7 +12,7 @@ import io.quarkiverse.permuplate.PermuteTypeParam;
  *
  * <p>Generated: Predicate2&lt;DS,A,B&gt; through Predicate7&lt;DS,A,B,C,D,E,F&gt;
  */
-@Permute(varName = "i", from = 2, to = 7, className = "Predicate${i}",
+@Permute(varName = "i", from = "2", to = "7", className = "Predicate${i}",
          inline = false, keepTemplate = true)
 public interface Predicate1<DS,
         @PermuteTypeParam(varName = "j", from = "1", to = "${i-1}", name = "${alpha(j)}") A> {

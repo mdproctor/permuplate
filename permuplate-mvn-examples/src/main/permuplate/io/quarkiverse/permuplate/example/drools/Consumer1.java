@@ -13,7 +13,7 @@ import io.quarkiverse.permuplate.PermuteTypeParam;
  * <p>Generated: Consumer2&lt;DS,A&gt; through Consumer7&lt;DS,A,B,C,D,E,F&gt;
  * Alpha naming (A,B,C...) matches Drools conventions.
  */
-@Permute(varName = "i", from = 2, to = 7, className = "Consumer${i}",
+@Permute(varName = "i", from = "2", to = "7", className = "Consumer${i}",
          inline = false, keepTemplate = true)
 public interface Consumer1<DS,
         @PermuteTypeParam(varName = "j", from = "1", to = "${i-1}", name = "${alpha(j)}") A> {

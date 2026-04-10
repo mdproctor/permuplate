@@ -22,7 +22,7 @@ public class ImplicitInferenceTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=4, className="Chain${i}")
+                        @Permute(varName="i", from="3", to="4", className="Chain${i}")
                         public class Chain2<T1, @PermuteTypeParam(varName="j", from="2", to="${i}", name="T${j}") T2> {
                             public Chain2<T1, T2> next() { return null; }
                         }
@@ -55,7 +55,7 @@ public class ImplicitInferenceTest {
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=3, to=3, className="Explicit${i}")
+                        @Permute(varName="i", from="3", to="3", className="Explicit${i}")
                         public class Explicit2<T1, @PermuteTypeParam(varName="j", from="2", to="${i}", name="T${j}") T2> {
                             @PermuteReturn(className="Explicit${i}", typeArgVarName="j", typeArgFrom="1", typeArgTo="${i}", typeArgName="T${j}")
                             public Explicit2<T1, T2> typed() { return this; }

@@ -6,7 +6,7 @@ import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteParam;
 
-@Permute(varName = "i", from = 3, to = 4, className = "${prefix}Join${i}", strings = { "prefix=Buffered" })
+@Permute(varName = "i", from = "3", to = "4", className = "${prefix}Join${i}", strings = { "prefix=Buffered" })
 public class PrefixedJoin2 {
 
     private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;

@@ -39,7 +39,7 @@ import java.lang.annotation.Target;
  * <pre>
  * {
  *     &#64;code
- *     &#64;Permute(varName = "i", from = 1, to = 4, className = "Step${i}")
+ *     &#64;Permute(varName = "i", from = "1", to = "4", className = "Step${i}")
  *     public class Step1<T1> {
  *         @PermuteReturn(className = "Step${i+1}", typeArgVarName = "j", typeArgFrom = "1", typeArgTo = "${i+1}", typeArgName = "T${j}")
  *         public Object join(@PermuteDeclr(type = "Source<T${i+1}>") Object src) {

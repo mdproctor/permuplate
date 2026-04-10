@@ -16,7 +16,7 @@ public class PermuteSafeDeleteDelegateTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Callable1.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=2, to=10, className=\"Callable${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"2\", to=\"10\", className=\"Callable${i}\")\n" +
                 "public interface Callable1 {}");
 
         // Add a stub Callable2 so we have a PsiClass to pass to the delegate
@@ -37,7 +37,7 @@ public class PermuteSafeDeleteDelegateTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Callable1.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=2, to=10, className=\"Callable${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"2\", to=\"10\", className=\"Callable${i}\")\n" +
                 "public interface Callable1 {}");
 
         myFixture.addFileToProject("Callable2.java",
@@ -63,7 +63,7 @@ public class PermuteSafeDeleteDelegateTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Callable1.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=2, to=4, className=\"Callable${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"2\", to=\"4\", className=\"Callable${i}\")\n" +
                 "public interface Callable1 {}");
 
         PsiClass callable1 = findClass("io.example.Callable1");

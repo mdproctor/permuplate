@@ -107,7 +107,7 @@ public class PrefixValidationTest {
                         import %s;
                         import %s;
                         import java.util.List;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}",
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}",
                                  strings = {"v1=my", "v2=", "v3=2"})
                         public class Foo2 {
                             private List<Object> myElements;
@@ -141,7 +141,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object",
                                                    name = "${v1}${v2}c${v3}") Object c2;
@@ -171,7 +171,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Bar${i}", name = "c${i}") Object c2;
                         }
@@ -194,7 +194,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "x${i}") Object c2;
                         }
@@ -222,7 +222,7 @@ public class PrefixValidationTest {
                         import %s;
                         import %s;
                         import java.util.List;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private List<Object> right;
                             public void go() {
@@ -253,7 +253,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             public Foo2(@PermuteDeclr(type = "Object", name = "x${i}") Object c2) {}
                         }
@@ -281,7 +281,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             public void go(
                                     @PermuteParam(varName = "j", from = "1", to = "${i-1}", type = "Object", name = "x${j}") Object o1) {}
@@ -308,7 +308,7 @@ public class PrefixValidationTest {
                         import %s;
                         import %s;
                         import java.util.List;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private List<Object> right;
                             public void go() {
@@ -334,7 +334,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             public Foo2(@PermuteDeclr(type = "Bar${i}", name = "c${i}") Object c2) {}
                         }
@@ -361,7 +361,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "item${i}") Object item2;
                         }
@@ -384,7 +384,7 @@ public class PrefixValidationTest {
                         import %s;
                         import %s;
                         import java.util.List;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private List<Object> right;
                             public void go() {
@@ -407,7 +407,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             public Foo2(@PermuteDeclr(type = "Object", name = "arg${i}") Object arg2) {}
                         }
@@ -427,7 +427,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             public void go(
                                     @PermuteParam(varName = "j", from = "1", to = "${i-1}",
@@ -451,7 +451,7 @@ public class PrefixValidationTest {
                         import %s;
                         import %s;
                         import java.util.List;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "item${i}") Object item2;
                             private List<Object> elements;
@@ -477,7 +477,7 @@ public class PrefixValidationTest {
                         import %s;
                         import %s;
                         import java.util.List;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Object", name = "item${i}") Object item2;
                             private List<Object> elements;
@@ -508,7 +508,7 @@ public class PrefixValidationTest {
                         package %s;
                         import %s;
                         import %s;
-                        @Permute(varName = "i", from = 3, to = 5, className = "Foo${i}")
+                        @Permute(varName = "i", from = "3", to = "5", className = "Foo${i}")
                         public class Foo2 {
                             private @PermuteDeclr(type = "Bar${i}", name = "c${i}") Object c2;
                         }

@@ -27,7 +27,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {}");
         List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
         assertTrue("Expected no Permuplate warnings on valid className", warnings.isEmpty());
@@ -39,7 +39,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"${i}\")\n" +
                 "public class Join2 {}");
         List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
         assertFalse("Expected at least one Permuplate warning for R4 (no literal anchor)", warnings.isEmpty());
@@ -54,7 +54,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Foo${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Foo${i}\")\n" +
                 "public class Join2 {}");
         List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
         assertFalse("Expected at least one Permuplate warning for R2 (literal mismatch)", warnings.isEmpty());
@@ -70,7 +70,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Bar${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Bar${i}\")\n" +
                 "public class Join2 {}");
         List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
         assertFalse("Expected at least one Permuplate stale-string warning", warnings.isEmpty());
@@ -86,7 +86,7 @@ public class AnnotationStringInspectionTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=1, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"1\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteMethod(varName=\"j\", from=\"1\", to=\"${i-1}\")\n" +
                 "    public void join2() {}\n" +

@@ -15,12 +15,18 @@ import java.lang.annotation.Target;
  * program element.
  *
  * <p>
+ * The {@code from} and {@code to} attributes support the same JEXL expression strings
+ * and external property sources as {@link Permute#from()} and {@link Permute#to()}.
+ * The outer permutation variable (e.g. {@code i}) is available in expressions, so
+ * {@code to = "${i}"} is valid.
+ *
+ * <p>
  * Example:
  *
  * <pre>{@code
- * &#64;Permute(varName = "i", from = 2, to = 4,
+ * &#64;Permute(varName = "i", from = "2", to = "4",
  *          className = "Matrix${i}x${k}",
- *          extraVars = { @PermuteVar(varName = "k", from = 2, to = 4) })
+ *          extraVars = { @PermuteVar(varName = "k", from = "2", to = "4") })
  * public class Matrix2x2 { ... }
  * }</pre>
  *
@@ -32,9 +38,17 @@ public @interface PermuteVar {
     /** The variable name, referenced as {@code ${varName}} in expressions. */
     String varName();
 
-    /** Inclusive lower bound. */
-    int from();
+    /**
+     * Inclusive lower bound as a JEXL expression string (e.g. {@code "2"} or
+     * {@code "${start}"}). The outer variable and all named constants from
+     * {@code @Permute.strings} are available.
+     */
+    String from();
 
-    /** Inclusive upper bound. Must be &gt;= {@code from}. */
-    int to();
+    /**
+     * Inclusive upper bound as a JEXL expression string. Must evaluate to a value
+     * &gt;= {@code from}. The outer variable (e.g. {@code i}) is available, enabling
+     * patterns like {@code to = "${i}"}.
+     */
+    String to();
 }

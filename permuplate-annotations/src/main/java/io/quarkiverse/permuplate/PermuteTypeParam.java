@@ -32,7 +32,7 @@ import java.lang.annotation.Target;
  * Example — explicit phantom type:
  *
  * <pre>{@code
- * @Permute(varName = "i", from = 2, to = 5, className = "Step${i}")
+ * @Permute(varName = "i", from = "2", to = "5", className = "Step${i}")
  * public class Step1<@PermuteTypeParam(varName = "j", from = "1", to = "${i}", name = "T${j}") T1> {
  * }
  * // → Step2<T1, T2>, Step3<T1, T2, T3>, ...
@@ -71,7 +71,7 @@ import java.lang.annotation.Target;
  * <pre>
  * {
  *     &#64;code
- *     &#64;Permute(varName = "i", from = 2, to = 4, className = "Gatherer${i}")
+ *     &#64;Permute(varName = "i", from = "2", to = "4", className = "Gatherer${i}")
  *     public class Gatherer1 {
  *         @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "T${m}")
  *         public <B> void collect(java.util.List<B> items) {

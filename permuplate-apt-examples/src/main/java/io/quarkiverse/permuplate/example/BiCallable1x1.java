@@ -26,8 +26,8 @@ import io.quarkiverse.permuplate.PermuteVar;
  * BiCallable3x2 handler = (a1, a2, a3, b1, b2) -> process(a1, a2, a3, b1, b2);
  * }</pre>
  */
-@Permute(varName = "i", from = 2, to = 4, className = "BiCallable${i}x${k}", extraVars = {
-        @PermuteVar(varName = "k", from = 2, to = 4) })
+@Permute(varName = "i", from = "2", to = "4", className = "BiCallable${i}x${k}", extraVars = {
+        @PermuteVar(varName = "k", from = "2", to = "4") })
 public interface BiCallable1x1 {
 
     /**

@@ -101,11 +101,24 @@ public class PermuteMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
+    /** External properties resolved from {@code -Dpermuplate.*} system properties this run. */
+    private java.util.Map<String, Object> externalProperties = java.util.Collections.emptyMap();
+
     @Override
     public void execute() throws MojoExecutionException {
         try {
             outputDirectory.mkdirs();
             project.addCompileSourceRoot(outputDirectory.getAbsolutePath());
+
+            // Build external properties from system properties (-Dpermuplate.*).
+            // APT options (-Apermuplate.*) are NOT available in the Maven plugin —
+            // only system properties work here. Both APT and Maven plugin support -D.
+            externalProperties = PermuteConfig.buildExternalProperties(null, false);
+            if (!externalProperties.isEmpty()) {
+                getLog().info("Permuplate: resolved external properties from -Dpermuplate.*: "
+                        + externalProperties.keySet());
+            }
+            InlineGenerator.setExternalProperties(externalProperties);
 
             // --- Non-inline: scan sourceDirectory ---
             getLog().info("Permuplate: scanning " + sourceDirectory + " for @Permute templates");
@@ -187,9 +200,21 @@ public class PermuteMojo extends AbstractMojo {
     }
 
     private void validateConfig(PermuteConfig config, String location) throws MojoExecutionException {
-        if (config.from > config.to) {
+        // Evaluate from/to using the external properties + strings base context
+        java.util.Map<String, Object> baseVars = PermuteConfig.buildBaseVars(config, externalProperties);
+        io.quarkiverse.permuplate.core.EvaluationContext valCtx = new io.quarkiverse.permuplate.core.EvaluationContext(
+                baseVars);
+        int fromVal, toVal;
+        try {
+            fromVal = valCtx.evaluateInt(config.from);
+            toVal = valCtx.evaluateInt(config.to);
+        } catch (Exception e) {
+            throw new MojoExecutionException(location +
+                    ": @Permute from/to expression failed to evaluate: " + e.getMessage(), e);
+        }
+        if (fromVal > toVal) {
             throw new MojoExecutionException(location + ": @Permute has invalid range: from=" +
-                    config.from + " is greater than to=" + config.to);
+                    fromVal + " is greater than to=" + toVal);
         }
         for (String entry : config.strings) {
             int sep = entry.indexOf('=');
@@ -207,9 +232,16 @@ public class PermuteMojo extends AbstractMojo {
         Set<String> seen = new HashSet<>();
         seen.add(config.varName);
         for (PermuteVarConfig extra : config.extraVars) {
-            if (extra.from > extra.to)
-                throw new MojoExecutionException(location +
-                        ": @PermuteVar \"" + extra.varName + "\" has invalid range");
+            // from/to are now String expressions; only validate if plain integers
+            try {
+                int ef = Integer.parseInt(extra.from.trim());
+                int et = Integer.parseInt(extra.to.trim());
+                if (ef > et)
+                    throw new MojoExecutionException(location +
+                            ": @PermuteVar \"" + extra.varName + "\" has invalid range");
+            } catch (NumberFormatException ignored) {
+                // expression-based — validated at eval time
+            }
             if (seen.contains(extra.varName))
                 throw new MojoExecutionException(location +
                         ": @PermuteVar varName \"" + extra.varName + "\" conflicts with an existing variable");

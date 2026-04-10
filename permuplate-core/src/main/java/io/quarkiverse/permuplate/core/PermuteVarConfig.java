@@ -8,10 +8,12 @@ package io.quarkiverse.permuplate.core;
 public final class PermuteVarConfig {
 
     public final String varName;
-    public final int from;
-    public final int to;
+    /** JEXL expression string for the lower bound (e.g. {@code "2"} or {@code "${start}"}). */
+    public final String from;
+    /** JEXL expression string for the upper bound (e.g. {@code "4"} or {@code "${i}"}). */
+    public final String to;
 
-    public PermuteVarConfig(String varName, int from, int to) {
+    public PermuteVarConfig(String varName, String from, String to) {
         this.varName = varName;
         this.from = from;
         this.to = to;

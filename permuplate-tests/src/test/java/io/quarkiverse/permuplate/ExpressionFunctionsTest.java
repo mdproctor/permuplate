@@ -130,10 +130,10 @@ public class ExpressionFunctionsTest {
                 """
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
-                        // from=2, not from=1: alpha(1)="A" would generate a class named StepA,
+                        // from="2", not from=1: alpha(1)="A" would generate a class named StepA,
                         // which collides with the template class name. The processor does not skip
                         // template-name collisions — it would fail. from=2 generates StepB..StepF.
-                        @Permute(varName="i", from=2, to=6, className="Step${alpha(i)}")
+                        @Permute(varName="i", from="2", to="6", className="Step${alpha(i)}")
                         public class StepA { }
                         """);
 
@@ -163,7 +163,7 @@ public class ExpressionFunctionsTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=3, className="JoinLower${i}")
+                        @Permute(varName="i", from="3", to="3", className="JoinLower${i}")
                         public class JoinLower4 {
                             public void join(
                                 // to="${i}" (not "${i-1}") because this template has no for-each loop;
@@ -199,7 +199,7 @@ public class ExpressionFunctionsTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteDeclr;
-                        @Permute(varName="i", from=3, to=3, className="BadStyle${i}")
+                        @Permute(varName="i", from="3", to="3", className="BadStyle${i}")
                         public class BadStyle3 {
                             @PermuteDeclr(type="${typeArgList(1, i, 'X')}", name="field${i}")
                             Object field3;
@@ -226,7 +226,7 @@ public class ExpressionFunctionsTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         // from=27: alpha(27) is out of range — should cause generation-time error
-                        @Permute(varName="i", from=27, to=27, className="Step${alpha(i)}")
+                        @Permute(varName="i", from="27", to="27", className="Step${alpha(i)}")
                         public class StepZ { }
                         """);
 

@@ -49,7 +49,7 @@ public class JoinBuilder {
      *       chain always uses {@code Void} as END (no outer scope).</li>
      * </ul>
      */
-    @Permute(varName = "i", from = 1, to = 6, className = "Join${i}Second",
+    @Permute(varName = "i", from = "1", to = "6", className = "Join${i}Second",
              inline = true, keepTemplate = false)
     public static class Join0Second<END, DS,
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
@@ -391,7 +391,7 @@ public class JoinBuilder {
      * <p>Holds {@code filter()} (single-fact and all-facts overloads). All inherited from
      * the template; inherited {@code join()} and {@code fn()} come from Second via extends.
      */
-    @Permute(varName = "i", from = 1, to = 6, className = "Join${i}First",
+    @Permute(varName = "i", from = "1", to = "6", className = "Join${i}First",
              inline = true, keepTemplate = false)
     public static class Join0First<END, DS,
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
@@ -419,7 +419,7 @@ public class JoinBuilder {
          * Single-fact filter — applies a predicate to the most recently joined fact only.
          * Suppressed at i=1 via {@code @PermuteMethod} ternary: at arity 1 both overloads
          * would have {@code filter(Predicate2<DS, A>)} — a compile error. The JEXL ternary
-         * {@code from="${i > 1 ? i : i+1}"} produces {@code from=2, to=1} at i=1 (empty
+         * {@code from="${i > 1 ? i : i+1}"} produces {@code from="2", to=1} at i=1 (empty
          * range), silently omitting this method. At i≥2: from=to=i, one clone per arity.
          */
         @PermuteMethod(varName = "x", from = "${i > 1 ? i : i+1}", to = "${i}", name = "filter")

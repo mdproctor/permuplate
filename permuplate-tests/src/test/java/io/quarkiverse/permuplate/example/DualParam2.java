@@ -7,7 +7,7 @@ import java.util.List;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteParam;
 
-@Permute(varName = "i", from = 3, to = 4, className = "DualParam${i}")
+@Permute(varName = "i", from = "3", to = "4", className = "DualParam${i}")
 public class DualParam2 {
 
     public final List<Object> merged = new ArrayList<>();

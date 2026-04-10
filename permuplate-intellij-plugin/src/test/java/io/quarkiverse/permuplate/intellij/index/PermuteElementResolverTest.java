@@ -34,7 +34,7 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
         // Ask resolver to find the template for generated name "Join3"
@@ -56,7 +56,7 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
         VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
@@ -76,7 +76,7 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    public void join2() {}\n" +
                 "}");
@@ -105,7 +105,7 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    public void join2(@PermuteParam(varName=\"j\", from=\"1\", to=\"${i-1}\", " +
                 "type=\"Object\", name=\"o${j}\") Object o1) {}\n" +
@@ -137,7 +137,7 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +
                 "    private Object c2;\n" +
@@ -169,7 +169,7 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
         PsiClass join2 = ((PsiJavaFile) myFixture.getFile()).getClasses()[0];

@@ -32,7 +32,7 @@ public class PermuteMethodTest {
         ClassOrInterfaceDeclaration template = cu.findFirst(
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals(templateClass)).orElseThrow();
-        PermuteConfig config = new PermuteConfig(varName, from, to, classNameTemplate,
+        PermuteConfig config = new PermuteConfig(varName, String.valueOf(from), String.valueOf(to), classNameTemplate,
                 new String[0], new PermuteVarConfig[0], true, false);
         return InlineGenerator.generate(cu, template, config,
                 List.of(Map.of(varName, forI))).toString();
@@ -44,7 +44,7 @@ public class PermuteMethodTest {
 
     @Test
     public void testBasicInferredToAndLeafNode() {
-        // @Permute(from=1, to=3): to = @Permute.to - i = 3-i
+        // @Permute(from="1", to="3"): to = @Permute.to - i = 3-i
         // i=1: j=1..2 → 2 join() overloads
         // i=3: j=1..0 → 0 overloads (leaf)
         String template = """
@@ -224,7 +224,7 @@ public class PermuteMethodTest {
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteMethod;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=1, to=3, className="Apt${i}Second",
+                        @Permute(varName="i", from="1", to="3", className="Apt${i}Second",
                                  strings={"max=3"})
                         public class Apt0Second {
                             @PermuteMethod(varName="j", from="1", to="${max - i}", name="join${j}")
@@ -356,7 +356,7 @@ public class PermuteMethodTest {
         String parentSource = """
                 package com.example;
                 public class Selector {
-                    @io.quarkiverse.permuplate.Permute(varName = "i", from = 1, to = 3,
+                    @io.quarkiverse.permuplate.Permute(varName = "i", from = "1", to = "3",
                             className = "Sel${i}", inline = true, keepTemplate = false)
                     public static class Sel0 {
                         @io.quarkiverse.permuplate.PermuteMethod(
@@ -402,7 +402,7 @@ public class PermuteMethodTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteMethod;
-                        @Permute(varName="i", from=1, to=1, className="JConn${i}")
+                        @Permute(varName="i", from="1", to="1", className="JConn${i}")
                         public class JConn0<T1> {
                             @PermuteMethod(varName="j", from="1", to="3")
                             public <T2> JConn2<T1, T2> connect(JS1<T2> src) { return null; }

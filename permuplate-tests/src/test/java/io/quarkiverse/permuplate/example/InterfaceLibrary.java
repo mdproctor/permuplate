@@ -13,7 +13,7 @@ import io.quarkiverse.permuplate.PermuteParam;
  */
 public class InterfaceLibrary {
 
-    @Permute(varName = "i", from = 3, to = 4, className = "Merger${i}")
+    @Permute(varName = "i", from = "3", to = "4", className = "Merger${i}")
     public static interface Merger2 {
         void merge(
                 @PermuteParam(varName = "j", from = "1", to = "${i}", type = "Object", name = "o${j}") Object o1);

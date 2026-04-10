@@ -13,7 +13,7 @@ import java.util.*;
 /**
  * Forward index: template class simple name → PermuteTemplateData.
  * Key:   "Join2"
- * Value: PermuteTemplateData{varName="i", from=3, to=10, generatedNames=["Join3"…], …}
+ * Value: PermuteTemplateData{varName="i", from="3", to="10", generatedNames=["Join3"…], …}
  */
 public class PermuteTemplateIndex extends FileBasedIndexExtension<String, PermuteTemplateData> {
 

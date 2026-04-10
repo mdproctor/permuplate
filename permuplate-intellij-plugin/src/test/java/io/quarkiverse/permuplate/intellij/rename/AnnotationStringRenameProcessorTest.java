@@ -16,7 +16,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join<caret>2 {}");
 
         myFixture.renameElementAtCaret("Merge2");
@@ -24,7 +24,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.checkResult(
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Merge${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Merge${i}\")\n" +
                 "public class Merge2 {}");
     }
 
@@ -32,7 +32,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +
                 "    private Object c<caret>2;\n" +
@@ -43,7 +43,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.checkResult(
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Callable${i}\", name=\"d${i}\")\n" +
                 "    private Object d2;\n" +
@@ -54,7 +54,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteMethod(varName=\"j\", to=\"${i-1}\", name=\"join${j}\")\n" +
                 "    public void joi<caret>n2() {}\n" +
@@ -65,7 +65,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.checkResult(
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteMethod(varName=\"j\", to=\"${i-1}\", name=\"merge${j}\")\n" +
                 "    public void merge2() {}\n" +
@@ -76,13 +76,13 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Callable2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=10, className=\"Callable${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"10\", className=\"Callable${i}\")\n" +
                 "public interface Callable2 {}");
 
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {\n" +
                 "    @PermuteDeclr(type=\"Callable${i}\", name=\"c${i}\")\n" +
                 "    private Object c2;\n" +
@@ -107,7 +107,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
         // Generated file lives under target/generated-sources so isGeneratedFile() returns true
@@ -138,7 +138,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         myFixture.configureByText("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
         PsiClass join2 = ((com.intellij.psi.PsiJavaFile) myFixture.getFile()).getClasses()[0];
@@ -178,7 +178,7 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         PsiFile templatePsiFile = myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
         // Generated file in target/generated-sources so isGeneratedFile() fires

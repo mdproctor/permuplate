@@ -31,7 +31,7 @@ public class PermuteConstTest {
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteConst;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=4, className="Counter${i}")
+                        @Permute(varName="i", from="3", to="4", className="Counter${i}")
                         public class Counter2 {
                             @PermuteConst("${i}") public static final int ARITY = 2;
 
@@ -77,7 +77,7 @@ public class PermuteConstTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteConst;
-                        @Permute(varName="i", from=3, to=3, className="Tracker${i}")
+                        @Permute(varName="i", from="3", to="3", className="Tracker${i}")
                         public class Tracker2 {
                             public int getArity() {
                                 @PermuteConst("${i}") int n = 2;
@@ -115,7 +115,7 @@ public class PermuteConstTest {
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteConst;
                         import io.quarkiverse.permuplate.PermuteDeclr;
-                        @Permute(varName="i", from=3, to=4, className="Audit${i}")
+                        @Permute(varName="i", from="3", to="4", className="Audit${i}")
                         public class Audit2 {
                             @PermuteDeclr(type="int", name="ARITY_${i}")
                             @PermuteConst("${i}")
@@ -160,7 +160,7 @@ public class PermuteConstTest {
                         package io.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteConst;
-                        @Permute(varName="i", from=3, to=3, className="Store${i}")
+                        @Permute(varName="i", from="3", to="3", className="Store${i}")
                         public interface Store2 {
                             @PermuteConst("${i}") int ARITY = 2;
                             default int getArity() { return ARITY; }

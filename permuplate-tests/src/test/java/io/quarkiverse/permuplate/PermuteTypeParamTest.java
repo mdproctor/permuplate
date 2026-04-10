@@ -33,7 +33,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="Condition${i}")
+                        @Permute(varName="i", from="3", to="3", className="Condition${i}")
                         public interface Condition1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="T${j}") T1> {
                             boolean test(T1 fact);
                         }
@@ -64,7 +64,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="SortedCondition${i}")
+                        @Permute(varName="i", from="3", to="3", className="SortedCondition${i}")
                         public interface SortedCondition1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="T${j}") T1 extends Comparable<T1>> {
                             boolean test(T1 fact);
                         }
@@ -95,7 +95,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=2, to=4, className="RangeCondition${i}")
+                        @Permute(varName="i", from="2", to="4", className="RangeCondition${i}")
                         public interface RangeCondition1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="T${j}") T1> {
                             boolean test(T1 fact);
                         }
@@ -128,7 +128,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=3, className="Consumer${i}")
+                        @Permute(varName="i", from="3", to="3", className="Consumer${i}")
                         public interface Consumer1<T1> {
                             void accept(
                                 @PermuteParam(varName="j", from="1", to="${i}", type="T${j}", name="arg${j}") T1 arg1);
@@ -157,7 +157,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=3, className="BoundedConsumer${i}")
+                        @Permute(varName="i", from="3", to="3", className="BoundedConsumer${i}")
                         public interface BoundedConsumer1<T1 extends Comparable<T1>> {
                             void accept(
                                 @PermuteParam(varName="j", from="1", to="${i}", type="T${j}", name="arg${j}") T1 arg1);
@@ -186,7 +186,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=3, className="Transformer${i}")
+                        @Permute(varName="i", from="3", to="3", className="Transformer${i}")
                         public interface Transformer1<T1, R> {
                             R apply(
                                 @PermuteParam(varName="j", from="1", to="${i}", type="T${j}", name="input${j}") T1 input1);
@@ -217,7 +217,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteParam;
-                        @Permute(varName="i", from=3, to=3, className="Mapper${i}")
+                        @Permute(varName="i", from="3", to="3", className="Mapper${i}")
                         public interface Mapper1<T1> {
                             T1 apply(
                                 @PermuteParam(varName="j", from="1", to="${i}", type="T${j}", name="input${j}") T1 input1);
@@ -245,7 +245,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="BadPrefix${i}")
+                        @Permute(varName="i", from="3", to="3", className="BadPrefix${i}")
                         public interface BadPrefix1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="X${j}") T1> {
                             boolean test(T1 fact);
                         }
@@ -271,7 +271,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="BadRange${i}")
+                        @Permute(varName="i", from="3", to="3", className="BadRange${i}")
                         public interface BadRange1<@PermuteTypeParam(varName="j", from="5", to="2", name="T${j}") T1> {
                             boolean test(T1 fact);
                         }
@@ -303,7 +303,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="AlphaCondition${i}")
+                        @Permute(varName="i", from="3", to="3", className="AlphaCondition${i}")
                         public interface AlphaCondition1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="${alpha(j)}") A> {
                             boolean test(A fact);
                         }
@@ -335,7 +335,7 @@ public class PermuteTypeParamTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=3, to=3, className="SortedAlpha${i}")
+                        @Permute(varName="i", from="3", to="3", className="SortedAlpha${i}")
                         public interface SortedAlpha1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="${alpha(j)}") A extends Comparable<A>> {
                             boolean test(A fact);
                         }
@@ -370,7 +370,7 @@ public class PermuteTypeParamTest {
                         package io.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName = "i", from = 2, to = 3, className = "Gatherer${i}")
+                        @Permute(varName = "i", from = "2", to = "3", className = "Gatherer${i}")
                         public class Gatherer1 {
                             @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "T${m}")
                             public <B> void collect(java.util.List<B> items) {}
@@ -399,7 +399,7 @@ public class PermuteTypeParamTest {
                         package io.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName = "i", from = 2, to = 3, className = "Fetcher${i}")
+                        @Permute(varName = "i", from = "2", to = "3", className = "Fetcher${i}")
                         public class Fetcher1 {
                             @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "T${m}")
                             public <B> void fetch(
@@ -432,7 +432,7 @@ public class PermuteTypeParamTest {
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteDeclr;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName = "i", from = 2, to = 3, className = "Dual${i}")
+                        @Permute(varName = "i", from = "2", to = "3", className = "Dual${i}")
                         public class Dual1 {
                             @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "T${m}")
                             public <B> void handle(
@@ -466,7 +466,7 @@ public class PermuteTypeParamTest {
                         import io.quarkiverse.permuplate.PermuteMethod;
                         import io.quarkiverse.permuplate.PermuteReturn;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName = "i", from = 2, to = 2, className = "Guarded${i}")
+                        @Permute(varName = "i", from = "2", to = "2", className = "Guarded${i}")
                         public class Guarded1 {
                             @PermuteTypeParam(varName = "m", from = "${i}", to = "${i}", name = "X${m}")
                             public <B> void standalone(java.util.List<B> items) {}
@@ -500,7 +500,7 @@ public class PermuteTypeParamTest {
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName = "i", from = 1, to = 3, className = "Chain${i}")
+                        @Permute(varName = "i", from = "1", to = "3", className = "Chain${i}")
                         public class Chain0<
                                 @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "T${k}") T1> {
                             @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "T${m}")

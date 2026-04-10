@@ -76,7 +76,7 @@ public class GeneratedFileRenameHandlerTest extends BasePlatformTestCase {
         myFixture.addFileToProject("Join2.java",
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.Permute;\n" +
-                "@Permute(varName=\"i\", from=3, to=5, className=\"Join${i}\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
                 "public class Join2 {}");
 
         VirtualFile generatedFile = myFixture.getTempDirFixture().createFile(

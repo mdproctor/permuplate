@@ -42,7 +42,7 @@ public class InlineGenerationTest {
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals("Child2")).orElseThrow();
 
-        PermuteConfig config = new PermuteConfig("i", 3, 4, "Child${i}",
+        PermuteConfig config = new PermuteConfig("i", "3", "4", "Child${i}",
                 new String[0], new PermuteVarConfig[0], true, false);
 
         List<Map<String, Object>> combos = List.of(Map.of("i", 3), Map.of("i", 4));
@@ -83,7 +83,7 @@ public class InlineGenerationTest {
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals("Handler1")).orElseThrow();
 
-        PermuteConfig config = new PermuteConfig("i", 2, 3, "Handler${i}",
+        PermuteConfig config = new PermuteConfig("i", "2", "3", "Handler${i}",
                 new String[0], new PermuteVarConfig[0], true, true);
 
         List<Map<String, Object>> combos = List.of(Map.of("i", 2), Map.of("i", 3));
@@ -128,7 +128,7 @@ public class InlineGenerationTest {
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals("Worker2")).orElseThrow();
 
-        PermuteConfig config = new PermuteConfig("i", 3, 3, "Worker${i}",
+        PermuteConfig config = new PermuteConfig("i", "3", "3", "Worker${i}",
                 new String[0], new PermuteVarConfig[0], true, false);
 
         CompilationUnit output = InlineGenerator.generate(
@@ -176,7 +176,7 @@ public class InlineGenerationTest {
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals("Condition1")).orElseThrow();
 
-        PermuteConfig config = new PermuteConfig("i", 2, 3, "Condition${i}",
+        PermuteConfig config = new PermuteConfig("i", "2", "3", "Condition${i}",
                 new String[0], new PermuteVarConfig[0], true, false);
 
         CompilationUnit output = InlineGenerator.generate(cu, template, config,
@@ -228,7 +228,7 @@ public class InlineGenerationTest {
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals("Condition1")).orElseThrow();
 
-        PermuteConfig condConfig = new PermuteConfig("i", 2, 3, "Condition${i}",
+        PermuteConfig condConfig = new PermuteConfig("i", "2", "3", "Condition${i}",
                 new String[0], new PermuteVarConfig[0], true, false);
 
         CompilationUnit afterConditions = InlineGenerator.generate(cu, condition1, condConfig,
@@ -240,7 +240,7 @@ public class InlineGenerationTest {
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals("Action1")).orElseThrow();
 
-        PermuteConfig actionConfig = new PermuteConfig("i", 2, 3, "Action${i}",
+        PermuteConfig actionConfig = new PermuteConfig("i", "2", "3", "Action${i}",
                 new String[0], new PermuteVarConfig[0], true, false);
 
         CompilationUnit finalOutput = InlineGenerator.generate(afterConditions, action1, actionConfig,
@@ -275,7 +275,7 @@ public class InlineGenerationTest {
                 package com.example;
                 import io.quarkiverse.permuplate.Permute;
                 public class Outer {
-                    @Permute(varName = "i", from = 3, to = 5,
+                    @Permute(varName = "i", from = "3", to = "5",
                              className = "Foo${i}", inline = true, keepTemplate = true)
                     public static class Foo2 {}
                 }
@@ -289,8 +289,8 @@ public class InlineGenerationTest {
         PermuteConfig config = AnnotationReader.readPermute(ann);
 
         assertThat(config.varName).isEqualTo("i");
-        assertThat(config.from).isEqualTo(3);
-        assertThat(config.to).isEqualTo(5);
+        assertThat(config.from).isEqualTo("3");
+        assertThat(config.to).isEqualTo("5");
         assertThat(config.className).isEqualTo("Foo${i}");
         assertThat(config.inline).isTrue();
         assertThat(config.keepTemplate).isTrue();

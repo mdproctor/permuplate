@@ -46,7 +46,7 @@ public class PermuteReturnTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=1, to=4, className="Node${i}")
+                        @Permute(varName="i", from="1", to="4", className="Node${i}")
                         public class NodeT {
                             @PermuteReturn(className="Node${i+1}")
                             public Object next() { return null; }
@@ -89,7 +89,7 @@ public class PermuteReturnTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=1, to=2, className="ForcedChain${i}")
+                        @Permute(varName="i", from="1", to="2", className="ForcedChain${i}")
                         public class ForcedChainT {
                             @PermuteReturn(className="ForcedChain${i+1}", when="true")
                             public Object next() { return null; }
@@ -125,7 +125,7 @@ public class PermuteReturnTest {
         ClassOrInterfaceDeclaration template = cu.findFirst(
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals(templateClassName)).orElseThrow();
-        PermuteConfig config = new PermuteConfig(varName, from, to, classNameTemplate,
+        PermuteConfig config = new PermuteConfig(varName, String.valueOf(from), String.valueOf(to), classNameTemplate,
                 new String[0], new PermuteVarConfig[0], true, false);
         CompilationUnit output = InlineGenerator.generate(cu, template,
                 config, List.of(Map.of(varName, forI)));
@@ -238,7 +238,7 @@ public class PermuteReturnTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=2, to=3, className="BadV2Step${i}")
+                        @Permute(varName="i", from="2", to="3", className="BadV2Step${i}")
                         public class BadV2Step1 {
                             @PermuteReturn(className="BadV2Step${i+1}", typeArgVarName="j")
                             public Object method() { return null; }
@@ -262,7 +262,7 @@ public class PermuteReturnTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=2, to=3, className="BadV3Step${i}")
+                        @Permute(varName="i", from="2", to="3", className="BadV3Step${i}")
                         public class BadV3Step1 {
                             @PermuteReturn(className="BadV3Step${i+1}", typeArgVarName="j",
                                            typeArgFrom="5", typeArgTo="2", typeArgName="T${j}")
@@ -301,7 +301,7 @@ public class PermuteReturnTest {
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
                         import io.quarkiverse.permuplate.PermuteTypeParam;
-                        @Permute(varName="i", from=2, to=4, className="AlphaStep${i}")
+                        @Permute(varName="i", from="2", to="4", className="AlphaStep${i}")
                         public class AlphaStep1<@PermuteTypeParam(varName="j", from="1", to="${i}", name="${alpha(j)}") A> {
                         @PermuteReturn(className="AlphaStep${i+1}")
                             public Object next() { return null; }
@@ -342,7 +342,7 @@ public class PermuteReturnTest {
                         package io.quarkiverse.permuplate.example;
                         import io.quarkiverse.permuplate.Permute;
                         import io.quarkiverse.permuplate.PermuteReturn;
-                        @Permute(varName="i", from=2, to=3, className="BadV6Step${i}")
+                        @Permute(varName="i", from="2", to="3", className="BadV6Step${i}")
                         public class BadV6Step1 {
                             @PermuteReturn(className="BadV6Step${i+1}",
                                            typeArgVarName="j", typeArgTo="${i+1}", typeArgName="T${j}",

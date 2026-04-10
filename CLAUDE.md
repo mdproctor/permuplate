@@ -60,7 +60,7 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 ### `@Permute` — on a class or interface (top-level or nested static), or on a method
 
 ```java
-@Permute(varName = "i", from = 3, to = 10, className = "Join${i}")
+@Permute(varName = "i", from = "3", to = "10", className = "Join${i}")
 ```
 
 **On a type:** for each value of `i` from `from` to `to` inclusive, clones the class/interface, runs transformations, and writes a new `.java` file named by evaluating `className`. Nested types have `static` stripped and are written as top-level types.
@@ -98,12 +98,32 @@ The sentinel's original name is registered as an **anchor**. Every method call i
 ### `@PermuteVar` — nested annotation for extra integer loop axes
 
 ```java
-@Permute(varName = "i", from = 2, to = 4,
+@Permute(varName = "i", from = "2", to = "4",
          className = "BiCallable${i}x${k}",
-         extraVars = { @PermuteVar(varName = "k", from = 2, to = 4) })
+         extraVars = { @PermuteVar(varName = "k", from = "2", to = "4") })
 ```
 
 Defines an additional integer loop variable for cross-product generation. Each `@PermuteVar` adds one axis; one output type is generated per combination of the primary variable and all extra variables. The primary variable (`varName` on `@Permute`) is the outermost loop; `extraVars` are inner loops in declaration order. Variable names must not conflict with `varName` or `strings` keys.
+
+---
+
+## Expression-based `from` and `to`
+
+Both `@Permute.from` / `@Permute.to` and `@PermuteVar.from` / `@PermuteVar.to` are **JEXL expression strings** (not int literals). Plain integers (`"3"`), arithmetic (`"${max - 1}"`), and variable references (`"${max}"`) are all valid.
+
+Named constants are resolved in this order (later overrides earlier):
+
+| Source | APT mode | Maven plugin mode | Example |
+|---|---|---|---|
+| System property with `permuplate.` prefix | ✅ | ✅ | `-Dpermuplate.max=10` → `${max}` |
+| APT option with `permuplate.` prefix | ✅ | ❌ | `-Apermuplate.max=10` → `${max}` |
+| Annotation `strings` constant | ✅ | ✅ | `strings={"max=10"}` → `${max}` |
+
+**Key difference:** APT options (`-A`) are javac-only — they work in the APT annotation processor but are **not available** to the Maven plugin Mojo. System properties (`-D`) work for both. When a property exists in multiple sources, annotation `strings` wins over APT options, which win over system properties.
+
+**Migration from int literals:** existing templates using `from=3, to=10` must be updated to `from="3", to="10"`. Expressions that were previously computed (e.g. `permute.to() - currentI`) now go through `ctx.evaluateInt(permute.to())`.
+
+---
 
 ### `@PermuteConst` — on a field or local variable
 
@@ -151,7 +171,9 @@ int ARITY_2 = 2;
 
 ### `EvaluationContext`
 
-Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `Map<String, Object>` of variable bindings. The primary loop variable (`varName`) is an integer; `extraVars` integer axes and `strings` string constants are all merged into the same map by `buildAllCombinations()`. `withVariable(name, int)` creates a child context for the `@PermuteParam` inner loop variable. `evaluateInt()` accepts either a bare expression (`"1"`) or a wrapped one (`"${i-1}"`).
+Wraps Apache Commons JEXL3. All `${...}` placeholders are evaluated against a `Map<String, Object>` of variable bindings. The primary loop variable (`varName`) is an integer; `extraVars` integer axes and `strings` string constants are all merged into the same map by `buildAllCombinations()`. `withVariable(name, int)` creates a child context for the `@PermuteParam` inner loop variable. `evaluateInt()` accepts either a bare expression (`"1"`) or a wrapped one (`"${i-1}"`) — used to evaluate the now-string `from`/`to` attributes.
+
+**External property injection:** before building the per-permutation context, a *base context* is built from `PermuteConfig.buildExternalProperties()` — system properties (`-Dpermuplate.*`) and APT options (`-Apermuplate.*`, APT mode only) with the prefix stripped. The base context is merged with `strings` constants before evaluating `from`/`to` and then threaded into every per-permutation `EvaluationContext`.
 
 ### `PermuteDeclrTransformer`
 

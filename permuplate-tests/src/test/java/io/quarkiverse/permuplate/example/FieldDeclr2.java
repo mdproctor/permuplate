@@ -3,7 +3,7 @@ package io.quarkiverse.permuplate.example;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 
-@Permute(varName = "i", from = 3, to = 3, className = "FieldDeclr${i}")
+@Permute(varName = "i", from = "3", to = "3", className = "FieldDeclr${i}")
 public class FieldDeclr2 {
 
     private @PermuteDeclr(type = "Callable${i}", name = "c${i}") Callable2 c2;
