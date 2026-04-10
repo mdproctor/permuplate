@@ -391,6 +391,21 @@ public class PermuteProcessor extends AbstractProcessor {
                 generatedCu.addImport(imp.clone());
             }
         });
+
+        // @PermuteImport — add per-permutation evaluated imports to the generated CU
+        collectPermuteImports(classDecl).forEach(importStr -> {
+            try {
+                generatedCu.addImport(ctx.evaluate(importStr));
+            } catch (Exception ignored) {
+            }
+        });
+        // Strip @PermuteImport / @PermuteImports annotations from the generated class
+        classDecl.getAnnotations().removeIf(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteImport") || n.equals("io.quarkiverse.permuplate.PermuteImport")
+                    || n.equals("PermuteImports") || n.equals("io.quarkiverse.permuplate.PermuteImports");
+        });
+
         generatedCu.addType(classDecl);
 
         writeGeneratedClass(typeElement, newClassName, generatedCu.toString());
@@ -1511,6 +1526,57 @@ public class PermuteProcessor extends AbstractProcessor {
                 }
             }
         }
+    }
+
+    /**
+     * Extracts all {@code @PermuteImport} value strings from the class declaration,
+     * handling both single {@code @PermuteImport} and the {@code @PermuteImports}
+     * repeatable container form.
+     */
+    private static java.util.List<String> collectPermuteImports(
+            com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classDecl) {
+        java.util.List<String> imports = new java.util.ArrayList<>();
+        classDecl.getAnnotations().forEach(ann -> {
+            String name = ann.getNameAsString();
+            if (name.equals("PermuteImport") || name.equals("io.quarkiverse.permuplate.PermuteImport")) {
+                extractImportValue(ann).ifPresent(imports::add);
+            } else if (name.equals("PermuteImports") || name.equals("io.quarkiverse.permuplate.PermuteImports")) {
+                if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normal) {
+                    normal.getPairs().stream()
+                            .filter(p -> p.getNameAsString().equals("value"))
+                            .findFirst()
+                            .ifPresent(p -> {
+                                com.github.javaparser.ast.expr.Expression val = p.getValue();
+                                java.util.List<com.github.javaparser.ast.expr.Expression> elems = val instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr
+                                        ? arr.getValues()
+                                        : java.util.List.of(val);
+                                elems.forEach(e -> {
+                                    if (e instanceof com.github.javaparser.ast.expr.AnnotationExpr ae) {
+                                        extractImportValue(ae).ifPresent(imports::add);
+                                    }
+                                });
+                            });
+                }
+            }
+        });
+        return imports;
+    }
+
+    private static java.util.Optional<String> extractImportValue(
+            com.github.javaparser.ast.expr.AnnotationExpr ann) {
+        if (ann instanceof com.github.javaparser.ast.expr.SingleMemberAnnotationExpr s) {
+            return java.util.Optional.of(
+                    io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                            .stripQuotes(s.getMemberValue().toString()));
+        }
+        if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr n) {
+            return n.getPairs().stream()
+                    .filter(p -> p.getNameAsString().equals("value"))
+                    .findFirst()
+                    .map(p -> io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                            .stripQuotes(p.getValue().toString()));
+        }
+        return java.util.Optional.empty();
     }
 
     private void writeGeneratedClass(TypeElement typeElement, String newClassName, String source) {

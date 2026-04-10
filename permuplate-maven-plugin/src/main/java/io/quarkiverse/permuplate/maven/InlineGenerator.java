@@ -123,6 +123,21 @@ public class InlineGenerator {
             // @PermuteCase — expand switch statement cases per permutation
             PermuteCaseTransformer.transform(generated, ctx);
 
+            // @PermuteImport — add evaluated imports to the parent CU
+            for (String importStr : collectInlinePermuteImports(generated, ctx)) {
+                boolean alreadyPresent = outputCu.getImports().stream()
+                        .anyMatch(imp -> imp.getNameAsString().equals(importStr));
+                if (!alreadyPresent) {
+                    outputCu.addImport(importStr);
+                }
+            }
+            // Strip @PermuteImport annotations from the generated inner class
+            generated.getAnnotations().removeIf(a -> {
+                String n = a.getNameAsString();
+                return n.equals("PermuteImport") || n.equals("io.quarkiverse.permuplate.PermuteImport")
+                        || n.equals("PermuteImports") || n.equals("io.quarkiverse.permuplate.PermuteImports");
+            });
+
             // Extends/implements clause expansion (same-N formula)
             int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
             int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
@@ -882,6 +897,54 @@ public class InlineGenerator {
             }
         }
         return sb.toString();
+    }
+
+    private static java.util.List<String> collectInlinePermuteImports(
+            ClassOrInterfaceDeclaration classDecl, EvaluationContext ctx) {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        classDecl.getAnnotations().forEach(ann -> {
+            String name = ann.getNameAsString();
+            if (name.equals("PermuteImport") || name.equals("io.quarkiverse.permuplate.PermuteImport")) {
+                extractImportValueInline(ann).ifPresent(v -> {
+                    try {
+                        result.add(ctx.evaluate(v));
+                    } catch (Exception ignored) {
+                    }
+                });
+            } else if (name.equals("PermuteImports") || name.equals("io.quarkiverse.permuplate.PermuteImports")) {
+                if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normal) {
+                    normal.getPairs().stream().filter(p -> p.getNameAsString().equals("value"))
+                            .findFirst().ifPresent(p -> {
+                                com.github.javaparser.ast.expr.Expression val = p.getValue();
+                                java.util.List<com.github.javaparser.ast.expr.Expression> elems = val instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr
+                                        ? arr.getValues()
+                                        : java.util.List.of(val);
+                                elems.forEach(e -> {
+                                    if (e instanceof AnnotationExpr ae) {
+                                        extractImportValueInline(ae).ifPresent(v -> {
+                                            try {
+                                                result.add(ctx.evaluate(v));
+                                            } catch (Exception ignored) {
+                                            }
+                                        });
+                                    }
+                                });
+                            });
+                }
+            }
+        });
+        return result;
+    }
+
+    private static java.util.Optional<String> extractImportValueInline(AnnotationExpr ann) {
+        if (ann instanceof com.github.javaparser.ast.expr.SingleMemberAnnotationExpr s) {
+            return java.util.Optional.of(PermuteDeclrTransformer.stripQuotes(s.getMemberValue().toString()));
+        }
+        if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr n) {
+            return n.getPairs().stream().filter(p -> p.getNameAsString().equals("value")).findFirst()
+                    .map(p -> PermuteDeclrTransformer.stripQuotes(p.getValue().toString()));
+        }
+        return java.util.Optional.empty();
     }
 
     /**
