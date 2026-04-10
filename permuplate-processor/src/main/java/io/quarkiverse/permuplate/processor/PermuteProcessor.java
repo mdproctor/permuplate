@@ -716,6 +716,19 @@ public class PermuteProcessor extends AbstractProcessor {
 
             toRemove.add(method);
 
+            // Track whether the original method has @PermuteReturn — used in j-loop below.
+            // applyPermuteReturnSimple removes the annotation from clones that had it, so we
+            // check the original method before cloning.
+            boolean originalHasExplicitReturn = method.getAnnotations().stream().anyMatch(
+                    a -> a.getNameAsString().equals("PermuteReturn")
+                            || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteReturn"));
+
+            // Collect class-level declared type params for j-based growing-tip detection.
+            // These are the type params of the CURRENT generated class (after @PermuteTypeParam
+            // expansion). Undeclared T+number vars in method return/param types are the growing tip.
+            java.util.Set<String> declaredTypeParams = new java.util.LinkedHashSet<>();
+            classDecl.getTypeParameters().forEach(tp -> declaredTypeParams.add(tp.getNameAsString()));
+
             for (int j = fromVal; j <= toVal; j++) {
                 EvaluationContext innerCtx = ctx.withVariable(varName, j);
                 MethodDeclaration clone = method.clone();
@@ -732,6 +745,14 @@ public class PermuteProcessor extends AbstractProcessor {
 
                 // Apply @PermuteReturn: evaluate return type (no boundary omission)
                 applyPermuteReturnSimple(clone, innerCtx, element);
+
+                // J-based implicit type expansion: expand T+number growing tips by (j-1).
+                // Fires only when the original method had no explicit @PermuteReturn
+                // (explicit return types are already fully resolved by applyPermuteReturnSimple).
+                // j=1 is always a no-op (offset=0).
+                if (!originalHasExplicitReturn) {
+                    expandMethodTypesForJ(clone, declaredTypeParams, j);
+                }
 
                 // Apply @PermuteDeclr on parameters with innerCtx
                 io.quarkiverse.permuplate.core.PermuteDeclrTransformer
@@ -1287,6 +1308,158 @@ public class PermuteProcessor extends AbstractProcessor {
             try {
                 extended.set(idx, com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType(newExtStr));
             } catch (Exception ignored) {
+            }
+        }
+    }
+
+    // =========================================================================
+    // J-based @PermuteMethod type expansion helpers
+    // =========================================================================
+
+    /**
+     * Increments the first contiguous digit sequence in name by offset.
+     * E.g. incrementFirstEmbeddedNumber("JExpand2", 1) → "JExpand3".
+     */
+    private static String incrementFirstEmbeddedNumber(String name, int offset) {
+        int start = -1;
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i))) {
+                start = i;
+                break;
+            }
+        }
+        if (start < 0)
+            return name;
+        int end = start;
+        while (end < name.length() && Character.isDigit(name.charAt(end)))
+            end++;
+        int num = Integer.parseInt(name.substring(start, end));
+        return name.substring(0, start) + (num + offset) + name.substring(end);
+    }
+
+    /**
+     * Rebuilds the type argument list, expanding the growing tip from T(firstTipNum)
+     * to T(newLastTipNum) while preserving fixed args in their original relative positions.
+     *
+     * <p>
+     * Example: args=[T1, T2], declaredTypeParams={T1}, firstTipNum=2, newLastTipNum=3
+     * → [T1, T2, T3]
+     */
+    private static java.util.List<String> buildExpandedTypeArgs(java.util.List<String> originalArgs,
+            java.util.Set<String> declaredTypeParams,
+            int firstTipNum, int newLastTipNum) {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        boolean tipInserted = false;
+
+        for (String arg : originalArgs) {
+            boolean isTip = !declaredTypeParams.contains(arg) && isTNumberVar(arg);
+            if (isTip && !tipInserted) {
+                // Insert expanded tip: T(firstTipNum)..T(newLastTipNum)
+                for (int t = firstTipNum; t <= newLastTipNum; t++) {
+                    result.add("T" + t);
+                }
+                tipInserted = true;
+            } else if (isTip) {
+                // Additional tip vars from original — skip (already expanded above)
+            } else {
+                // Fixed arg — pass through
+                result.add(arg);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Expands a single type string for the j-based inner loop (offset = j-1).
+     * Finds undeclared T+number vars (growing tip), expands them, and increments
+     * the first embedded integer in the base class name by offset.
+     * Returns typeStr unchanged if no growing tip found.
+     */
+    private static String expandTypeStringForJ(String typeStr,
+            java.util.Set<String> declaredTypeParams, int offset) {
+        ReturnTypeInfo info = parseReturnTypeInfo(typeStr);
+        if (info == null)
+            return typeStr;
+
+        java.util.List<String> growingTip = new java.util.ArrayList<>();
+        for (String arg : info.typeArgs()) {
+            if (!declaredTypeParams.contains(arg) && isTNumberVar(arg))
+                growingTip.add(arg);
+        }
+        if (growingTip.isEmpty())
+            return typeStr;
+
+        int firstTipNum = Integer.parseInt(growingTip.get(0).substring(1));
+        int newLastTipNum = firstTipNum + offset;
+
+        java.util.List<String> newTypeArgs = buildExpandedTypeArgs(
+                info.typeArgs(), declaredTypeParams, firstTipNum, newLastTipNum);
+        String newBase = incrementFirstEmbeddedNumber(info.baseClass(), offset);
+        return newTypeArgs.isEmpty() ? newBase : newBase + "<" + String.join(", ", newTypeArgs) + ">";
+    }
+
+    /**
+     * Applies j-based implicit type expansion to a method's return type, parameter types,
+     * and method-level type parameters.
+     *
+     * <p>
+     * j=1 is always a no-op (offset=0). For j&gt;1, T+number vars that are NOT declared
+     * at CLASS level (growing tip — including method-level type params that serve as sentinels)
+     * are expanded by (j-1), the first embedded class-name number is incremented by (j-1),
+     * and any new T+number vars introduced by the expansion are added to the method's type
+     * parameter list.
+     *
+     * <p>
+     * Only called for clones that did NOT have explicit @PermuteReturn.
+     */
+    private static void expandMethodTypesForJ(
+            MethodDeclaration method,
+            java.util.Set<String> classDeclaredTypeParams, int j) {
+        if (j <= 1)
+            return;
+        int offset = j - 1;
+
+        // Use ONLY class-level declared type params for tip detection.
+        // Method-level type params (e.g. <T2>) are the sentinels / growing tip — they must NOT
+        // be treated as declared, so that T2 in JConn2<T1, T2> is recognized as the growing tip.
+        String rt = method.getTypeAsString();
+        String newRt = expandTypeStringForJ(rt, classDeclaredTypeParams, offset);
+        if (!newRt.equals(rt)) {
+            try {
+                method.setType(StaticJavaParser.parseType(newRt));
+            } catch (Exception ignored) {
+            }
+        }
+
+        method.getParameters().forEach(param -> {
+            String pt = param.getTypeAsString();
+            String newPt = expandTypeStringForJ(pt, classDeclaredTypeParams, offset);
+            if (!newPt.equals(pt)) {
+                try {
+                    param.setType(StaticJavaParser.parseType(newPt));
+                } catch (Exception ignored) {
+                }
+            }
+        });
+
+        // Add new T+number type params introduced by the expansion to the method's type param list.
+        // Collect existing method-level type params (before we start adding) to prevent duplicates.
+        java.util.Set<String> existingMethodTypeParams = new java.util.LinkedHashSet<>();
+        method.getTypeParameters().forEach(tp -> existingMethodTypeParams.add(tp.getNameAsString()));
+
+        ReturnTypeInfo expandedInfo = parseReturnTypeInfo(method.getTypeAsString());
+        if (expandedInfo != null) {
+            for (String arg : expandedInfo.typeArgs()) {
+                if (isTNumberVar(arg)
+                        && !classDeclaredTypeParams.contains(arg)
+                        && !existingMethodTypeParams.contains(arg)) {
+                    try {
+                        method.addTypeParameter(com.github.javaparser.StaticJavaParser
+                                .parseTypeParameter(arg));
+                        existingMethodTypeParams.add(arg); // prevent duplicates
+                    } catch (Exception ignored) {
+                    }
+                }
             }
         }
     }

@@ -383,4 +383,66 @@ public class PermuteMethodTest {
         String src3 = generateInline(parentSource, "Sel0", "i", 1, 3, "Sel${i}", 3);
         assertThat(src3).contains("Sel3 extra(String param)");
     }
+
+    @Test
+    public void testPermuteMethodJBasedTypeExpansion() {
+        // Template JConn0<T1> (generated set = {JConn1}) has one declared class-level type param T1.
+        // The sentinel method uses a method-level type param <T2> so the template is valid Java.
+        // T2 is NOT a class-level type param, so expandMethodTypesForJ treats it as the growing tip.
+        // The parameter type JS1<T2> (a separate stub class) also uses T2, making overloads
+        // distinguishable by erasure.
+        //
+        // @PermuteMethod(j=1..3):
+        //   j=1: no-op (offset=0) → <T2> JConn2<T1, T2> connect(JS1<T2> src)
+        //   j=2: tip grows by 1 → <T2, T3> JConn3<T1, T2, T3> connect(JS2<T2, T3> src)
+        //   j=3: tip grows by 2 → <T2, T3, T4> JConn4<T1, T2, T3, T4> connect(JS3<T2, T3, T4> src)
+        var source = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.JConn0",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteMethod;
+                        @Permute(varName="i", from=1, to=1, className="JConn${i}")
+                        public class JConn0<T1> {
+                            @PermuteMethod(varName="j", from="1", to="3")
+                            public <T2> JConn2<T1, T2> connect(JS1<T2> src) { return null; }
+                        }
+                        """);
+
+        // Stubs for JS1, JS2, JS3 (parameter types — separate from generated JConn family)
+        // and JConn2, JConn3, JConn4 (return types)
+        var js1 = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.JS1",
+                "package io.permuplate.example; public class JS1<A> {}");
+        var js2 = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.JS2",
+                "package io.permuplate.example; public class JS2<A, B> {}");
+        var js3 = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.JS3",
+                "package io.permuplate.example; public class JS3<A, B, C> {}");
+        var jconn2 = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.JConn2",
+                "package io.permuplate.example; public class JConn2<A, B> {}");
+        var jconn3 = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.JConn3",
+                "package io.permuplate.example; public class JConn3<A, B, C> {}");
+        var jconn4 = com.google.testing.compile.JavaFileObjects.forSourceString(
+                "io.permuplate.example.JConn4",
+                "package io.permuplate.example; public class JConn4<A, B, C, D> {}");
+
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source, js1, js2, js3, jconn2, jconn3, jconn4);
+
+        assertThat(compilation).succeeded();
+
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.JConn1").orElseThrow());
+        // j=1: return type unchanged (no-op) — method-level <T2> kept, param JS1<T2>
+        assertThat(src).contains("JConn2<T1, T2> connect(JS1<T2> src)");
+        // j=2: tip expanded by 1 → JConn3<T1, T2, T3>, param JS2<T2, T3>
+        assertThat(src).contains("JConn3<T1, T2, T3> connect(JS2<T2, T3> src)");
+        // j=3: tip expanded by 2 → JConn4<T1, T2, T3, T4>, param JS3<T2, T3, T4>
+        assertThat(src).contains("JConn4<T1, T2, T3, T4> connect(JS3<T2, T3, T4> src)");
+    }
 }
