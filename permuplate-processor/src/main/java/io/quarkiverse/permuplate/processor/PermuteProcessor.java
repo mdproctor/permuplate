@@ -291,6 +291,16 @@ public class PermuteProcessor extends AbstractProcessor {
         PermuteTypeParamTransformer.transform(classDecl, ctx,
                 processingEnv.getMessager(), typeElement);
 
+        // 1c. Extends clause expansion — update base class name to same-N sibling.
+        // Must run after @PermuteTypeParam so postG1TypeParams reflects the expanded list.
+        java.util.List<String> postG1TypeParams = classDecl.getTypeParameters().stream()
+                .map(tp -> tp.getNameAsString())
+                .collect(java.util.stream.Collectors.toList());
+        int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
+        int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
+        applyExtendsExpansion(classDecl, templateClassName, templateEmbeddedNum,
+                currentEmbeddedNum, postG1TypeParams);
+
         // 2, 3 & 4. @PermuteDeclr — fields, constructor params, then for-each vars
         PermuteDeclrTransformer.transform(classDecl, ctx, processingEnv.getMessager());
 
@@ -950,6 +960,144 @@ public class PermuteProcessor extends AbstractProcessor {
             }
         }
         return null;
+    }
+
+    // =========================================================================
+    // Extends expansion helpers
+    // =========================================================================
+
+    /** Returns the substring of name up to (but not including) its first digit. */
+    private static String prefixBeforeFirstDigit(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i)))
+                return name.substring(0, i);
+        }
+        return name;
+    }
+
+    /** Returns the first contiguous sequence of digits in name as an int, or -1 if none. */
+    private static int firstEmbeddedNumber(String name) {
+        int start = -1;
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i))) {
+                start = i;
+                break;
+            }
+        }
+        if (start < 0)
+            return -1;
+        int end = start;
+        while (end < name.length() && Character.isDigit(name.charAt(end)))
+            end++;
+        try {
+            return Integer.parseInt(name.substring(start, end));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** Replaces the first contiguous digit sequence in name with newNum. */
+    private static String replaceFirstEmbeddedNumber(String name, int newNum) {
+        int start = -1;
+        for (int i = 0; i < name.length(); i++) {
+            if (Character.isDigit(name.charAt(i))) {
+                start = i;
+                break;
+            }
+        }
+        if (start < 0)
+            return name;
+        int end = start;
+        while (end < name.length() && Character.isDigit(name.charAt(end)))
+            end++;
+        return name.substring(0, start) + newNum + name.substring(end);
+    }
+
+    /** Returns true if s matches the T+number pattern (e.g. "T1", "T23"). */
+    private static boolean isTNumberVar(String s) {
+        if (s == null || s.length() < 2 || s.charAt(0) != 'T')
+            return false;
+        for (int i = 1; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i)))
+                return false;
+        }
+        return true;
+    }
+
+    /**
+     * Expands the extends clause of a generated class to match its current arity.
+     *
+     * Fires only when the extends base class shares the same name prefix and embedded
+     * number as the template class. Replaces the embedded number with currentEmbeddedNum
+     * (same-N formula: Join3First extends Join3Second, not Join4Second).
+     *
+     * Branch 1 — all T+number type args: builds T1..T(currentEmbeddedNum).
+     * Branch 2 — alpha/mixed: extends type args must be a prefix of postG1TypeParams;
+     * uses the full postG1TypeParams list.
+     *
+     * Third-party base classes (different name prefix) are skipped.
+     */
+    private static void applyExtendsExpansion(
+            com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classDecl,
+            String templateName,
+            int templateEmbeddedNum,
+            int currentEmbeddedNum,
+            java.util.List<String> postG1TypeParams) {
+
+        if (templateEmbeddedNum < 0 || currentEmbeddedNum < 0)
+            return;
+        String templatePrefix = prefixBeforeFirstDigit(templateName);
+        int newNum = currentEmbeddedNum;
+
+        com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> extended = classDecl
+                .getExtendedTypes();
+
+        for (int idx = 0; idx < extended.size(); idx++) {
+            com.github.javaparser.ast.type.ClassOrInterfaceType ext = extended.get(idx);
+            String baseName = ext.getNameAsString();
+
+            // Only expand siblings: same prefix-before-digit as template
+            if (!prefixBeforeFirstDigit(baseName).equals(templatePrefix))
+                continue;
+
+            // Only expand when base class has the same embedded number as template
+            int extNum = firstEmbeddedNumber(baseName);
+            if (extNum < 0 || extNum != templateEmbeddedNum)
+                continue;
+
+            java.util.Optional<com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.Type>> typeArgsOpt = ext
+                    .getTypeArguments();
+            if (typeArgsOpt.isEmpty() || typeArgsOpt.get().isEmpty())
+                continue;
+
+            java.util.List<String> extArgNames = typeArgsOpt.get().stream()
+                    .map(com.github.javaparser.ast.type.Type::asString)
+                    .collect(java.util.stream.Collectors.toList());
+
+            // Determine new type args
+            java.util.List<String> newTypeArgNames;
+            boolean allTNumber = extArgNames.stream().allMatch(PermuteProcessor::isTNumberVar);
+            if (allTNumber) {
+                newTypeArgNames = new java.util.ArrayList<>();
+                for (int t = 1; t <= newNum; t++)
+                    newTypeArgNames.add("T" + t);
+            } else {
+                // Alpha/mixed: extends args must be a prefix of postG1TypeParams
+                boolean isPrefix = extArgNames.size() <= postG1TypeParams.size()
+                        && java.util.stream.IntStream.range(0, extArgNames.size())
+                                .allMatch(k -> extArgNames.get(k).equals(postG1TypeParams.get(k)));
+                if (!isPrefix)
+                    continue;
+                newTypeArgNames = postG1TypeParams;
+            }
+
+            String newBaseName = replaceFirstEmbeddedNumber(baseName, newNum);
+            String newExtStr = newBaseName + "<" + String.join(", ", newTypeArgNames) + ">";
+            try {
+                extended.set(idx, com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType(newExtStr));
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private void writeGeneratedClass(TypeElement typeElement, String newClassName, String source) {
