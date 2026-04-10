@@ -961,6 +961,7 @@ public class InlineGenerator {
                 "PermuteReturn", "io.quarkiverse.permuplate.PermuteReturn",
                 "PermuteMethod", "io.quarkiverse.permuplate.PermuteMethod",
                 "PermuteExtends", "io.quarkiverse.permuplate.PermuteExtends",
+                "PermuteConst", "io.quarkiverse.permuplate.PermuteConst",
                 "PermuteCase", "io.quarkiverse.permuplate.PermuteCase",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
                 "PermuteImports", "io.quarkiverse.permuplate.PermuteImports");
