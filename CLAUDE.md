@@ -496,11 +496,21 @@ work to date against the full vol2 test suite to identify gaps.
 
 ---
 
-## Writing Style Guide
+## Blog
 
-**The writing style guide at `~/claude-workspace/writing-styles/blog-technical.md` is mandatory for all blog and diary entries in `docs/blog/`.** Load it in full before drafting any entry. Complete the pre-draft voice classification (I / we / Claude-named) before generating any prose. Do not show a draft without first verifying it against the style guide's "What to Avoid" section.
+**Blog directory:** `site/_posts/`
+
+Blog posts are Jekyll posts — they must have YAML frontmatter (layout, title, date, phase, phase_label). The site is built with Jekyll from `site/` and deployed to `mdproctor.github.io/permuplate/`.
+
+**The writing style guide at `~/claude-workspace/writing-styles/blog-technical.md` is mandatory for all blog and diary entries.** Load it in full before drafting any entry. Complete the pre-draft voice classification (I / we / Claude-named) before generating any prose. Do not show a draft without first verifying it against the style guide's "What to Avoid" section.
 
 The guide covers Mark's voice and personality, the three collaboration registers (I / we / Claude named directly), structural patterns, quantitative fingerprint, and the heading smell check.
+
+**Phase labels for new posts:**
+- Phase 1 — The Annotation Processor (Apr 4)
+- Phase 2 — The Drools DSL Sandbox (Apr 6–7)
+- Phase 3 — The IntelliJ Plugin (Apr 8–9)
+- Add new phases as the project evolves.
 
 ## Work Tracking
 

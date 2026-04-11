@@ -1,0 +1,38 @@
+---
+layout: default
+---
+<article class="post-content">
+  <div class="container" style="max-width:780px;padding-top:var(--space-xl);padding-bottom:var(--space-xl)">
+    <div style="margin-bottom:var(--space-lg)">
+      <a href="{{ '/blog.html' | relative_url }}" style="font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--orange);text-decoration:none">← All entries</a>
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-md);margin-bottom:var(--space-sm);flex-wrap:wrap">
+      <time style="font-family:'Barlow Condensed',sans-serif;font-size:0.8rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)">{{ page.date | date: "%B %-d, %Y" }}</time>
+      {% if page.phase_label %}
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:0.68rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--orange);border:1px solid var(--orange);padding:2px 8px">{{ page.phase_label }}</span>
+      {% endif %}
+    </div>
+    <div class="post-body">
+      {{ content }}
+    </div>
+  </div>
+</article>
+
+<style>
+  .post-body h1 { font-size: clamp(2rem, 6vw, 3.5rem); margin-bottom: var(--space-lg); line-height: 1.1; }
+  .post-body h2 { font-size: 1.4rem; margin-top: var(--space-xl); margin-bottom: var(--space-md); color: var(--fg); }
+  .post-body h3 { font-size: 1.1rem; margin-top: var(--space-lg); margin-bottom: var(--space-sm); color: var(--fg); }
+  .post-body p { color: var(--muted); line-height: 1.75; margin-bottom: var(--space-md); font-size: 0.95rem; }
+  .post-body pre { background: var(--plate); border: 1px solid var(--rule); padding: var(--space-md); overflow-x: auto; margin-bottom: var(--space-md); }
+  .post-body code { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+  .post-body p code { color: var(--orange); background: var(--plate); padding: 1px 5px; }
+  .post-body ul, .post-body ol { color: var(--muted); line-height: 1.75; margin-bottom: var(--space-md); padding-left: 1.5rem; font-size: 0.95rem; }
+  .post-body li { margin-bottom: 0.3rem; }
+  .post-body blockquote { border-left: 3px solid var(--orange); padding-left: var(--space-md); margin: var(--space-lg) 0; color: var(--muted); font-style: italic; }
+  .post-body hr { border: none; border-top: 1px solid var(--rule); margin: var(--space-xl) 0; }
+  .post-body strong { color: var(--fg); }
+  .post-body img { max-width: 100%; height: auto; margin: var(--space-lg) 0; }
+  .post-body table { width: 100%; border-collapse: collapse; margin-bottom: var(--space-lg); font-size: 0.88rem; }
+  .post-body th { font-family: 'Barlow Condensed', sans-serif; font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--orange); border-bottom: 1px solid var(--rule); padding: var(--space-sm) var(--space-md); text-align: left; }
+  .post-body td { border-bottom: 1px solid var(--rule); padding: var(--space-sm) var(--space-md); color: var(--muted); }
+</style>

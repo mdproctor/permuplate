@@ -5,3 +5,4 @@ target/
 .claude/
 .worktrees/
 .superpowers/
+site/_site/
