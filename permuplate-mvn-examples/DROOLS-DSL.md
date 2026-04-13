@@ -685,6 +685,19 @@ The hand-written Drools codebase has `Join2First..Join5First`, `Join2Second..Joi
 `(ctx, a, b, c) -> ...`. The alternative `(a, b, c, ctx) -> ...` gives fact type parameters
 clean index-0 mapping. This decision must be locked in before migration begins.
 
+**Migration planning decisions:**
+
+| Decision | Chosen | Why | Alternatives Rejected |
+|---|---|---|---|
+| Epic structure | Capability area (not phase/timing) as primary axis | Area-based epics remain meaningful after work ships; phase names go stale | Phase-based epics — "Phase 1: Foundation" meaningless once done |
+| GitHub issue location | `apache/incubator-kie-drools` | Work belongs in the repo it affects; permuplate#5/#7 cross-reference | `mdproctor/drools` fork — issues disabled for forks of Apache projects |
+| Permuplate wiring | APT processor in `droolsvol2/pom.xml` annotationProcessorPaths | Compile-time annotation processing; APT mode generates top-level files (correct for JoinNFirst family) | Maven plugin (inline mode) — generates nested classes, wrong for this use case |
+| Order of work | droolsvol2 refactor first, then `@Permute` templates | Cannot add templates until module compiles cleanly | Adding templates now — impossible without compilation |
+
+GitHub epics: main `apache/incubator-kie-drools#6639` → DSL sub-epic #6638 (child issues #6640–#6645) + Rule Base sub-epic #6646 (#6647). Permuplate tracking: mdproctor/permuplate#5, #7.
+
+**Three vol2 bugs to fix before migration** (logged in `docs/ideas/IDEAS.md`).
+
 **Comparison with real Drools:**
 
 | Feature | Real Drools | This Sandbox |
@@ -708,10 +721,7 @@ clean index-0 mapping. This decision must be locked in before migration begins.
 | [ADR-0002](../docs/adr/0002-oopath-runtime-as-pipeline-on-ruledefinition.md) | OOPath runtime as pipeline on `RuleDefinition` |
 | [ADR-0003](../docs/adr/0003-end-phantom-type-added-in-phase-2.md) | END phantom type added alongside First/Second split in Phase 2 |
 | [ADR-0004](../docs/adr/0004-negationscope-as-separate-class.md) | `NegationScope` as separate builder class, not `JoinNSecond` subtype |
-
-**Design snapshots:**
-
-- [2026-04-06-drools-dsl-sandbox](../docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md) — full state post-Phase 3b
+| [ADR-0005](../docs/adr/0005-sandbox-scope-boundary.md) | Sandbox scope boundary: DSL API design only; Rete engine out of scope |
 
 **Blog series:** `docs/blog/` — entries 001–008 cover the Permuplate implementation journey
 including typed joins, First/Second split, not()/exists(), and OOPath traversal.

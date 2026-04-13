@@ -15,7 +15,9 @@ permuplate-ide-support/
     ├── AnnotationStringTemplate.java   — fully parsed template (list of parts)
     ├── AnnotationStringAlgorithm.java  — parse / match / rename / validate
     ├── RenameResult.java               — sealed result of computeRename()
-    └── ValidationError.java           — structured validation error with suggestion
+    ├── ValidationError.java           — structured validation error with suggestion
+    └── index/
+        └── PermuteElementResolver.java — shared template-resolution logic for all plugin components
 ```
 
 ---
@@ -181,6 +183,7 @@ A persistent `FileBasedIndex` maps templates to their generated families. All pl
 | Component | Extension Point | Covers # |
 |---|---|---|
 | **PermuteTemplateIndex** | `fileBasedIndex` | all (shared foundation) |
+| **PermuteElementResolver** | shared utility in `index` package | template resolution from any element type (class, method, field, parameter) |
 | **AnnotationStringRenameProcessor** | `renamePsiElementProcessor` | 1, 2, 3, 4, 11 |
 | **GeneratedFileRenameHandler** | `renameHandler` (high priority) | 2 (reverse rename block) |
 | **PermuteFamilyFindUsagesAction** | `<actions>` (EditorPopupMenu, ProjectViewPopupMenu) | 7 |
@@ -350,3 +353,36 @@ Same as IntelliJ: check if `document.uri.fsPath` contains `target/generated-sour
 - `expandStringConstants()` — only needed by the annotation processor (Maven plugin), not for IDE tooling
 - The `NeedsDisambiguation` dialog is a nice-to-have; ship the `Updated` path first
 - Boundary omission inspection requires evaluating JEXL expressions — skip until later
+
+---
+
+## PermuteElementResolver — Design
+
+`PermuteElementResolver` (in the `index` package) consolidates all template-resolution logic used by plugin components. Previously duplicated across `AnnotationStringRenameProcessor`, `GeneratedFileRenameHandler`, and `PermuteMethodNavigator`.
+
+**Resolution algorithm:**
+1. Fast path: `PermuteFileDetector` identifies whether the current file is Permuplate-managed; index reverse lookup returns template class name directly
+2. PSI scan fallback: scans `@Permute` annotations in the source tree when the index is cold or the file isn't indexed yet
+3. Base-name matching for members: strips trailing digits from both the generated element name and template member names; first match wins (e.g. `c3` → base `c` → matches `c2` in template, handling `@PermuteDeclr`-renamed members)
+4. Graceful fallthrough: returns original element unchanged for all unmatched cases — same UX as before for unhandled cases; no regression
+
+**Key decisions:**
+
+| Decision | Chosen | Why | Alternatives Rejected |
+|---|---|---|---|
+| `PermuteElementResolver` in `index` package | Shared class | Eliminates 3 duplicate `stripTrailingDigits` and 2 duplicate `findTemplateByPsiScan` copies; ready for `PermuteMethodNavigator` feature 2 | Inline in each component (no reuse); private method extraction (still contained) |
+| Base-name matching for member resolution | Strip trailing digits, first match wins | Handles `@PermuteDeclr`-renamed members that have no exact-name equivalent in template | Exact-name-only (always falls through for `@PermuteDeclr` members, silently loses rename) |
+| Graceful fallthrough | Return original element | Same UX for unhandled cases; no `RenamePsiElementProcessor` contract violation | Return null (breaks contract) |
+| Rename redirect as temporary solution | Accepted — ship, then improve | Closes the most visible IDE gap; full graph-aware rename is the long-term goal | Deferring until graph-aware approach — too long a gap in IDE usability |
+
+**Next steps:**
+- Smoke-test rename redirect from method/field/parameter in a generated file; verify template + annotation strings update atomically
+- `PermuteMethodNavigator` feature 2 — navigate from generated element to template (resolver already wired and ready)
+- `actionPerformed()` in `PermuteFamilyFindUsagesAction` — extract `collectAndFindFamilyUsages()`, test via `myFixture.findUsages()`
+- `GeneratedFileRenameHandler.invoke()` — dialog + navigation, testable via headless `Messages.showDialog()` auto-selection (GE-0147)
+- Drools migration work — blocked on droolsvol2 refactor completing
+
+**Open questions:**
+- Is base-name-only matching sufficient for production templates, or will cross-module families require index-based resolution rather than PSI scan?
+- What is the correct long-term architecture for graph-aware rename — redirect always to template, or a true bidirectional graph that propagates from any node?
+- When droolsvol2 compiles, should git history be cleaned before `@Permute` templates are added?
