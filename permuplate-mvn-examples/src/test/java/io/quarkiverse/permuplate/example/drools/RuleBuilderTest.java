@@ -16,18 +16,22 @@ public class RuleBuilderTest {
         DataSource<Library> libraries = DataSource.of(
                 new Library("ScienceLib", java.util.List.of(
                         new Room("Physics", java.util.List.of(
-                                new Book("Relativity", true),
-                                new Book("Draft", false))),
+                                new Book("Relativity", true, java.util.List.of(new Page("page1"))),
+                                new Book("Draft", false, java.util.List.of(new Page("page1")))),
+                                java.util.List.of()),
                         new Room("Biology", java.util.List.of(
-                                new Book("Evolution", true),
-                                new Book("Notes", false))))),
+                                new Book("Evolution", true, java.util.List.of(new Page("page1"))),
+                                new Book("Notes", false, java.util.List.of(new Page("page1")))),
+                                java.util.List.of()))),
                 new Library("ArtsLib", java.util.List.of(
                         new Room("History", java.util.List.of(
-                                new Book("Waterloo", true),
-                                new Book("Sketch", false))),
+                                new Book("Waterloo", true, java.util.List.of(new Page("page1"))),
+                                new Book("Sketch", false, java.util.List.of(new Page("page1")))),
+                                java.util.List.of()),
                         new Room("Literature", java.util.List.of(
-                                new Book("Hamlet", true),
-                                new Book("Outline", false))))));
+                                new Book("Hamlet", true, java.util.List.of(new Page("page1"))),
+                                new Book("Outline", false, java.util.List.of(new Page("page1")))),
+                                java.util.List.of()))));
 
         ctx = new Ctx(
                 DataSource.of(new Person("Alice", 30), new Person("Bob", 17)),
@@ -818,6 +822,212 @@ public class RuleBuilderTest {
             @SuppressWarnings("unchecked")
             BaseTuple.Tuple3<Library, Room, Book> t = (BaseTuple.Tuple3<Library, Room, Book>) rule.capturedFact(i, 2);
             assertThat(t.getC().published()).isTrue();
+        }
+    }
+
+    // =========================================================================
+    // OOPath — path4() and path5() deep traversal
+    // =========================================================================
+
+    @Test
+    public void testPath4TraversesThreeLevels() {
+        // path4(): Library -> Room -> Book -> Page — produces Tuple4<Library, Room, Book, Page>.
+        // 2 libs x 2 rooms x 2 books x 1 page each = 8 combinations (no filters).
+        var rule = builder.from(ctx -> ctx.libraries())
+                .<Room, Book, Page> path4()
+                .path((pathCtx, lib) -> lib.rooms(), (pathCtx, room) -> true)
+                .path((pathCtx, room) -> room.books(), (pathCtx, book) -> true)
+                .path((pathCtx, book) -> book.pages(), (pathCtx, page) -> true)
+                .fn((ctx, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(8); // 2 libs x 2 rooms x 2 books x 1 page
+        assertThat(rule.capturedFact(0, 0)).isInstanceOf(Library.class);
+        assertThat(rule.capturedFact(0, 1)).isInstanceOf(BaseTuple.Tuple4.class);
+        @SuppressWarnings("unchecked")
+        BaseTuple.Tuple4<Library, Room, Book, Page> t = (BaseTuple.Tuple4<Library, Room, Book, Page>) rule.capturedFact(0, 1);
+        assertThat(t.getA()).isInstanceOf(Library.class);
+        assertThat(t.getB()).isInstanceOf(Room.class);
+        assertThat(t.getC()).isInstanceOf(Book.class);
+        assertThat(t.getD()).isInstanceOf(Page.class);
+    }
+
+    @Test
+    public void testPath5TraversesFourLevels() {
+        // path5(): Library -> Room -> Shelf -> Book -> Page — produces Tuple5<Library, Room, Shelf, Book, Page>.
+        // Local ctx: 1 lib x 2 rooms x 2 shelves x 2 books x 2 pages = 16 combinations.
+        Page p1 = new Page("page1");
+        Page p2 = new Page("page2");
+        Book rel = new Book("Relativity", true, java.util.List.of(p1, p2));
+        Book draft = new Book("Draft", false, java.util.List.of(p1, p2));
+        Book evo = new Book("Evolution", true, java.util.List.of(p1, p2));
+        Book notes = new Book("Notes", false, java.util.List.of(p1, p2));
+        Room physics = new Room("Physics", java.util.List.of(),
+                java.util.List.of(new Shelf("ShelfA", java.util.List.of(rel, draft)),
+                        new Shelf("ShelfB", java.util.List.of(evo, notes))));
+        Room biology = new Room("Biology", java.util.List.of(),
+                java.util.List.of(new Shelf("ShelfA", java.util.List.of(rel, draft)),
+                        new Shelf("ShelfB", java.util.List.of(evo, notes))));
+        Ctx ctx5 = new Ctx(
+                DataSource.of(), DataSource.of(), DataSource.of(), DataSource.of(), DataSource.of(),
+                DataSource.of(new Library("ScienceLib", java.util.List.of(physics, biology))));
+
+        var rule = builder.from(c -> c.libraries())
+                .<Room, Shelf, Book, Page> path5()
+                .path((pathCtx, lib) -> lib.rooms(), (pathCtx, room) -> true)
+                .path((pathCtx, room) -> room.shelves(), (pathCtx, shelf) -> true)
+                .path((pathCtx, shelf) -> shelf.books(), (pathCtx, book) -> true)
+                .path((pathCtx, book) -> book.pages(), (pathCtx, page) -> true)
+                .fn((c, lib, t) -> {
+                });
+
+        rule.run(ctx5);
+
+        assertThat(rule.executionCount()).isEqualTo(16); // 1 lib x 2 rooms x 2 shelves x 2 books x 2 pages
+        assertThat(rule.capturedFact(0, 0)).isInstanceOf(Library.class);
+        assertThat(rule.capturedFact(0, 1)).isInstanceOf(BaseTuple.Tuple5.class);
+        @SuppressWarnings("unchecked")
+        BaseTuple.Tuple5<Library, Room, Shelf, Book, Page> t = (BaseTuple.Tuple5<Library, Room, Shelf, Book, Page>) rule
+                .capturedFact(0, 1);
+        assertThat(t.getA()).isInstanceOf(Library.class);
+        assertThat(t.getB()).isInstanceOf(Room.class);
+        assertThat(t.getC()).isInstanceOf(Shelf.class);
+        assertThat(t.getD()).isInstanceOf(Book.class);
+        assertThat(t.getE()).isInstanceOf(Page.class);
+    }
+
+    @Test
+    public void testPath4FilterAppliedAtBookStep() {
+        // Filter at the book step (step 2) restricts to published books only.
+        // 2 libs x 2 rooms x 1 published book x 1 page = 4 combinations.
+        var rule = builder.from(ctx -> ctx.libraries())
+                .<Room, Book, Page> path4()
+                .path((pathCtx, lib) -> lib.rooms(), (pathCtx, room) -> true)
+                .path((pathCtx, room) -> room.books(), (pathCtx, book) -> book.published())
+                .path((pathCtx, book) -> book.pages(), (pathCtx, page) -> true)
+                .fn((ctx, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(4); // 2 libs x 2 rooms x 1 published book x 1 page
+        for (int i = 0; i < rule.executionCount(); i++) {
+            @SuppressWarnings("unchecked")
+            BaseTuple.Tuple4<Library, Room, Book, Page> t = (BaseTuple.Tuple4<Library, Room, Book, Page>) rule.capturedFact(i,
+                    1);
+            assertThat(t.getC().published()).isTrue();
+        }
+    }
+
+    @Test
+    public void testPath4ContextCrossReferenceAtPageStep() {
+        // At the page step (step 3), pathCtx.getTuple().getA() gives the Library —
+        // verifying that PathContext carries all earlier facts across four levels.
+        // Filter: only pages from ScienceLib pass. ScienceLib has 2 rooms x 2 books x 1 page = 4.
+        var rule = builder.from(ctx -> ctx.libraries())
+                .<Room, Book, Page> path4()
+                .path((pathCtx, lib) -> lib.rooms(), (pathCtx, room) -> true)
+                .path((pathCtx, room) -> room.books(), (pathCtx, book) -> true)
+                .path((pathCtx, book) -> book.pages(),
+                        (pathCtx, page) -> pathCtx.getTuple().getA().name().equals("ScienceLib"))
+                .fn((ctx, lib, t) -> {
+                });
+
+        rule.run(ctx);
+
+        assertThat(rule.executionCount()).isEqualTo(4); // ScienceLib: 2 rooms x 2 books x 1 page
+        for (int i = 0; i < rule.executionCount(); i++) {
+            @SuppressWarnings("unchecked")
+            BaseTuple.Tuple4<Library, Room, Book, Page> t = (BaseTuple.Tuple4<Library, Room, Book, Page>) rule.capturedFact(i,
+                    1);
+            assertThat(t.getA().name()).isEqualTo("ScienceLib");
+        }
+    }
+
+    @Test
+    public void testPath5FilterAtShelfLevel() {
+        // Filter at the shelf step (step 2) restricts to ShelfA only, halving the result.
+        // Local ctx: 1 lib x 2 rooms x 2 shelves x 2 books x 2 pages.
+        // With ShelfA filter: 1 x 2 rooms x 1 shelf x 2 books x 2 pages = 8 combinations.
+        Page p1 = new Page("page1");
+        Page p2 = new Page("page2");
+        Book rel = new Book("Relativity", true, java.util.List.of(p1, p2));
+        Book draft = new Book("Draft", false, java.util.List.of(p1, p2));
+        Book evo = new Book("Evolution", true, java.util.List.of(p1, p2));
+        Book notes = new Book("Notes", false, java.util.List.of(p1, p2));
+        Room physics = new Room("Physics", java.util.List.of(),
+                java.util.List.of(new Shelf("ShelfA", java.util.List.of(rel, draft)),
+                        new Shelf("ShelfB", java.util.List.of(evo, notes))));
+        Room biology = new Room("Biology", java.util.List.of(),
+                java.util.List.of(new Shelf("ShelfA", java.util.List.of(rel, draft)),
+                        new Shelf("ShelfB", java.util.List.of(evo, notes))));
+        Ctx ctx5 = new Ctx(
+                DataSource.of(), DataSource.of(), DataSource.of(), DataSource.of(), DataSource.of(),
+                DataSource.of(new Library("ScienceLib", java.util.List.of(physics, biology))));
+
+        var rule = builder.from(c -> c.libraries())
+                .<Room, Shelf, Book, Page> path5()
+                .path((pathCtx, lib) -> lib.rooms(), (pathCtx, room) -> true)
+                .path((pathCtx, room) -> room.shelves(), (pathCtx, shelf) -> shelf.name().equals("ShelfA"))
+                .path((pathCtx, shelf) -> shelf.books(), (pathCtx, book) -> true)
+                .path((pathCtx, book) -> book.pages(), (pathCtx, page) -> true)
+                .fn((c, lib, t) -> {
+                });
+
+        rule.run(ctx5);
+
+        assertThat(rule.executionCount()).isEqualTo(8); // 2 rooms x 1 ShelfA x 2 books x 2 pages
+        for (int i = 0; i < rule.executionCount(); i++) {
+            @SuppressWarnings("unchecked")
+            BaseTuple.Tuple5<Library, Room, Shelf, Book, Page> t = (BaseTuple.Tuple5<Library, Room, Shelf, Book, Page>) rule
+                    .capturedFact(i, 1);
+            assertThat(t.getC().name()).isEqualTo("ShelfA");
+        }
+    }
+
+    @Test
+    public void testPath5ContextCrossReferenceAtBookStep() {
+        // At the book step (step 3), pathCtx.getTuple().getA() gives the Library —
+        // verifying PathContext carries state across five levels.
+        // Filter: only books from rooms named "Physics" pass.
+        // Local ctx: 1 lib x 2 rooms (Physics, Biology) x 2 shelves x 2 books.
+        // Physics: 2 shelves x 2 books x 2 pages = 8. Biology: filtered out.
+        Page p1 = new Page("page1");
+        Page p2 = new Page("page2");
+        Book rel = new Book("Relativity", true, java.util.List.of(p1, p2));
+        Book draft = new Book("Draft", false, java.util.List.of(p1, p2));
+        Book evo = new Book("Evolution", true, java.util.List.of(p1, p2));
+        Book notes = new Book("Notes", false, java.util.List.of(p1, p2));
+        Room physics = new Room("Physics", java.util.List.of(),
+                java.util.List.of(new Shelf("ShelfA", java.util.List.of(rel, draft)),
+                        new Shelf("ShelfB", java.util.List.of(evo, notes))));
+        Room biology = new Room("Biology", java.util.List.of(),
+                java.util.List.of(new Shelf("ShelfA", java.util.List.of(rel, draft)),
+                        new Shelf("ShelfB", java.util.List.of(evo, notes))));
+        Ctx ctx5 = new Ctx(
+                DataSource.of(), DataSource.of(), DataSource.of(), DataSource.of(), DataSource.of(),
+                DataSource.of(new Library("ScienceLib", java.util.List.of(physics, biology))));
+
+        var rule = builder.from(c -> c.libraries())
+                .<Room, Shelf, Book, Page> path5()
+                .path((pathCtx, lib) -> lib.rooms(), (pathCtx, room) -> true)
+                .path((pathCtx, room) -> room.shelves(), (pathCtx, shelf) -> true)
+                .path((pathCtx, shelf) -> shelf.books(),
+                        (pathCtx, book) -> pathCtx.getTuple().getB().name().equals("Physics"))
+                .path((pathCtx, book) -> book.pages(), (pathCtx, page) -> true)
+                .fn((c, lib, t) -> {
+                });
+
+        rule.run(ctx5);
+
+        assertThat(rule.executionCount()).isEqualTo(8); // Physics: 2 shelves x 2 books x 2 pages
+        for (int i = 0; i < rule.executionCount(); i++) {
+            @SuppressWarnings("unchecked")
+            BaseTuple.Tuple5<Library, Room, Shelf, Book, Page> t = (BaseTuple.Tuple5<Library, Room, Shelf, Book, Page>) rule
+                    .capturedFact(i, 1);
+            assertThat(t.getB().name()).isEqualTo("Physics");
         }
     }
 

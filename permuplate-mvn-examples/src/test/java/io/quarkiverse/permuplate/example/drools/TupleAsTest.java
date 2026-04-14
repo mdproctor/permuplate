@@ -26,8 +26,8 @@ public class TupleAsTest {
 
     @Before
     public void setUp() {
-        relativityBook = new Book("Relativity", true);
-        physicsRoom = new Room("Physics", List.of(relativityBook, new Book("Draft", false)));
+        relativityBook = new Book("Relativity", true, List.of(new Page("p1")));
+        physicsRoom = new Room("Physics", List.of(relativityBook, new Book("Draft", false, List.of())), List.of());
         scienceLib = new Library("ScienceLib", List.of(physicsRoom));
     }
 

@@ -1,4 +1,6 @@
 package io.quarkiverse.permuplate.example.drools;
 
-public record Book(String title, boolean published) {
+import java.util.List;
+
+public record Book(String title, boolean published, List<Page> pages) {
 }
