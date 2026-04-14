@@ -23,13 +23,13 @@ Promote to an ADR when ready to decide; discard when no longer relevant.
 ## 2026-04-09 — Automated end-to-end tests for rename cascade in IntelliJ and VS Code
 
 **Priority:** high
-**Status:** active
+**Status:** resolved (2026-04-15)
 
-When a class in a Permuplate permutation family is renamed, the cascade must ripple correctly — constructor names, call sites, type references, annotation strings. This behaviour needs automated end-to-end tests in both IntelliJ and VS Code, not just manual verification. Without them, a plugin change could silently break the cascade and only be caught when a developer hits a broken rename in a real project.
+**What was done:** Added two cascade tests to `AnnotationStringRenameProcessorTest`:
+- Template rename (Join2→Merge2): verifies constructor rename + annotation string + cross-file annotation string in one operation
+- Generated file rename (Join3→Merge2): verifies redirect fires AND full cascade followsAlso fixed a pre-existing index bug: `PermuteTemplateIndex`, `PermuteGeneratedIndex`, and `PermuteElementResolver` all checked for `Integer` literals for `from`/`to`, but issue #16 changed those attributes to `String`. This silently broke 14 tests. Fixed `getIntAttr()`/`parseLiteralInt()` in all three locations. Plugin now at 58 tests, 0 failures (was 42 passing before fix).
 
-Scope: IntelliJ plugin tests (already have a Gradle test suite) should include a rename-cascade scenario covering the full chain. VS Code extension tests (when the port is built) must include the same scenario from day one.
-
-**Context:** Arose during brainstorming for JoinNFirst/JoinNSecond Permuplate templates in droolsvol2 (2026-04-09). The IntelliJ rename redirect is already implemented; the cascade correctness was assumed rather than tested. VS Code port is planned but not started.
+VS Code: out of scope — extension parked.
 
 **Promoted to:**
 
