@@ -83,25 +83,15 @@ public class JoinBuilder {
          * <p>Boundary omission removes this from Join6Second — Join7First is not in the
          * generated set, so {@code @PermuteReturn} silently omits it at i=6.
          *
-         * <p>Uses reflection to instantiate the next JoinFirst class. The constructor takes
-         * {@code (END end, RuleDefinition<DS> rd)} — erased to {@code (Object, RuleDefinition)}
-         * at runtime, found via {@code getConstructor(Object.class, RuleDefinition.class)}.
+         * <p>Uses {@code @PermuteDeclr TYPE_USE} on the constructor to rename
+         * {@code Join1First} to {@code Join${i+1}First} per permutation — no reflection needed.
          */
         @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "${alpha(m)}")
         @PermuteReturn(className = "Join${i+1}First",
                        typeArgs = "'END, DS, ' + typeArgList(1, i+1, 'alpha')")
         public <B> Object join(java.util.function.Function<DS, DataSource<B>> source) {
             rd.addSource(source);
-            String cn = getClass().getSimpleName();
-            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
-            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
-            try {
-                return cast(Class.forName(nextName)
-                        .getConstructor(Object.class, RuleDefinition.class)
-                        .newInstance(end(), rd));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate " + nextName, e);
-            }
+            return cast(new @PermuteDeclr(type = "Join${i+1}First") Join1First<>(end(), rd));
         }
 
         /**
@@ -135,6 +125,8 @@ public class JoinBuilder {
             @SuppressWarnings("unchecked")
             JoinSecond<DS> second = (JoinSecond<DS>) secondChain;
             rd.addBilinearSource(second.getRuleDefinition());
+            // Reflection required: j is a @PermuteMethod inner variable, unavailable to
+            // @PermuteDeclr TYPE_USE which is processed by the outer PermuteDeclrTransformer.
             String myCn = getClass().getSimpleName();
             int myN = Integer.parseInt(myCn.replaceAll("[^0-9]", ""));
             String otherCn = secondChain.getClass().getSimpleName();
@@ -202,17 +194,8 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path2() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            String cn = getClass().getSimpleName();
-            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
-            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
-            try {
-                Object nextJoin = Class.forName(nextName)
-                        .getConstructor(Object.class, RuleDefinition.class)
-                        .newInstance(end(), rd);
-                return cast(new RuleOOPathBuilder.Path2<>(nextJoin, rd, steps, rd.factArity() - 1));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate " + nextName, e);
-            }
+            Object nextJoin = new @PermuteDeclr(type = "Join${i+1}First") Join1First<>(end(), rd);
+            return cast(new RuleOOPathBuilder.Path2<>(nextJoin, rd, steps, rd.factArity() - 1));
         }
 
         /**
@@ -227,17 +210,8 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path3() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            String cn = getClass().getSimpleName();
-            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
-            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
-            try {
-                Object nextJoin = Class.forName(nextName)
-                        .getConstructor(Object.class, RuleDefinition.class)
-                        .newInstance(end(), rd);
-                return cast(new RuleOOPathBuilder.Path3<>(nextJoin, rd, steps, rd.factArity() - 1));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate " + nextName, e);
-            }
+            Object nextJoin = new @PermuteDeclr(type = "Join${i+1}First") Join1First<>(end(), rd);
+            return cast(new RuleOOPathBuilder.Path3<>(nextJoin, rd, steps, rd.factArity() - 1));
         }
 
         /**
@@ -252,17 +226,8 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path4() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            String cn = getClass().getSimpleName();
-            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
-            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
-            try {
-                Object nextJoin = Class.forName(nextName)
-                        .getConstructor(Object.class, RuleDefinition.class)
-                        .newInstance(end(), rd);
-                return cast(new RuleOOPathBuilder.Path4<>(nextJoin, rd, steps, rd.factArity() - 1));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate " + nextName, e);
-            }
+            Object nextJoin = new @PermuteDeclr(type = "Join${i+1}First") Join1First<>(end(), rd);
+            return cast(new RuleOOPathBuilder.Path4<>(nextJoin, rd, steps, rd.factArity() - 1));
         }
 
         /**
@@ -277,17 +242,8 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path5() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            String cn = getClass().getSimpleName();
-            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
-            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
-            try {
-                Object nextJoin = Class.forName(nextName)
-                        .getConstructor(Object.class, RuleDefinition.class)
-                        .newInstance(end(), rd);
-                return cast(new RuleOOPathBuilder.Path5<>(nextJoin, rd, steps, rd.factArity() - 1));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate " + nextName, e);
-            }
+            Object nextJoin = new @PermuteDeclr(type = "Join${i+1}First") Join1First<>(end(), rd);
+            return cast(new RuleOOPathBuilder.Path5<>(nextJoin, rd, steps, rd.factArity() - 1));
         }
 
         /**
@@ -302,17 +258,8 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         public <B> Object path6() {
             java.util.List<OOPathStep> steps = new java.util.ArrayList<>();
-            String cn = getClass().getSimpleName();
-            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
-            String nextName = getClass().getEnclosingClass().getName() + "$Join" + (n + 1) + "First";
-            try {
-                Object nextJoin = Class.forName(nextName)
-                        .getConstructor(Object.class, RuleDefinition.class)
-                        .newInstance(end(), rd);
-                return cast(new RuleOOPathBuilder.Path6<>(nextJoin, rd, steps, rd.factArity() - 1));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate " + nextName, e);
-            }
+            Object nextJoin = new @PermuteDeclr(type = "Join${i+1}First") Join1First<>(end(), rd);
+            return cast(new RuleOOPathBuilder.Path6<>(nextJoin, rd, steps, rd.factArity() - 1));
         }
 
         /**
@@ -344,8 +291,10 @@ public class JoinBuilder {
          * Pass the result to RuleBuilder.extendsRule() to start a child rule that
          * inherits all sources, filters, and constraint scopes up to this point.
          *
-         * <p>Uses reflection to instantiate RuleExtendsPoint.RuleExtendsPoint(N+1) where N
-         * is the current arity — same pattern as join().
+         * <p>Uses reflection to instantiate {@code RuleExtendsPoint.RuleExtendsPoint(N+1)}
+         * because the target type is a qualified name ({@code RuleExtendsPoint.RuleExtendsPointN})
+         * — {@code @PermuteDeclr TYPE_USE} requires a simple (unqualified) name on the
+         * {@code new} expression. Reflection is the correct workaround for this case.
          */
         @SuppressWarnings("unchecked")
         @PermuteReturn(className = "RuleExtendsPoint.RuleExtendsPoint${i+1}",

@@ -480,4 +480,67 @@ public class PermuteDeclrTest {
         // @PermuteDeclr annotation must be removed from the type
         assertThat(newExpr.getType().getAnnotations()).isEmpty();
     }
+
+    /**
+     * Verifies that @PermuteDeclr type expressions work with two @Permute-level variables
+     * both present in the EvaluationContext. Note: @PermuteMethod inner variables (e.g. j)
+     * are NOT available to @PermuteDeclr TYPE_USE in the method body because
+     * PermuteDeclrTransformer runs in the outer context after PermuteMethodTransformer has
+     * already consumed and removed the @PermuteMethod overloads.
+     */
+    @Test
+    public void testPermuteDeclrOnNewExpressionWithTwoVariables() {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                class Join1Second {
+                    public Object joinBilinear() {
+                        return new @io.quarkiverse.permuplate.PermuteDeclr(type = "Join${i+j}First")
+                                Join1First<>();
+                    }
+                }
+                """);
+        ClassOrInterfaceDeclaration classDecl = cu.getClassByName("Join1Second").orElseThrow();
+        EvaluationContext ctx = new EvaluationContext(Map.of("i", 1, "j", 2));
+
+        PermuteDeclrTransformer.transform(classDecl, ctx, null);
+
+        com.github.javaparser.ast.expr.ObjectCreationExpr newExpr = classDecl
+                .getMethods().get(0).getBody().orElseThrow()
+                .findFirst(com.github.javaparser.ast.expr.ObjectCreationExpr.class)
+                .orElseThrow();
+
+        // i=1, j=2 → Join${1+2}First = Join3First
+        assertThat(newExpr.getType().getNameAsString()).isEqualTo("Join3First");
+        assertThat(newExpr.getType().getAnnotations()).isEmpty();
+    }
+
+    /**
+     * Verifies that @PermuteDeclr on a new expression inside a local variable assignment
+     * works — the pattern used by path2()..path6() where the next JoinFirst is assigned
+     * to a local variable before being passed to a PathN constructor.
+     */
+    @Test
+    public void testPermuteDeclrOnNewExpressionInLocalVariable() {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                class Join2Second {
+                    public Object path2() {
+                        Object nextJoin = new @io.quarkiverse.permuplate.PermuteDeclr(type = "Join${i+1}First")
+                                Join3First<>(end(), rd);
+                        return nextJoin;
+                    }
+                }
+                """);
+        ClassOrInterfaceDeclaration classDecl = cu.getClassByName("Join2Second").orElseThrow();
+        EvaluationContext ctx = new EvaluationContext(Map.of("i", 3));
+
+        PermuteDeclrTransformer.transform(classDecl, ctx, null);
+
+        com.github.javaparser.ast.expr.ObjectCreationExpr newExpr = classDecl
+                .getMethods().get(0).getBody().orElseThrow()
+                .findFirst(com.github.javaparser.ast.expr.ObjectCreationExpr.class)
+                .orElseThrow();
+
+        // Join3First → Join4First at i=3
+        assertThat(newExpr.getType().getNameAsString()).isEqualTo("Join4First");
+        assertThat(newExpr.getType().getAnnotations()).isEmpty();
+    }
 }
