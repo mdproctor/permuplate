@@ -91,9 +91,26 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
         return null;
     }
 
+    /**
+     * Reads an integer-valued annotation attribute. Handles both:
+     * - Legacy int literals: {@code from = 3}
+     * - Current String JEXL literals (plain integers only): {@code from = "3"}
+     *
+     * The {@code @Permute.from} and {@code @Permute.to} attributes changed from
+     * {@code int} to {@code String} in issue #16 (expression-based ranges). This
+     * method handles both forms so existing templates and future templates work.
+     * JEXL expressions containing variables (e.g. {@code "${max}"}) are not
+     * supported by the index — the default is returned for those cases.
+     */
     private static int getIntAttr(PsiAnnotation ann, String attr, int defaultVal) {
         PsiAnnotationMemberValue v = ann.findAttributeValue(attr);
-        if (v instanceof PsiLiteralExpression lit && lit.getValue() instanceof Integer i) return i;
+        if (v instanceof PsiLiteralExpression lit) {
+            Object value = lit.getValue();
+            if (value instanceof Integer i) return i;
+            if (value instanceof String s) {
+                try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ignored) {}
+            }
+        }
         return defaultVal;
     }
 
@@ -147,7 +164,7 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
         return PermuteTemplateDataExternalizer.INSTANCE;
     }
 
-    @Override public int getVersion() { return 3; }
+    @Override public int getVersion() { return 4; } // bumped: from/to now parsed as String (issue #16)
 
     @Override public @NotNull FileBasedIndex.InputFilter getInputFilter() {
         return (VirtualFile file) -> "java".equals(file.getExtension());

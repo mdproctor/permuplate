@@ -87,9 +87,17 @@ public class PermuteGeneratedIndex extends FileBasedIndexExtension<String, Strin
         return null;
     }
 
+    /** Handles both legacy int literals and current String JEXL literals (plain integers only).
+     *  @Permute.from and @Permute.to changed from int to String in issue #16. */
     private static int getIntAttr(PsiAnnotation ann, String attr, int defaultVal) {
         PsiAnnotationMemberValue v = ann.findAttributeValue(attr);
-        if (v instanceof PsiLiteralExpression lit && lit.getValue() instanceof Integer i) return i;
+        if (v instanceof PsiLiteralExpression lit) {
+            Object value = lit.getValue();
+            if (value instanceof Integer i) return i;
+            if (value instanceof String s) {
+                try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ignored) {}
+            }
+        }
         return defaultVal;
     }
 
@@ -101,7 +109,7 @@ public class PermuteGeneratedIndex extends FileBasedIndexExtension<String, Strin
         return EnumeratorStringDescriptor.INSTANCE;
     }
 
-    @Override public int getVersion() { return 3; }
+    @Override public int getVersion() { return 4; } // bumped: from/to now parsed as String (issue #16)
 
     @Override public @NotNull FileBasedIndex.InputFilter getInputFilter() {
         return (VirtualFile file) -> "java".equals(file.getExtension());

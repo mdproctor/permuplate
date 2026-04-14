@@ -204,6 +204,127 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
                 templateText.contains("className=\"Merge${i}\""));
     }
 
+    // =========================================================================
+    // Full cascade — integrated rename scenarios covering the complete chain:
+    // constructor names, type references, call sites, and annotation strings
+    // =========================================================================
+
+    /**
+     * Full cascade from template rename: Join2 → Merge2.
+     * Verifies the Permuplate-specific parts of the cascade in a single rename operation:
+     * (1) template class name, (2) template constructor name,
+     * (3) template annotation string, (4) cross-file annotation strings in other templates.
+     *
+     * Note: cross-file type references and call sites (e.g. "Join2 j = new Join2()") are
+     * updated by IntelliJ's standard Java rename infrastructure — not by Permuplate. The
+     * lightweight test fixture does not simulate full cross-file PSI resolution, so those
+     * assertions belong in manual IDE verification, not here. What this test covers is
+     * everything that Permuplate's rename processor adds on top of standard Java rename.
+     */
+    public void testFullCascadeTemplateRenameUpdatesConstructorAndAnnotationStrings() {
+        // Template: Join2 with @Permute, a constructor, and a method
+        PsiFile templateFile = myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    public Join2() {}\n" +
+                "    public void join() {}\n" +
+                "}");
+
+        // Another template referencing Join2 via a @PermuteDeclr annotation string
+        PsiFile otherTemplate = myFixture.addFileToProject("Consumer2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Consumer${i}\")\n" +
+                "public class Consumer2 {\n" +
+                "    @PermuteDeclr(type=\"Join${i}\")\n" +
+                "    private Object c2;\n" +
+                "}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join2);
+        myFixture.renameElement(join2, "Merge2");
+
+        // 1. Template class renamed (standard Java rename)
+        String templateText = templateFile.getText();
+        assertTrue("Template class renamed to Merge2",
+                templateText.contains("public class Merge2"));
+
+        // 2. Template constructor renamed (standard Java rename — constructor tracks class name)
+        assertTrue("Template constructor renamed to Merge2",
+                templateText.contains("public Merge2()"));
+        assertFalse("Old constructor name must not remain", templateText.contains("Join2()"));
+
+        // 3. Template annotation string updated (Permuplate: className literal updated)
+        assertTrue("Template annotation updated to Merge${i}",
+                templateText.contains("className=\"Merge${i}\""));
+        assertFalse("Old annotation className must not remain", templateText.contains("\"Join${i}\""));
+
+        // 4. Cross-file annotation string in other template updated (Permuplate: cross-file cascade)
+        String otherText = otherTemplate.getText();
+        assertTrue("Cross-file annotation string updated to Merge${i}",
+                otherText.contains("type=\"Merge${i}\""));
+        assertFalse("Old cross-file annotation string must not remain",
+                otherText.contains("\"Join${i}\""));
+    }
+
+    /**
+     * Full cascade from generated file rename: renaming Join3 (generated) → Merge2.
+     * Verifies that the redirect to the template fires AND the full cascade follows —
+     * constructor rename, annotation string update, and cross-file annotation string update.
+     */
+    public void testFullCascadeRenameFromGeneratedFileUpdatesTemplateAndCrossFileStrings()
+            throws Exception {
+        // Template
+        PsiFile templateFile = myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    public Join2() {}\n" +
+                "}");
+
+        // Another template with a cross-file annotation string referencing Join
+        PsiFile otherTemplate = myFixture.addFileToProject("Consumer2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Consumer${i}\")\n" +
+                "public class Consumer2 {\n" +
+                "    @PermuteDeclr(type=\"Join${i}\")\n" +
+                "    private Object c2;\n" +
+                "}");
+
+        // Generated file in target/generated-sources
+        VirtualFile generatedVFile = myFixture.getTempDirFixture().createFile(
+                "target/generated-sources/permuplate/Join3.java",
+                "package io.example;\npublic class Join3 {}");
+        PsiFile generatedPsiFile = PsiManager.getInstance(getProject()).findFile(generatedVFile);
+        assertNotNull(generatedPsiFile);
+        PsiClass join3 = ((PsiJavaFile) generatedPsiFile).getClasses()[0];
+
+        // Rename from generated file — substituteElementToRename() redirects to Join2
+        myFixture.renameElement(join3, "Merge2");
+
+        // Template class and constructor renamed
+        String templateText = templateFile.getText();
+        assertTrue("Template class renamed to Merge2", templateText.contains("public class Merge2"));
+        assertTrue("Template constructor renamed to Merge2", templateText.contains("public Merge2()"));
+        assertFalse("Old constructor name must not remain", templateText.contains("Join2()"));
+
+        // Template annotation string updated
+        assertTrue("Template annotation updated to Merge${i}",
+                templateText.contains("className=\"Merge${i}\""));
+
+        // Cross-file annotation string in other template updated
+        String otherText = otherTemplate.getText();
+        assertTrue("Cross-file annotation string updated to Merge${i}",
+                otherText.contains("type=\"Merge${i}\""));
+        assertFalse("Old cross-file annotation string must not remain",
+                otherText.contains("\"Join${i}\""));
+    }
+
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
         com.intellij.openapi.vfs.VirtualFile generatedFile =
                 myFixture.getTempDirFixture().createFile(

@@ -77,10 +77,10 @@ public final class PermuteElementResolver {
                             && vlit.getValue() instanceof String vs ? vs : null;
                     String className = classVal instanceof PsiLiteralExpression clit
                             && clit.getValue() instanceof String cs ? cs : null;
-                    int from = fromVal instanceof PsiLiteralExpression flit
-                            && flit.getValue() instanceof Integer fi ? fi : 1;
-                    int to = toVal instanceof PsiLiteralExpression tlit
-                            && tlit.getValue() instanceof Integer ti ? ti : 1;
+                    // from/to changed from int to String (JEXL expressions) in issue #16.
+                    // Handle both int literals (legacy) and plain-integer String literals (current).
+                    int from = parseLiteralInt(fromVal, 1);
+                    int to   = parseLiteralInt(toVal,   1);
 
                     if (varName == null || className == null) continue;
                     String placeholder = "${" + varName + "}";
@@ -126,6 +126,17 @@ public final class PermuteElementResolver {
         if (element instanceof PsiClass) return templateClass;
 
         return findMatchingTemplateElement(element, templateClass);
+    }
+
+    private static int parseLiteralInt(@Nullable PsiAnnotationMemberValue val, int defaultVal) {
+        if (val instanceof PsiLiteralExpression lit) {
+            Object v = lit.getValue();
+            if (v instanceof Integer i) return i;
+            if (v instanceof String s) {
+                try { return Integer.parseInt(s.trim()); } catch (NumberFormatException ignored) {}
+            }
+        }
+        return defaultVal;
     }
 
     @Nullable
