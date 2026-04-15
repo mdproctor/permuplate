@@ -61,7 +61,7 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 
 | Annotation | Target | Purpose |
 |---|---|---|
-| `@Permute` | class, interface, method | Master: declares the permutation loop |
+| `@Permute` | class, interface, method | Master: declares the permutation loop (integer range via `from`/`to`, or string set via `values`) |
 | `@PermuteVar` | (nested in @Permute) | Extra loop axes for cross-product generation |
 | `@PermuteDeclr` | field, parameter, for-each var | Rename type+name per permutation |
 | `@PermuteParam` | method/constructor parameter | Expand a sentinel parameter into a sequence |
@@ -126,6 +126,10 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 | `@PermuteExtends` `interfaceIndex` | `0` = extends clause; `1+` = implements interface at `(interfaceIndex - 1)` in the `implementedTypes` list (0-indexed among implements). |
 | `@PermuteFilter` all-filtered-out in Maven plugin | Maven plugin has no `Messager` — silently produces zero output rather than erroring. APT errors with annotation-mirror precision. |
 | `@PermuteFilter` and `@PermuteVar` cross-product | Filters applied AFTER `buildAllCombinations()` — each combination (i,j,...) evaluated independently. |
+| `@Permute(values=...)` binds varName as String | When `values` is used, the loop variable is bound as a `String`, not an `Integer`. JEXL expressions that assume integer semantics (e.g. `@PermuteFilter("${T} > 2")`) will not work. Filter expressions for string-set templates must use string comparisons (e.g. `@PermuteFilter("!${T}.equals(\"Byte\")")`). |
+| `@Permute` `values` XOR `from`/`to` | Both `from` and `to` default to `""` in the annotation definition. The APT processor validates exactly one mode is provided: `values` (non-empty) OR both `from` and `to` (non-empty). The empty string is the sentinel for "not provided". |
+| `validatePrefixes` skipped in string-set mode | R4 (no-anchor), R2 (unmatched literal), and R3 (orphan variable) checks are all skipped when `values` is present. R4 fires spuriously for pure-variable expressions like `"${T}"` where the variable substitutes the entire type name with no literal prefix. |
+| String-set in IntelliJ index (version 5) | `getStringArrayAttr()` reads the `values` array from PSI. Index versions bumped from 4→5 in both `PermuteTemplateIndex` and `PermuteGeneratedIndex` to invalidate stale caches. |
 | Lambda `@PermuteParam` — scoped anchor expansion | `@PermuteParam` on a typed lambda parameter (valid Java syntax) expands the lambda's param list and expands call sites **within the lambda body only** via `expandAnchorInStatement`. Method-body anchors do not bleed into lambdas; lambda anchors do not bleed into the outer method body. |
 | Pure-variable `@PermuteParam.name` — R4 exemption | `name="${lower(j)}"` and `name="${alpha(j)}"` have no static literal, which would normally trigger R4. For `@PermuteParam.name`, if the template has no static literals the R4/R2/R3 check is skipped entirely — the generated param names are fresh and have no obligation to match the sentinel's placeholder name. Literal+variable names like `name="o${j}"` still receive full R2/R3 validation. |
 | `@PermuteTypeParam` R1 skips `@PermuteReturn` methods | `validateR1()` in `PermuteTypeParamTransformer` skips methods annotated with `@PermuteReturn` — such methods explicitly manage their own return type, so the restriction against expanding type params in the return type is inapplicable. |
