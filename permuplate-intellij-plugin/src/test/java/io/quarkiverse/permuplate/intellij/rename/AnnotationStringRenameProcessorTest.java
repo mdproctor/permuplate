@@ -425,6 +425,106 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         assertEquals("d2", allRenames.get(join4.findFieldByName("c2", false)));
     }
 
+    public void testMethodAbsentInBoundaryOmittedClassIsSkipped() {
+        // Join4 exists but does NOT have a join() method (boundary omission)
+        myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"4\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    public void join() {}\n" +
+                "}");
+        myFixture.addFileToProject("Join3.java",
+                "package io.example;\n" +
+                "public class Join3 {\n" +
+                "    public void join() {}\n" +
+                "}");
+        myFixture.addFileToProject("Join4.java",
+                "package io.example;\n" +
+                "public class Join4 {\n" +
+                "    // join() intentionally absent — boundary omission\n" +
+                "}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        PsiMethod joinMethod = join2.findMethodsByName("join", false)[0];
+
+        AnnotationStringRenameProcessor processor = new AnnotationStringRenameProcessor();
+        Map<PsiElement, String> allRenames = new java.util.HashMap<>();
+        // Must not throw — gracefully skips Join4 since join() is absent
+        processor.prepareRenaming(joinMethod, "combine",
+                allRenames, GlobalSearchScope.allScope(getProject()));
+
+        PsiClass join3 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join3", GlobalSearchScope.allScope(getProject()));
+        PsiClass join4 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join4", GlobalSearchScope.allScope(getProject()));
+        // Join3.join() IS in allRenames
+        assertTrue("Join3.join() must be in allRenames",
+                allRenames.containsKey(join3.findMethodsByName("join", false)[0]));
+        // Nothing from Join4 in allRenames
+        for (PsiElement key : allRenames.keySet()) {
+            if (key instanceof PsiMethod m) {
+                assertFalse("No method from Join4 should be in allRenames",
+                        join4.equals(m.getContainingClass()));
+            }
+        }
+    }
+
+    public void testRenameInNonTemplateClassProducesNoFamilyRenames() {
+        myFixture.configureByText("PlainClass.java",
+                "package io.example;\n" +
+                "public class PlainClass {\n" +
+                "    public void join() {}\n" +
+                "}");
+
+        PsiClass plainClass = ((com.intellij.psi.PsiJavaFile) myFixture.getFile()).getClasses()[0];
+        PsiMethod joinMethod = plainClass.findMethodsByName("join", false)[0];
+
+        AnnotationStringRenameProcessor processor = new AnnotationStringRenameProcessor();
+        Map<PsiElement, String> allRenames = new java.util.HashMap<>();
+        processor.prepareRenaming(joinMethod, "combine",
+                allRenames, GlobalSearchScope.allScope(getProject()));
+
+        assertTrue("Non-template class must produce no family renames", allRenames.isEmpty());
+    }
+
+    public void testPermuteMethodAnnotatedSentinelIsSkipped() {
+        myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"4\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteMethod(varName=\"j\", from=\"1\", name=\"join${j}\")\n" +
+                "    public void joinSentinel() {}\n" +
+                "}");
+        myFixture.addFileToProject("Join3.java",
+                "package io.example;\n" +
+                "public class Join3 {\n" +
+                "    public void join1() {}\n" +
+                "}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join2);
+        PsiMethod sentinel = join2.findMethodsByName("joinSentinel", false)[0];
+
+        AnnotationStringRenameProcessor processor = new AnnotationStringRenameProcessor();
+        Map<PsiElement, String> allRenames = new java.util.HashMap<>();
+        processor.prepareRenaming(sentinel, "mergeSentinel",
+                allRenames, GlobalSearchScope.allScope(getProject()));
+
+        PsiClass join3 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join3", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join3);
+        for (PsiElement key : allRenames.keySet()) {
+            if (key instanceof PsiMethod m) {
+                assertFalse("@PermuteMethod sentinel must not add Join3 methods to allRenames",
+                        join3.equals(m.getContainingClass()));
+            }
+        }
+    }
+
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
         com.intellij.openapi.vfs.VirtualFile generatedFile =
                 myFixture.getTempDirFixture().createFile(
