@@ -146,8 +146,8 @@ The preprocessor strips the block when the condition is false. Trade-off: breaks
 
 | Feature | Effort | Value | Status |
 |---|---|---|---|
-| String-set iteration | Medium | High | **In progress** |
-| `@PermuteFilter` | Low | Medium | **In progress** |
+| String-set iteration | Medium | High | **Done** (#27) |
+| `@PermuteFilter` | Low | Medium | **Done** (#28) |
 | `@PermuteAnnotation` | Medium | Medium | Future |
 | Record component expansion | Low (verify first) | Medium | Future |
 | `@PermuteThrows` | Low | Low | Future |
