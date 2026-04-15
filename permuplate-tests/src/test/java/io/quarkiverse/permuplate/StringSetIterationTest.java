@@ -79,6 +79,48 @@ public class StringSetIterationTest {
     }
 
     /**
+     * String-set iteration works in inline (Maven plugin) mode.
+     * @Permute(values={"Byte","Short"}, inline=true) generates ToByteFunction and
+     * ToShortFunction as nested siblings inside the parent class.
+     */
+    @Test
+    public void testStringSetInInlineMode() throws Exception {
+        String parentSrc = "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "import io.quarkiverse.permuplate.PermuteDeclr;\n" +
+                "public class Converters {\n" +
+                "    @Permute(varName=\"T\", values={\"Byte\",\"Short\"},\n" +
+                "             className=\"To${T}Function\", inline=true, keepTemplate=false)\n" +
+                "    public static class ToTypeFunction {\n" +
+                "        @PermuteDeclr(type=\"${T}\")\n" +
+                "        private Object value;\n" +
+                "    }\n" +
+                "}";
+
+        com.github.javaparser.ast.CompilationUnit cu = com.github.javaparser.StaticJavaParser.parse(parentSrc);
+        com.github.javaparser.ast.body.ClassOrInterfaceDeclaration parent = cu.getClassByName("Converters").orElseThrow();
+        com.github.javaparser.ast.body.ClassOrInterfaceDeclaration template = parent.getMembers().stream()
+                .filter(m -> m instanceof com.github.javaparser.ast.body.ClassOrInterfaceDeclaration)
+                .map(m -> (com.github.javaparser.ast.body.ClassOrInterfaceDeclaration) m)
+                .findFirst().orElseThrow();
+
+        io.quarkiverse.permuplate.maven.AnnotationReader reader = new io.quarkiverse.permuplate.maven.AnnotationReader();
+        io.quarkiverse.permuplate.core.PermuteConfig config = reader.readPermuteConfig(template);
+        java.util.List<java.util.Map<String, Object>> allCombinations = io.quarkiverse.permuplate.core.PermuteConfig
+                .buildAllCombinations(config);
+
+        com.github.javaparser.ast.CompilationUnit result = new io.quarkiverse.permuplate.maven.InlineGenerator()
+                .generate(cu, template, config, allCombinations);
+
+        String output = result.toString();
+        assertThat(output).contains("ToByteFunction");
+        assertThat(output).contains("ToShortFunction");
+        assertThat(output).doesNotContain("ToTypeFunction"); // keepTemplate=false
+        assertThat(output).contains("Byte value"); // @PermuteDeclr applied
+        assertThat(output).contains("Short value");
+    }
+
+    /**
      * Specifying neither values nor from/to is a compile error.
      */
     @Test

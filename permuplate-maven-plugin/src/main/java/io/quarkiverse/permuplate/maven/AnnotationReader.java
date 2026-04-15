@@ -3,6 +3,7 @@ package io.quarkiverse.permuplate.maven;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.ArrayInitializerExpr;
 import com.github.javaparser.ast.expr.Expression;
@@ -23,7 +24,24 @@ import io.quarkiverse.permuplate.core.PermuteVarConfig;
  */
 public class AnnotationReader {
 
-    private AnnotationReader() {
+    public AnnotationReader() {
+    }
+
+    /**
+     * Convenience method: finds the {@code @Permute} annotation on the given class
+     * declaration and converts it to a {@link PermuteConfig}.
+     *
+     * @throws MojoAnnotationException if the annotation is missing or malformed
+     */
+    public PermuteConfig readPermuteConfig(ClassOrInterfaceDeclaration classDecl)
+            throws MojoAnnotationException {
+        AnnotationExpr ann = classDecl.getAnnotations().stream()
+                .filter(a -> a.getNameAsString().equals("Permute")
+                        || a.getNameAsString().equals("io.quarkiverse.permuplate.Permute"))
+                .findFirst()
+                .orElseThrow(() -> new MojoAnnotationException(
+                        "Class " + classDecl.getNameAsString() + " has no @Permute annotation"));
+        return readPermute(ann);
     }
 
     /**
@@ -39,15 +57,16 @@ public class AnnotationReader {
         NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
 
         String varName = requireString(normal, "varName");
-        String from = requireStringOrInt(normal, "from");
-        String to = requireStringOrInt(normal, "to");
+        String[] values = readStringArray(normal, "values");
+        String from = values.length > 0 ? "" : optionalStringOrInt(normal, "from");
+        String to = values.length > 0 ? "" : optionalStringOrInt(normal, "to");
         String className = requireString(normal, "className");
         String[] strings = readStringArray(normal, "strings");
         PermuteVarConfig[] extraVars = readExtraVars(normal);
         boolean inline = readBoolean(normal, "inline", false);
         boolean keepTemplate = readBoolean(normal, "keepTemplate", false);
 
-        return new PermuteConfig(varName, from, to, className, strings, extraVars, inline, keepTemplate);
+        return new PermuteConfig(varName, from, to, values, className, strings, extraVars, inline, keepTemplate);
     }
 
     private static String requireString(NormalAnnotationExpr ann, String name)
@@ -61,20 +80,17 @@ public class AnnotationReader {
     }
 
     /**
-     * Reads an attribute that is either a String literal ({@code "3"}, {@code "${max}"})
-     * or a bare integer literal ({@code 3}). Returns the value as a String in both cases.
-     * Used for {@code from} and {@code to} which changed from {@code int} to {@code String}.
+     * Reads a string or int attribute from the annotation; returns empty string if absent.
+     * Used for {@code from}/{@code to} which are optional when {@code values} is specified.
      */
-    private static String requireStringOrInt(NormalAnnotationExpr ann, String name)
-            throws MojoAnnotationException {
+    private static String optionalStringOrInt(NormalAnnotationExpr ann, String name) {
         for (MemberValuePair pair : ann.getPairs()) {
             if (pair.getNameAsString().equals(name)) {
                 String raw = pair.getValue().toString().trim();
-                // Strip quotes if it's a string literal, otherwise return bare int as string
                 return PermuteDeclrTransformer.stripQuotes(raw);
             }
         }
-        throw new MojoAnnotationException("@Permute is missing required attribute: " + name);
+        return "";
     }
 
     private static boolean readBoolean(NormalAnnotationExpr ann, String name, boolean defaultValue) {
@@ -116,9 +132,10 @@ public class AnnotationReader {
                     if (e instanceof NormalAnnotationExpr) {
                         NormalAnnotationExpr varAnn = (NormalAnnotationExpr) e;
                         String varName = requireString(varAnn, "varName");
-                        String from = requireStringOrInt(varAnn, "from");
-                        String to = requireStringOrInt(varAnn, "to");
-                        result.add(new PermuteVarConfig(varName, from, to));
+                        String[] extraValues = readStringArray(varAnn, "values");
+                        String from = extraValues.length > 0 ? "" : optionalStringOrInt(varAnn, "from");
+                        String to = extraValues.length > 0 ? "" : optionalStringOrInt(varAnn, "to");
+                        result.add(new PermuteVarConfig(varName, from, to, extraValues));
                     }
                 }
                 return result.toArray(new PermuteVarConfig[0]);

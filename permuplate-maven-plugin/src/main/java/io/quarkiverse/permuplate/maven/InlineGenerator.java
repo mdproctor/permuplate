@@ -50,7 +50,7 @@ public class InlineGenerator {
         externalProperties = props != null ? props : java.util.Collections.emptyMap();
     }
 
-    private InlineGenerator() {
+    public InlineGenerator() {
     }
 
     /**
