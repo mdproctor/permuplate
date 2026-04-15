@@ -71,21 +71,16 @@ public class Join0Second { ... }
 Records are increasingly idiomatic. Being able to template record canonical constructors:
 
 ```java
-@Permute(varName="i", from="2", to="6", className="Tuple${i}", inline=true)
-public record Tuple2<A, B>(
-    @PermuteParam(varName="j", from="1", to="${i}", type="${alpha(j)}", name="${lower(j)}")
-    A a
-) { }
+@Permute(varName="i", from="3", to="6", className="Tuple${i}")
+public record Tuple2<
+        @PermuteTypeParam(varName="k", from="1", to="${i}", name="${alpha(k)}") A>(
+        @PermuteParam(varName="j", from="1", to="${i}", type="${alpha(j)}", name="${lower(j)}")
+        A a) {
+}
 // Generates: record Tuple3<A,B,C>(A a, B b, C c) etc.
 ```
 
-**Verified 2026-04-15: NOT currently supported — two blockers:**
-
-1. `StaticJavaParser` defaults to Java 11, which predates records. The processor throws `ParseProblemException` on any record template. Fix: call `StaticJavaParser.getParserConfiguration().setLanguageLevel(JAVA_17)` in `PermuteProcessor.init()`.
-
-2. The processor looks for `ClassOrInterfaceDeclaration` in the parsed AST. Records are `RecordDeclaration` — a different JavaParser node type. Even with Blocker 1 fixed, the template class is not found and compilation fails. All transformer methods take `ClassOrInterfaceDeclaration` — updating them to `TypeDeclaration<?>` is a significant refactor throughout `permuplate-core` and `permuplate-processor`.
-
-Tests documenting both blockers: `RecordExpansionTest.java` in `permuplate-tests/`.
+**Implemented in #29.** `StaticJavaParser` configured for Java 17; all transformer signatures generalized from `ClassOrInterfaceDeclaration` to `TypeDeclaration<?>`. Record components work with `@PermuteParam` and `@PermuteDeclr`. Tuple2Record.java demonstrates Tuple3–Tuple6 generation.
 
 ---
 

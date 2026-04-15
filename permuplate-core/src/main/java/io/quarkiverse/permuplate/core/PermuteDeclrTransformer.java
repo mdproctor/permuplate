@@ -287,8 +287,9 @@ public class PermuteDeclrTransformer {
      * Record components are {@code Parameter} nodes attached directly to the
      * {@code RecordDeclaration} — they are not in a constructor or method.
      * Type-only transforms ({@code name=""}) just update the component type.
-     * Name changes propagate through the record's compact constructor body if present,
-     * or through all member methods if none.
+     * Name changes propagate unconditionally through all members of the record
+     * (constructors and methods), covering both compact and explicit constructors
+     * in a single pass.
      */
     private static void transformRecordComponents(RecordDeclaration recordDecl,
             EvaluationContext ctx,

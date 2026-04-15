@@ -195,6 +195,11 @@ public class InlineGenerator {
                 // Record path: apply param + declr transforms (no extends, no methods/return/case)
                 PermuteDeclrTransformer.transform(generated, ctx, null);
                 PermuteParamTransformer.transform(generated, ctx, null);
+                // PermuteStatementsTransformer is not applied to records — records cannot have
+                // arbitrary constructor bodies via template syntax; @PermuteStatements support
+                // for compact record constructors is deferred.
+                // PermuteCaseTransformer is also omitted — switch cases in record methods are not
+                // a supported pattern.
                 PermuteValueTransformer.transform(generated, ctx);
             }
 

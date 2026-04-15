@@ -15,10 +15,12 @@ import io.quarkiverse.permuplate.processor.PermuteProcessor;
 /**
  * Target-state tests for record template support — all four currently fail (TDD red phase).
  *
- * <p>Blocker 1 (already fixed): StaticJavaParser configured for Java 17 in
+ * <p>
+ * Blocker 1 (already fixed): StaticJavaParser configured for Java 17 in
  * PermuteProcessor.init() — records now parse without ParseProblemException.
  *
- * <p>Blocker 2 (fixed in Tasks 2–4): Transformer signatures generalized from
+ * <p>
+ * Blocker 2 (fixed in Tasks 2–4): Transformer signatures generalized from
  * ClassOrInterfaceDeclaration to TypeDeclaration&lt;?&gt;, and PermuteProcessor updated
  * to find RecordDeclaration alongside ClassOrInterfaceDeclaration. Until then, these
  * tests fail because the processor cannot locate the record template class.
@@ -99,7 +101,7 @@ public class RecordExpansionTest {
         assertThat(src).contains("A");
         assertThat(src).contains("B");
         assertThat(src).contains("C");
-        assertThat(src).contains("item");
+        assertThat(src).contains("A item");
     }
 
     /**
