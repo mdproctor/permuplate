@@ -84,6 +84,75 @@ public class PermuteFilterTest {
         assertThat(compilation.generatedSourceFile("io.example.Join6").isPresent()).isFalse();
     }
 
+    /**
+     * When @PermuteFilter eliminates ALL combinations, the APT processor must report a compile error.
+     */
+    @Test
+    public void testAllFilteredOutIsCompileError() {
+        Compilation compilation = compile("io.example.Join2",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteFilter;\n" +
+                        "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                        "@PermuteFilter(\"${i} > 100\")\n" + // always false for range 3..5
+                        "public class Join2 {}");
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("all permutations");
+    }
+
+    /**
+     * @PermuteFilter works on @Permute on a method — skips generating specific overloads.
+     *                Method permutation collects all N variants into one class.
+     *                Uses @PermuteParam so each arity produces a distinct signature (i=3 → 3 params, i=5 → 5 params).
+     */
+    @Test
+    public void testFilterOnMethodPermutation() {
+        Compilation compilation = compile("io.example.Joiner",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteFilter;\n" +
+                        "import io.quarkiverse.permuplate.PermuteParam;\n" +
+                        "public class Joiner {\n" +
+                        "    @Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"JoinMethods\")\n" +
+                        "    @PermuteFilter(\"${i} != 4\")\n" +
+                        "    public void join(@PermuteParam(varName=\"j\", from=\"1\", to=\"${i}\", type=\"Object\", name=\"o${j}\") Object o1) {}\n"
+                        +
+                        "}");
+
+        assertThat(compilation).succeeded();
+        String src = io.quarkiverse.permuplate.ProcessorTestSupport
+                .sourceOf(compilation.generatedSourceFile("io.example.JoinMethods").get());
+        // i=3: join(Object o1, Object o2, Object o3); i=5: join(Object o1..o5); i=4 filtered
+        assertThat(src).contains("Object o1, Object o2, Object o3");
+        assertThat(src).contains("Object o1, Object o2, Object o3, Object o4, Object o5");
+        assertThat(src).doesNotContain("Object o1, Object o2, Object o3, Object o4)");
+    }
+
+    /**
+     * @PermuteFilter with @PermuteVar cross-product: i=2..3, j=1..2.
+     *                Filter "${i} != ${j}" keeps (2,1),(3,1),(3,2) and drops (2,2).
+     *                Template class name "BiJoinx2" contains both literal segments ("BiJoin" and "x") from className.
+     */
+    @Test
+    public void testFilterOnCrossProductSkipsCombination() {
+        Compilation compilation = compile("io.example.BiJoinx2",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteFilter;\n" +
+                        "import io.quarkiverse.permuplate.PermuteVar;\n" +
+                        "@Permute(varName=\"i\", from=\"2\", to=\"3\", className=\"BiJoin${i}x${j}\",\n" +
+                        "         extraVars={@PermuteVar(varName=\"j\", from=\"1\", to=\"2\")})\n" +
+                        "@PermuteFilter(\"${i} != ${j}\")\n" +
+                        "public class BiJoinx2 {}");
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation.generatedSourceFile("io.example.BiJoin2x1").isPresent()).isTrue(); // i=2,j=1 ✓
+        assertThat(compilation.generatedSourceFile("io.example.BiJoin3x1").isPresent()).isTrue(); // i=3,j=1 ✓
+        assertThat(compilation.generatedSourceFile("io.example.BiJoin3x2").isPresent()).isTrue(); // i=3,j=2 ✓
+        assertThat(compilation.generatedSourceFile("io.example.BiJoin2x2").isPresent()).isFalse(); // i=2,j=2 ✗
+    }
+
     // -------------------------------------------------------------------------
     // EvaluationContext.evaluateBoolean() — unit tests
     // -------------------------------------------------------------------------

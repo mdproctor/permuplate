@@ -276,6 +276,20 @@ public class PermuteProcessor extends AbstractProcessor {
         List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(permuteConfig, externalProperties);
         List<Map<String, Object>> filteredCombinations = applyFilters(allCombinations, filterExprs, typeElement);
 
+        if (filteredCombinations.isEmpty()) {
+            AnnotationMirror filterMirror = findAnnotationMirror(typeElement,
+                    "io.quarkiverse.permuplate.PermuteFilter");
+            if (filterMirror == null) {
+                filterMirror = findAnnotationMirror(typeElement,
+                        "io.quarkiverse.permuplate.PermuteFilters");
+            }
+            error("@PermuteFilter eliminates all permutations in the range "
+                    + permuteConfig.from + ".." + permuteConfig.to
+                    + " — at least one combination must pass",
+                    typeElement, filterMirror, null);
+            return;
+        }
+
         for (Map<String, Object> vars : filteredCombinations) {
             generatePermutation(templateCu, typeElement, permute, new EvaluationContext(vars), generatedSet);
         }
@@ -490,7 +504,24 @@ public class PermuteProcessor extends AbstractProcessor {
 
         // Evaluate the output class name using the first combination's context.
         List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(methodConfig, externalProperties);
-        EvaluationContext firstCtx = new EvaluationContext(allCombinations.get(0));
+        List<String> filterExprsM = readFilterExpressions(methodElement);
+        List<Map<String, Object>> filteredCombinations = applyFilters(allCombinations, filterExprsM, methodElement);
+
+        if (filteredCombinations.isEmpty()) {
+            AnnotationMirror filterMirror = findAnnotationMirror(methodElement,
+                    "io.quarkiverse.permuplate.PermuteFilter");
+            if (filterMirror == null) {
+                filterMirror = findAnnotationMirror(methodElement,
+                        "io.quarkiverse.permuplate.PermuteFilters");
+            }
+            error("@PermuteFilter eliminates all permutations in the range "
+                    + methodConfig.from + ".." + methodConfig.to
+                    + " — at least one combination must pass",
+                    methodElement, filterMirror, null);
+            return;
+        }
+
+        EvaluationContext firstCtx = new EvaluationContext(filteredCombinations.get(0));
         String outputClassName;
         try {
             outputClassName = firstCtx.evaluate(permute.className());
@@ -507,7 +538,7 @@ public class PermuteProcessor extends AbstractProcessor {
 
         // Generate one method variant per combination.
         List<MethodDeclaration> methods = new ArrayList<>();
-        for (Map<String, Object> vars : allCombinations) {
+        for (Map<String, Object> vars : filteredCombinations) {
             EvaluationContext ctx = new EvaluationContext(vars);
             MethodDeclaration clone = foundMethod.get().clone();
 
