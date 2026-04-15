@@ -153,6 +153,52 @@ public class PermuteFilterTest {
         assertThat(compilation.generatedSourceFile("io.example.BiJoin2x2").isPresent()).isFalse(); // i=2,j=2 ✗
     }
 
+    /**
+     * When @PermuteFilter removes Join4 from the generated set, @PermuteReturn boundary
+     * omission must treat Join4 as non-existent. Before the fix, buildGeneratedSet()
+     * used the unfiltered combination list, so Join4 was still in the generated set and
+     * Join3.next() was incorrectly generated with return type Join4 (which doesn't exist),
+     * causing a compile error in the user's code.
+     *
+     * Template: NodeT with @PermuteFilter("${i} != 4"), range 3..5.
+     *
+     * @PermuteReturn makes next() return Node${i+1}.
+     *                - Node3.next() would return Node4, but Node4 is filtered out → method must be omitted.
+     *                - Node5.next() would return Node6, which is outside the range → method must be omitted.
+     */
+    @Test
+    public void testFilteredClassTreatedAsAbsentForBoundaryOmission() {
+        Compilation compilation = compile("io.example.NodeT",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteFilter;\n" +
+                        "import io.quarkiverse.permuplate.PermuteReturn;\n" +
+                        "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Node${i}\")\n" +
+                        "@PermuteFilter(\"${i} != 4\")\n" +
+                        "public class NodeT {\n" +
+                        "    @PermuteReturn(className=\"Node${i+1}\")\n" +
+                        "    public Object next() { return null; }\n" +
+                        "    public void other() {}\n" +
+                        "}");
+
+        assertThat(compilation).succeeded();
+        // Node4 must not be generated (filtered out)
+        assertThat(compilation.generatedSourceFile("io.example.Node4").isPresent()).isFalse();
+        // Node3 and Node5 must be generated
+        assertThat(compilation.generatedSourceFile("io.example.Node3").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.example.Node5").isPresent()).isTrue();
+        // Node3.next() would return Node4, which is filtered out → method must be absent
+        String src3 = io.quarkiverse.permuplate.ProcessorTestSupport
+                .sourceOf(compilation.generatedSourceFile("io.example.Node3").get());
+        assertThat(src3).doesNotContain("next(");
+        assertThat(src3).contains("other()");
+        // Node5.next() would return Node6 (outside range) → method must also be absent
+        String src5 = io.quarkiverse.permuplate.ProcessorTestSupport
+                .sourceOf(compilation.generatedSourceFile("io.example.Node5").get());
+        assertThat(src5).doesNotContain("next(");
+        assertThat(src5).contains("other()");
+    }
+
     // -------------------------------------------------------------------------
     // EvaluationContext.evaluateBoolean() — unit tests
     // -------------------------------------------------------------------------

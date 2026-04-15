@@ -122,13 +122,17 @@ public class PermuteProcessor extends AbstractProcessor {
         // Build global generated-names set across all @Permute templates in this round.
         // Used by implicit return type inference (applyPermuteReturn) to find cross-template
         // generated class names for boundary omission decisions.
+        // Filters are applied here so that filtered-out classes are absent from the set —
+        // otherwise @PermuteReturn boundary omission would not omit methods that reference
+        // a class that @PermuteFilter has removed from generation.
         globalGeneratedNames = new java.util.HashSet<>();
         for (Element elem : annotated) {
             if (elem instanceof TypeElement) {
                 Permute p = ((TypeElement) elem).getAnnotation(Permute.class);
                 if (p != null) {
                     try {
-                        globalGeneratedNames.addAll(buildGeneratedSet(p));
+                        List<String> elemFilterExprs = readFilterExpressions(elem);
+                        globalGeneratedNames.addAll(buildGeneratedSet(p, elem, elemFilterExprs));
                     } catch (Exception ignored) {
                         // If generation fails during global set building (e.g. malformed strings),
                         // skip it — the proper error will be reported in processTypePermutation
@@ -270,9 +274,11 @@ public class PermuteProcessor extends AbstractProcessor {
                 return;
         }
 
-        // Build generated set once for boundary omission in @PermuteReturn
-        Set<String> generatedSet = buildGeneratedSet(permute);
+        // Read filter expressions before building the generated set so that filtered-out
+        // classes are absent from the set used by @PermuteReturn boundary omission.
         List<String> filterExprs = readFilterExpressions(typeElement);
+        // Build generated set once for boundary omission in @PermuteReturn
+        Set<String> generatedSet = buildGeneratedSet(permute, typeElement, filterExprs);
         List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(permuteConfig, externalProperties);
         List<Map<String, Object>> filteredCombinations = applyFilters(allCombinations, filterExprs, typeElement);
 
@@ -295,10 +301,19 @@ public class PermuteProcessor extends AbstractProcessor {
         }
     }
 
-    /** Computes the full set of class names that this @Permute annotation will generate. */
-    private Set<String> buildGeneratedSet(Permute permute) {
+    /**
+     * Computes the set of class names that this @Permute annotation will actually generate,
+     * after applying any @PermuteFilter expressions. Filtered-out combinations are excluded
+     * so that @PermuteReturn boundary omission treats them as non-existent.
+     */
+    private Set<String> buildGeneratedSet(Permute permute, Element element, List<String> filterExprs) {
         Set<String> names = new HashSet<>();
-        for (Map<String, Object> vars : PermuteConfig.buildAllCombinations(PermuteConfig.from(permute), externalProperties)) {
+        List<Map<String, Object>> combinations = PermuteConfig.buildAllCombinations(PermuteConfig.from(permute),
+                externalProperties);
+        if (!filterExprs.isEmpty()) {
+            combinations = applyFilters(combinations, filterExprs, element);
+        }
+        for (Map<String, Object> vars : combinations) {
             try {
                 names.add(new EvaluationContext(vars).evaluate(permute.className()));
             } catch (Exception ignored) {
