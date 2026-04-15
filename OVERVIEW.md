@@ -47,6 +47,8 @@ public @interface Permute {
              default {};
     PermuteVar[] extraVars()     // additional integer axes for cross-product generation
              default {};
+    String[] values()            // alternative to from/to: named string set to iterate
+             default {};
     boolean  inline()            // default false — inline into parent class (Maven plugin only)
              default false;
     boolean  keepTemplate()      // default false — retain template class in inline output
@@ -55,6 +57,8 @@ public @interface Permute {
 ```
 
 **`from` and `to` are JEXL expression strings**, not `int` literals. Plain integers (`"3"`), arithmetic (`"${max - 1}"`), and variable references (`"${max}"`) are all valid. Named constants are resolved from system properties, APT options, or annotation `strings` — see [External Property Injection](#external-property-injection).
+
+**String-set iteration:** `values` is an alternative to `from`/`to`. When present, `varName` is bound to each string in turn instead of an integer. `values` and `from`/`to` are mutually exclusive — the APT processor reports a compile error if both are specified, or if `values={}` is empty. The loop variable is bound as `String` (not `Integer`) in JEXL context.
 
 **Type permutation:** `className` is evaluated per-combination to name each generated file. The **leading literal** of `className` (everything before the first `${`) must be a prefix of the template type's simple name. Using only the leading literal (rather than all literal segments) correctly handles multi-variable class names: `"Combo${i}x${k}"` has leading literal `"Combo"`, not `"Combox"`. If `className` starts with a `${...}` expression, the prefix check is skipped entirely.
 
@@ -228,6 +232,27 @@ Explicit override of the extends or implements clause. Inline mode (Maven plugin
 The automatic expansion logic (`applyExtendsExpansion`) uses name-prefix family matching + embedded number match to detect sibling classes. Two detection branches:
 1. All-T+number type args → hardcodes `T1..TN`
 2. Extends type args are a prefix of post-G1 type params → uses full post-G1 list (supports alpha naming when `@PermuteTypeParam` has fired)
+
+### `@PermuteFilter`
+
+```java
+@Repeatable(PermuteFilters.class)
+@Retention(RetentionPolicy.SOURCE)
+@Target({ ElementType.TYPE, ElementType.METHOD })
+public @interface PermuteFilter {
+    String value();  // JEXL boolean expression; combination skipped when false
+}
+```
+
+Placed on a `@Permute`-annotated class or method. Evaluated once per permutation combination after cross-product expansion. A combination is skipped if any filter returns `false`. Multiple `@PermuteFilter` conditions are ANDed.
+
+**APT vs Maven plugin:** The APT processor reports a compile error if all combinations are filtered out (`@PermuteFilter` makes the range empty). The Maven plugin silently produces no output in that case — it has no `Messager`.
+
+**With `@PermuteVar` cross-products:** each combination (i, j, ...) is evaluated independently. The filter expression has access to all loop variables.
+
+**`@PermuteMethod` inner variables not available:** `@PermuteMethod` creates an inner loop variable `j`. This variable is NOT available to `@PermuteFilter` because `PermuteDeclrTransformer` runs in the outer context after `PermuteMethodTransformer` has already consumed those overloads. Filters only see outer `@Permute` and `@PermuteVar` variables.
+
+**`buildGeneratedSet` is filter-aware:** when `@PermuteFilter` excludes a class, that class is also absent from the set used by `@PermuteReturn` boundary omission. Methods that would reference the filtered-out class are correctly omitted.
 
 ---
 

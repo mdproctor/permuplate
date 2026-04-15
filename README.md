@@ -435,6 +435,29 @@ Drives the outer loop. Supported in two positions:
 | `inline` | `boolean` | Default `false`. When `true`, generates permuted classes as nested siblings inside the parent class rather than separate top-level files. Only valid on nested static classes. Requires `permuplate-maven-plugin`; the APT annotation processor reports a compile error if set. Template must be in `src/main/permuplate/`. |
 | `keepTemplate` | `boolean` | Default `false`. When `true` and `inline = true`, retains the template class itself in the output alongside the permuted classes. When `false`, the template class is removed. Has no effect when `inline = false`. |
 
+### `values` — string-set iteration (alternative to `from`/`to`)
+
+Instead of an integer range, iterate over a named set of strings. Mutually exclusive with `from`/`to`.
+
+```java
+@Permute(varName = "F", values = {"Json", "Xml", "Csv", "Yaml"}, className = "${F}Serializer")
+public class JsonSerializer {
+
+    @PermuteConst("${F}")
+    public static final String FORMAT = "Json";
+
+    public String serialize(Object obj) {
+        return FORMAT + ":" + obj;
+    }
+}
+// Generates: JsonSerializer (FORMAT="Json"), XmlSerializer (FORMAT="Xml"),
+//            CsvSerializer (FORMAT="Csv"), YamlSerializer (FORMAT="Yaml")
+```
+
+The loop variable is bound as a `String` (not `Integer`), so `${F}` in any JEXL expression evaluates to the current string value. Use `@PermuteDeclr(type="${F}")` to rename field/parameter types, `@PermuteConst("${F}")` to replace string constants, and `className="${F}..."` to name the generated classes.
+
+`values` and `from`/`to` are mutually exclusive — specifying both is a compile error. An empty `values={}` is also a compile error.
+
 **`className` prefix rule (type permutation only):** the static (non-`${...}`) part of `className` must be a prefix of the template class's simple name. `className = "Join${i}"` on `class Join2` is valid; `className = "Bar${i}"` on `class Join2` is a compile error. This rule does not apply when `className` starts with a variable expression or to method-level `@Permute`.
 
 **Inline generation example:**
@@ -772,6 +795,36 @@ When `@PermuteExtends` is present, the automatic same-N extends expansion is ski
 public class Join1First<T1> extends Join1Second<T1> { ... }
 // Join3First extends Join3Second<T1, T2, T3>
 ```
+
+---
+
+### `@PermuteFilter`
+
+Skips generation of a permutation when a JEXL boolean expression evaluates to `false`. Placed on the same class (or method) as `@Permute`. Repeatable — multiple conditions are ANDed.
+
+```java
+@Permute(varName = "i", from = "3", to = "7", className = "FilteredCallable${i}")
+@PermuteFilter("${i} != 4")  // arity 4 is hand-written elsewhere — skip it
+public interface FilteredCallable2 {
+
+    void call(
+            @PermuteParam(varName = "j", from = "1", to = "${i}", type = "Object", name = "o${j}")
+            Object o1);
+}
+// Generates: FilteredCallable3, FilteredCallable5, FilteredCallable6, FilteredCallable7
+// (arity 4 is excluded)
+```
+
+Multiple filters are ANDed:
+
+```java
+@PermuteFilter("${i} != 1")   // skip the singleton case
+@PermuteFilter("${i} != 10")  // skip the maximum case (reserved)
+```
+
+The APT processor reports a compile error if all values in the range are filtered out. The Maven plugin silently produces no output in that case.
+
+Works with `@PermuteVar` cross-products — each combination (i, j, ...) is evaluated independently.
 
 ---
 
