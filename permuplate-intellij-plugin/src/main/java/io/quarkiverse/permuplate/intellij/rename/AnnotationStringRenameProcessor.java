@@ -19,7 +19,10 @@ import com.intellij.usageView.UsageInfo;
 import io.quarkiverse.permuplate.ide.AnnotationStringAlgorithm;
 import io.quarkiverse.permuplate.ide.AnnotationStringTemplate;
 import io.quarkiverse.permuplate.ide.RenameResult;
+import com.intellij.psi.search.GlobalSearchScope;
 import io.quarkiverse.permuplate.intellij.index.PermuteElementResolver;
+import io.quarkiverse.permuplate.intellij.index.PermuteFileDetector;
+import io.quarkiverse.permuplate.intellij.index.PermuteTemplateData;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -139,6 +142,9 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
         }
 
         pendingUpdates.get().addAll(updates);
+
+        // Propagate rename to corresponding elements in all generated sibling classes
+        addGeneratedFamilyRenames(element, newName, allRenames);
     }
 
     @Override
@@ -303,6 +309,69 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
                             pointerManager.createSmartPsiElementPointer(lit);
                     disambigCases.add(Pair.create(pointer, disambiguation));
                 }
+            }
+        }
+    }
+
+    /**
+     * When renaming a method or field in a Permuplate template class, adds the corresponding
+     * element from every generated sibling class to allRenames. IntelliJ then renames all of
+     * them and updates all their call sites atomically in one undo step.
+     *
+     * Skips @PermuteMethod sentinel methods — their generated names are controlled by the
+     * name attribute string (handled by annotation string update), not the sentinel name.
+     * Skips generated classes that don't contain the named element (boundary omission).
+     */
+    private void addGeneratedFamilyRenames(@NotNull PsiElement element,
+                                            @NotNull String newName,
+                                            @NotNull Map<PsiElement, String> allRenames) {
+        if (!(element instanceof PsiMethod) && !(element instanceof PsiField)) return;
+
+        PsiClass containingClass = element instanceof PsiMember m ? m.getContainingClass() : null;
+        if (containingClass == null) return;
+
+        if (!PermuteFileDetector.isTemplate(containingClass)) return;
+
+        // Skip @PermuteMethod sentinel methods
+        if (element instanceof PsiMethod method) {
+            for (PsiAnnotation ann : method.getModifierList().getAnnotations()) {
+                String fqn = ann.getQualifiedName();
+                if ("io.quarkiverse.permuplate.PermuteMethod".equals(fqn)
+                        || (fqn != null && !fqn.contains(".") && "PermuteMethod".equals(fqn))) {
+                    return;
+                }
+            }
+        }
+
+        String templateName = containingClass.getName();
+        if (templateName == null) return;
+
+        PermuteTemplateData data = PermuteFileDetector.templateDataFor(
+                templateName, element.getProject());
+        if (data == null || data.generatedNames.isEmpty()) return;
+
+        PsiFile containingFile = containingClass.getContainingFile();
+        if (!(containingFile instanceof PsiJavaFile javaFile)) return;
+        String pkg = javaFile.getPackageName();
+
+        Project project = element.getProject();
+        GlobalSearchScope scope = GlobalSearchScope.allScope(project);
+        if (!(element instanceof PsiNamedElement named)) return;
+        String elementName = named.getName();
+        if (elementName == null) return;
+
+        for (String generatedSimpleName : data.generatedNames) {
+            String fqn = pkg.isEmpty() ? generatedSimpleName : pkg + "." + generatedSimpleName;
+            PsiClass generatedClass = JavaPsiFacade.getInstance(project).findClass(fqn, scope);
+            if (generatedClass == null) continue;
+
+            if (element instanceof PsiMethod) {
+                for (PsiMethod m : generatedClass.findMethodsByName(elementName, false)) {
+                    allRenames.put(m, newName);
+                }
+            } else {
+                PsiField f = generatedClass.findFieldByName(elementName, false);
+                if (f != null) allRenames.put(f, newName);
             }
         }
     }

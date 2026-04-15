@@ -7,8 +7,11 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiManager;
+import com.intellij.psi.PsiMethod;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+
+import java.util.Map;
 
 public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
 
@@ -323,6 +326,57 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
                 otherText.contains("type=\"Merge${i}\""));
         assertFalse("Old cross-file annotation string must not remain",
                 otherText.contains("\"Join${i}\""));
+    }
+
+    // =========================================================================
+    // Generated family rename propagation — addGeneratedFamilyRenames()
+    // =========================================================================
+
+    public void testMethodRenameInTemplateAddsGeneratedSiblingsToAllRenames() {
+        // Template: Join2 with @Permute generating Join3 and Join4
+        myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"4\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    public void join() {}\n" +
+                "}");
+
+        // Generated siblings (plain source files so JavaPsiFacade can find them by FQN)
+        myFixture.addFileToProject("Join3.java",
+                "package io.example;\n" +
+                "public class Join3 {\n" +
+                "    public void join() {}\n" +
+                "}");
+        myFixture.addFileToProject("Join4.java",
+                "package io.example;\n" +
+                "public class Join4 {\n" +
+                "    public void join() {}\n" +
+                "}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join2);
+        PsiMethod joinMethod = join2.findMethodsByName("join", false)[0];
+
+        AnnotationStringRenameProcessor processor = new AnnotationStringRenameProcessor();
+        Map<PsiElement, String> allRenames = new java.util.HashMap<>();
+        processor.prepareRenaming(joinMethod, "combine",
+                allRenames, GlobalSearchScope.allScope(getProject()));
+
+        PsiClass join3 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join3", GlobalSearchScope.allScope(getProject()));
+        PsiClass join4 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join4", GlobalSearchScope.allScope(getProject()));
+        assertNotNull("Join3 must be resolvable", join3);
+        assertNotNull("Join4 must be resolvable", join4);
+        PsiMethod join3Method = join3.findMethodsByName("join", false)[0];
+        PsiMethod join4Method = join4.findMethodsByName("join", false)[0];
+
+        assertTrue("Join3.join() must be in allRenames", allRenames.containsKey(join3Method));
+        assertEquals("combine", allRenames.get(join3Method));
+        assertTrue("Join4.join() must be in allRenames", allRenames.containsKey(join4Method));
+        assertEquals("combine", allRenames.get(join4Method));
     }
 
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
