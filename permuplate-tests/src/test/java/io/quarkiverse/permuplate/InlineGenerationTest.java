@@ -266,6 +266,40 @@ public class InlineGenerationTest {
     }
 
     // -------------------------------------------------------------------------
+    // @PermuteFilter in inline mode — skip filtered combinations
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testPermuteFilterSkipsValueInInlineMode() throws Exception {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                package io.example;
+                import io.quarkiverse.permuplate.Permute;
+                import io.quarkiverse.permuplate.PermuteFilter;
+                public class JoinBuilder {
+                    @Permute(varName="i", from="3", to="5", className="Join${i}Second",
+                             inline=true, keepTemplate=false)
+                    @PermuteFilter("${i} != 4")
+                    public static class Join0Second {}
+                }
+                """);
+
+        ClassOrInterfaceDeclaration template = cu.findFirst(
+                ClassOrInterfaceDeclaration.class,
+                c -> c.getNameAsString().equals("Join0Second")).orElseThrow();
+
+        com.github.javaparser.ast.expr.AnnotationExpr permuteAnn = template.getAnnotationByName("Permute").orElseThrow();
+        PermuteConfig config = AnnotationReader.readPermute(permuteAnn);
+        List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
+
+        CompilationUnit result = InlineGenerator.generate(cu, template, config, allCombinations);
+
+        String output = result.toString();
+        assertThat(output).contains("Join3Second");
+        assertThat(output).contains("Join5Second");
+        assertThat(output).doesNotContain("Join4Second");
+    }
+
+    // -------------------------------------------------------------------------
     // AnnotationReader: reads @Permute values from JavaParser AST
     // -------------------------------------------------------------------------
 

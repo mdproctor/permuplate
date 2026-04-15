@@ -89,8 +89,29 @@ public class InlineGenerator {
         // Build complete generated class set for boundary omission
         Set<String> allGeneratedNames = scanAllGeneratedClassNames(parentCu, config);
 
+        // Apply @PermuteFilter — drop combinations where any filter returns false
+        List<String> filterExprs = readFilterExpressions(templateClassDecl);
+        final List<Map<String, Object>> filteredCombinations;
+        if (filterExprs.isEmpty()) {
+            filteredCombinations = allCombinations;
+        } else {
+            filteredCombinations = allCombinations.stream().filter(vars -> {
+                EvaluationContext filterCtx = new EvaluationContext(vars);
+                for (String expr : filterExprs) {
+                    try {
+                        if (!filterCtx.evaluateBoolean(expr))
+                            return false;
+                    } catch (Exception e) {
+                        System.err.println("[Permuplate] @PermuteFilter expression error (combination kept): "
+                                + expr + " — " + e.getMessage());
+                    }
+                }
+                return true;
+            }).collect(java.util.stream.Collectors.toList());
+        }
+
         // Generate and append each permuted nested class
-        for (Map<String, Object> vars : allCombinations) {
+        for (Map<String, Object> vars : filteredCombinations) {
             EvaluationContext ctx = new EvaluationContext(vars);
 
             ClassOrInterfaceDeclaration generated = templateClassDecl.clone();
@@ -162,10 +183,12 @@ public class InlineGenerator {
                 }
             }
 
-            // Strip @Permute
+            // Strip @Permute, @PermuteFilter, @PermuteFilters
             generated.getAnnotations().removeIf(a -> {
                 String n = a.getNameAsString();
-                return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute");
+                return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute")
+                        || n.equals("PermuteFilter") || n.equals("io.quarkiverse.permuplate.PermuteFilter")
+                        || n.equals("PermuteFilters") || n.equals("io.quarkiverse.permuplate.PermuteFilters");
             });
 
             outputParent.addMember(generated);
@@ -1073,6 +1096,57 @@ public class InlineGenerator {
         if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr n) {
             return n.getPairs().stream().filter(p -> p.getNameAsString().equals("value")).findFirst()
                     .map(p -> PermuteDeclrTransformer.stripQuotes(p.getValue().toString()));
+        }
+        return java.util.Optional.empty();
+    }
+
+    /**
+     * Reads all {@code @PermuteFilter} expression strings from the template class's annotations.
+     * Handles both the single {@code @PermuteFilter} and the {@code @PermuteFilters} container.
+     */
+    private static List<String> readFilterExpressions(
+            ClassOrInterfaceDeclaration templateClass) {
+        List<String> result = new ArrayList<>();
+        for (com.github.javaparser.ast.expr.AnnotationExpr ann : templateClass.getAnnotations()) {
+            String name = ann.getNameAsString();
+            if ("PermuteFilter".equals(name) || "io.quarkiverse.permuplate.PermuteFilter".equals(name)) {
+                extractFilterValue(ann).ifPresent(result::add);
+            } else if ("PermuteFilters".equals(name) || "io.quarkiverse.permuplate.PermuteFilters".equals(name)) {
+                if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normal) {
+                    normal.getPairs().stream()
+                            .filter(p -> "value".equals(p.getNameAsString()))
+                            .findFirst()
+                            .ifPresent(p -> {
+                                com.github.javaparser.ast.expr.Expression val = p.getValue();
+                                List<com.github.javaparser.ast.expr.Expression> elems = val instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr
+                                        ? arr.getValues()
+                                        : List.of(val);
+                                elems.forEach(e -> extractFilterValue(e).ifPresent(result::add));
+                            });
+                }
+            }
+        }
+        return result;
+    }
+
+    private static java.util.Optional<String> extractFilterValue(
+            com.github.javaparser.ast.Node node) {
+        if (node instanceof com.github.javaparser.ast.expr.SingleMemberAnnotationExpr single) {
+            String raw = single.getMemberValue().toString();
+            if (raw.startsWith("\"") && raw.endsWith("\"")) {
+                return java.util.Optional.of(raw.substring(1, raw.length() - 1));
+            }
+        } else if (node instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normal) {
+            return normal.getPairs().stream()
+                    .filter(p -> "value".equals(p.getNameAsString()))
+                    .findFirst()
+                    .map(p -> {
+                        String raw = p.getValue().toString();
+                        return (raw.startsWith("\"") && raw.endsWith("\""))
+                                ? raw.substring(1, raw.length() - 1)
+                                : null;
+                    })
+                    .filter(s -> s != null);
         }
         return java.util.Optional.empty();
     }
