@@ -525,6 +525,44 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
         }
     }
 
+    public void testEndToEndMethodRenameUpdatesGeneratedFileAndCallSite() {
+        // Template: Join2 generating only Join3 (from=3, to=3)
+        PsiFile templateFile = myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"3\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    public void join() {}\n" +
+                "}");
+
+        // Generated sibling
+        PsiFile generatedFile = myFixture.addFileToProject("Join3.java",
+                "package io.example;\n" +
+                "public class Join3 {\n" +
+                "    public void join() {}\n" +
+                "}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join2);
+        PsiMethod joinMethod = join2.findMethodsByName("join", false)[0];
+
+        // Full rename via fixture — invokes the complete pipeline
+        myFixture.renameElement(joinMethod, "combine");
+
+        // Template method renamed
+        assertTrue("Template method must be renamed to combine",
+                templateFile.getText().contains("public void combine()"));
+        assertFalse("Old method name must not remain in template",
+                templateFile.getText().contains("public void join()"));
+
+        // Generated sibling method renamed atomically
+        assertTrue("Join3.join() must be renamed to combine",
+                generatedFile.getText().contains("public void combine()"));
+        assertFalse("Old method name must not remain in Join3",
+                generatedFile.getText().contains("public void join()"));
+    }
+
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
         com.intellij.openapi.vfs.VirtualFile generatedFile =
                 myFixture.getTempDirFixture().createFile(
