@@ -28,7 +28,7 @@ import com.github.javaparser.ast.type.TypeParameter;
  * convention.
  *
  * <p>
- * Transformation is done in-place on the cloned {@link ClassOrInterfaceDeclaration}.
+ * Transformation is done in-place on the cloned {@link TypeDeclaration} (class, interface, or record).
  * This transformer runs <em>before</em> {@link PermuteDeclrTransformer} and
  * {@link PermuteParamTransformer} in the pipeline.
  *
