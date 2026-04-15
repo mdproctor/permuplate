@@ -10,9 +10,10 @@ import javax.tools.Diagnostic;
 
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
-import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.RecordDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.stmt.Statement;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
@@ -77,6 +78,11 @@ public class PermuteParamTransformer {
                 transformConstructor(constructor, sentinel, ctx, messager);
             }
         });
+
+        // Record components — @PermuteParam on RecordDeclaration.getParameters()
+        if (classDecl instanceof RecordDeclaration rec) {
+            transformRecordComponents(rec, ctx, messager);
+        }
     }
 
     private static Parameter findNextSentinel(MethodDeclaration method) {
@@ -137,6 +143,71 @@ public class PermuteParamTransformer {
             allParams.add(origParams.get(k).clone());
         }
         constructor.setParameters(allParams);
+    }
+
+    /**
+     * Processes {@code @PermuteParam} on record components ({@link RecordDeclaration#getParameters()}).
+     * Expands the sentinel component into the generated sequence, then expands anchor call sites
+     * in all constructor bodies and method bodies within the record.
+     */
+    private static void transformRecordComponents(
+            RecordDeclaration rec,
+            EvaluationContext ctx,
+            Messager messager) {
+        Parameter sentinel;
+        while ((sentinel = findNextRecordComponentSentinel(rec)) != null) {
+            AnnotationExpr ann = getPermuteParam(sentinel.getAnnotations());
+            PermuteParamValues values = extractValues(ann, messager);
+            if (values == null)
+                return;
+
+            String anchorName = sentinel.getNameAsString();
+
+            // Evaluate inner range using outer context
+            int fromVal = ctx.evaluateInt(values.from);
+            int toVal = ctx.evaluateInt(values.to);
+
+            // Build expanded component list and record generated names for anchor expansion
+            NodeList<Parameter> newParams = new NodeList<>();
+            List<String> generatedArgNames = new ArrayList<>();
+            for (int j = fromVal; j <= toVal; j++) {
+                EvaluationContext innerCtx = ctx.withVariable(values.varName, j);
+                String paramType = innerCtx.evaluate(values.type);
+                String paramName = innerCtx.evaluate(values.name);
+                newParams.add(new Parameter(new ClassOrInterfaceType(null, paramType), paramName));
+                generatedArgNames.add(paramName);
+            }
+
+            // Preserve components before and after the sentinel
+            NodeList<Parameter> origParams = rec.getParameters();
+            int sentinelIdx = origParams.indexOf(sentinel);
+
+            NodeList<Parameter> allParams = new NodeList<>();
+            for (int k = 0; k < sentinelIdx; k++) {
+                allParams.add(origParams.get(k).clone());
+            }
+            allParams.addAll(newParams);
+            for (int k = sentinelIdx + 1; k < origParams.size(); k++) {
+                allParams.add(origParams.get(k).clone());
+            }
+            rec.setParameters(allParams);
+
+            // Expand anchor call sites in constructor bodies
+            rec.getConstructors().forEach(ctor -> expandAnchorInStatement(ctor.getBody(), anchorName, generatedArgNames));
+
+            // Expand anchor call sites in method bodies
+            rec.getMethods().forEach(
+                    method -> method.getBody().ifPresent(body -> expandAnchorInStatement(body, anchorName, generatedArgNames)));
+        }
+    }
+
+    private static Parameter findNextRecordComponentSentinel(RecordDeclaration rec) {
+        for (Parameter p : rec.getParameters()) {
+            if (hasPermuteParam(p.getAnnotations())) {
+                return p;
+            }
+        }
+        return null;
     }
 
     private static void transformMethod(MethodDeclaration method,
@@ -397,6 +468,31 @@ public class PermuteParamTransformer {
                         }
                     });
         });
+
+        // Validate record components with @PermuteParam
+        if (classDecl instanceof RecordDeclaration rec) {
+            rec.getParameters().stream()
+                    .filter(p -> hasPermuteParam(p.getAnnotations()))
+                    .forEach(sentinel -> {
+                        AnnotationExpr ann = getPermuteParam(sentinel.getAnnotations());
+                        PermuteParamValues values = extractValues(ann, messager);
+                        if (values == null) {
+                            valid[0] = false;
+                            return;
+                        }
+                        String actualName = sentinel.getNameAsString();
+                        // Pure-variable names like "${lower(j)}" or "${alpha(j)}" generate
+                        // fresh component names unrelated to the sentinel — no prefix matching
+                        // applies. Only validate when the template has at least one literal.
+                        boolean hasliteral = !values.name.replaceAll("\\$\\{[^}]*}", "").isEmpty();
+                        if (hasliteral && !PermuteDeclrTransformer.checkAnnotationString(
+                                "@PermuteParam name", values.name, "sentinel component name",
+                                actualName, messager, element, stringConstants)) {
+                            valid[0] = false;
+                        }
+                    });
+        }
+
         return valid[0];
     }
 
