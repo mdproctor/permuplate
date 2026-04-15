@@ -9,8 +9,8 @@ import javax.lang.model.element.Element;
 import javax.tools.Diagnostic;
 
 import com.github.javaparser.ast.NodeList;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.*;
@@ -48,7 +48,7 @@ public class PermuteParamTransformer {
     private static final String ANNOTATION_SIMPLE = "PermuteParam";
     private static final String ANNOTATION_FQ = "io.quarkiverse.permuplate.PermuteParam";
 
-    public static void transform(ClassOrInterfaceDeclaration classDecl,
+    public static void transform(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager) {
         classDecl.findAll(MethodDeclaration.class).forEach(method -> {
@@ -371,7 +371,7 @@ public class PermuteParamTransformer {
      *        expand any string-constant variables before validation
      * @return {@code true} if all constraints are satisfied
      */
-    public static boolean validatePrefixes(ClassOrInterfaceDeclaration classDecl, Messager messager,
+    public static boolean validatePrefixes(TypeDeclaration<?> classDecl, Messager messager,
             Element element, Map<String, String> stringConstants) {
         boolean[] valid = { true };
         classDecl.findAll(MethodDeclaration.class).forEach(method -> {

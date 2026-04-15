@@ -4,8 +4,8 @@ import java.util.Optional;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.NodeList;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.IntegerLiteralExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
@@ -28,7 +28,7 @@ public class PermuteCaseTransformer {
     private static final String ANNOTATION_SIMPLE = "PermuteCase";
     private static final String ANNOTATION_FQ = "io.quarkiverse.permuplate.PermuteCase";
 
-    public static void transform(ClassOrInterfaceDeclaration classDecl, EvaluationContext ctx) {
+    public static void transform(TypeDeclaration<?> classDecl, EvaluationContext ctx) {
         classDecl.findAll(MethodDeclaration.class).forEach(method -> {
             Optional<AnnotationExpr> annOpt = method.getAnnotations().stream()
                     .filter(PermuteCaseTransformer::isPermuteCase)

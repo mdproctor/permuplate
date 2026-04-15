@@ -2,8 +2,8 @@ package io.quarkiverse.permuplate.core;
 
 import java.util.Optional;
 
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.AssignExpr;
@@ -28,7 +28,7 @@ public class PermuteValueTransformer {
     private static final String SIMPLE = "PermuteValue";
     private static final String FQ = "io.quarkiverse.permuplate.PermuteValue";
 
-    public static void transform(ClassOrInterfaceDeclaration classDecl, EvaluationContext ctx) {
+    public static void transform(TypeDeclaration<?> classDecl, EvaluationContext ctx) {
         // --- Fields ---
         classDecl.getFields().forEach(field -> field.getAnnotations().stream()
                 .filter(PermuteValueTransformer::isPermuteValue)

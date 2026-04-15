@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 import com.github.javaparser.StaticJavaParser;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
@@ -30,7 +30,7 @@ public class PermuteStatementsTransformer {
     private static final String SIMPLE = "PermuteStatements";
     private static final String FQ = "io.quarkiverse.permuplate.PermuteStatements";
 
-    public static void transform(ClassOrInterfaceDeclaration classDecl, EvaluationContext ctx) {
+    public static void transform(TypeDeclaration<?> classDecl, EvaluationContext ctx) {
         classDecl.findAll(MethodDeclaration.class).forEach(method -> {
             Optional<AnnotationExpr> annOpt = method.getAnnotations().stream()
                     .filter(PermuteStatementsTransformer::isPermuteStatements)

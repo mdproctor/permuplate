@@ -11,8 +11,8 @@ import javax.tools.Diagnostic;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.VariableDeclarator;
@@ -59,7 +59,7 @@ public class PermuteDeclrTransformer {
     private static final String CONST_ANNOTATION_SIMPLE = "PermuteConst";
     private static final String CONST_ANNOTATION_FQ = "io.quarkiverse.permuplate.PermuteConst";
 
-    public static void transform(ClassOrInterfaceDeclaration classDecl,
+    public static void transform(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager) {
         // Fields first (broadest scope — entire class body)
@@ -82,7 +82,7 @@ public class PermuteDeclrTransformer {
     // Field declarations
     // -------------------------------------------------------------------------
 
-    private static void transformFields(ClassOrInterfaceDeclaration classDecl,
+    private static void transformFields(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager) {
         // Collect annotated fields snapshot (avoid ConcurrentModification)
@@ -124,7 +124,7 @@ public class PermuteDeclrTransformer {
     // @PermuteConst — field initializer substitution
     // -------------------------------------------------------------------------
 
-    private static void transformConstFields(ClassOrInterfaceDeclaration classDecl,
+    private static void transformConstFields(TypeDeclaration<?> classDecl,
             EvaluationContext ctx) {
         classDecl.getFields().forEach(field -> {
             field.getAnnotations().stream()
@@ -140,7 +140,7 @@ public class PermuteDeclrTransformer {
         });
     }
 
-    private static void transformConstLocals(ClassOrInterfaceDeclaration classDecl,
+    private static void transformConstLocals(TypeDeclaration<?> classDecl,
             EvaluationContext ctx) {
         // Walk all method and constructor bodies looking for annotated local variable declarations.
         // VariableDeclarationExpr covers local vars in method bodies; skip for-each variables
@@ -182,7 +182,7 @@ public class PermuteDeclrTransformer {
      * // Generated for i=3: new Join4First<>(end(), rule)
      * }</pre>
      */
-    private static void transformNewExpressions(ClassOrInterfaceDeclaration classDecl,
+    private static void transformNewExpressions(TypeDeclaration<?> classDecl,
             EvaluationContext ctx) {
         classDecl.walk(com.github.javaparser.ast.expr.ObjectCreationExpr.class, newExpr -> {
             com.github.javaparser.ast.type.ClassOrInterfaceType type = newExpr.getType();
@@ -239,7 +239,7 @@ public class PermuteDeclrTransformer {
     // Constructor parameters
     // -------------------------------------------------------------------------
 
-    private static void transformConstructorParams(ClassOrInterfaceDeclaration classDecl,
+    private static void transformConstructorParams(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager) {
         classDecl.getConstructors().forEach(constructor -> {
@@ -277,7 +277,7 @@ public class PermuteDeclrTransformer {
     // For-each loop variables
     // -------------------------------------------------------------------------
 
-    private static void transformForEachVars(ClassOrInterfaceDeclaration classDecl,
+    private static void transformForEachVars(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager) {
         // Walk the class to find all ForEachStmt nodes whose variable is annotated.
@@ -314,7 +314,7 @@ public class PermuteDeclrTransformer {
     // Method parameters (G2a)
     // -------------------------------------------------------------------------
 
-    private static void transformMethodParams(ClassOrInterfaceDeclaration classDecl,
+    private static void transformMethodParams(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager) {
         classDecl.getMethods().forEach(method -> {
@@ -464,7 +464,7 @@ public class PermuteDeclrTransformer {
      *        expand any string-constant variables before validation
      * @return {@code true} if all constraints are satisfied
      */
-    public static boolean validatePrefixes(ClassOrInterfaceDeclaration classDecl, Messager messager,
+    public static boolean validatePrefixes(TypeDeclaration<?> classDecl, Messager messager,
             Element element, Map<String, String> stringConstants) {
         boolean[] valid = { true };
 

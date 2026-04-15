@@ -13,8 +13,8 @@ import javax.tools.Diagnostic;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.NodeList;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
@@ -58,7 +58,7 @@ public class PermuteTypeParamTransformer {
      * @param element the annotated element for error location; {@code null} in Maven plugin mode
      * @return names of the sentinel type parameters that were expanded
      */
-    public static Set<String> transform(ClassOrInterfaceDeclaration classDecl,
+    public static Set<String> transform(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager,
             Element element) {
@@ -76,7 +76,7 @@ public class PermuteTypeParamTransformer {
      *        methods whose return type base class is in this set are excluded from R1 validation
      * @return names of the sentinel type parameters that were expanded
      */
-    public static Set<String> transform(ClassOrInterfaceDeclaration classDecl,
+    public static Set<String> transform(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager,
             Element element,
@@ -312,7 +312,7 @@ public class PermuteTypeParamTransformer {
     // Detection (dry run — finds which type params will expand for R1 check)
     // -------------------------------------------------------------------------
 
-    private static Set<String> detectExpansions(ClassOrInterfaceDeclaration classDecl,
+    private static Set<String> detectExpansions(TypeDeclaration<?> classDecl,
             EvaluationContext ctx) {
         Set<String> sentinels = new HashSet<>();
 
@@ -343,14 +343,14 @@ public class PermuteTypeParamTransformer {
     // R1 validation — return type must not reference expanding type params
     // -------------------------------------------------------------------------
 
-    private static void validateR1(ClassOrInterfaceDeclaration classDecl,
+    private static void validateR1(TypeDeclaration<?> classDecl,
             Set<String> expandingSentinels,
             Messager messager,
             Element element) {
         validateR1(classDecl, expandingSentinels, messager, element, java.util.Collections.emptySet());
     }
 
-    private static void validateR1(ClassOrInterfaceDeclaration classDecl,
+    private static void validateR1(TypeDeclaration<?> classDecl,
             Set<String> expandingSentinels,
             Messager messager,
             Element element,
@@ -415,7 +415,7 @@ public class PermuteTypeParamTransformer {
     // Explicit expansion — @PermuteTypeParam on a type parameter
     // -------------------------------------------------------------------------
 
-    private static Set<String> expandExplicit(ClassOrInterfaceDeclaration classDecl,
+    private static Set<String> expandExplicit(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager,
             Element element) {
@@ -490,7 +490,7 @@ public class PermuteTypeParamTransformer {
     // Implicit expansion — triggered by @PermuteParam with type="T${j}"
     // -------------------------------------------------------------------------
 
-    private static Set<String> expandImplicit(ClassOrInterfaceDeclaration classDecl,
+    private static Set<String> expandImplicit(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Set<String> alreadyExpanded) {
         Set<String> expanded = new HashSet<>();
@@ -599,7 +599,7 @@ public class PermuteTypeParamTransformer {
         return newTp;
     }
 
-    private static Set<String> typeParamNames(ClassOrInterfaceDeclaration classDecl) {
+    private static Set<String> typeParamNames(TypeDeclaration<?> classDecl) {
         Set<String> names = new HashSet<>();
         for (TypeParameter tp : classDecl.getTypeParameters()) {
             names.add(tp.getNameAsString());
