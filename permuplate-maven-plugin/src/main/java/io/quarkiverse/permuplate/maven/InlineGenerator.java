@@ -11,6 +11,8 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.RecordDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
@@ -33,6 +35,11 @@ import io.quarkiverse.permuplate.core.PermuteValueTransformer;
  * {@link PermuteConfig#keepTemplate}.
  */
 public class InlineGenerator {
+
+    static {
+        StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_17);
+    }
 
     private static final String PM_SIMPLE = "PermuteMethod";
     private static final String PM_FQ = "io.quarkiverse.permuplate.PermuteMethod";
@@ -63,7 +70,7 @@ public class InlineGenerator {
      * @return a new {@link CompilationUnit} containing the augmented parent
      */
     public static CompilationUnit generate(CompilationUnit parentCu,
-            ClassOrInterfaceDeclaration templateClassDecl,
+            TypeDeclaration<?> templateClassDecl,
             PermuteConfig config,
             List<Map<String, Object>> allCombinations) {
 
@@ -74,17 +81,19 @@ public class InlineGenerator {
                 c -> !c.isNestedType())
                 .orElseThrow(() -> new IllegalStateException("Cannot find top-level class in parent CU"));
 
-        // Remove the template nested class from the output
+        // Remove the template nested type from the output (class, interface, or record)
         String templateClassName = templateClassDecl.getNameAsString();
-        outputParent.getMembers().removeIf(member -> member instanceof ClassOrInterfaceDeclaration &&
-                ((ClassOrInterfaceDeclaration) member).getNameAsString().equals(templateClassName));
+        outputParent.getMembers().removeIf(member -> member instanceof TypeDeclaration<?> td &&
+                td.getNameAsString().equals(templateClassName));
 
-        // Re-add the template class if keepTemplate = true (strip all permuplate annotations)
+        // Re-add the template type if keepTemplate = true (strip all permuplate annotations)
         if (config.keepTemplate) {
-            ClassOrInterfaceDeclaration templateCopy = templateClassDecl.clone();
+            TypeDeclaration<?> templateCopy = templateClassDecl.clone();
             stripPermuteAnnotations(templateCopy);
             outputParent.addMember(templateCopy);
         }
+
+        boolean isRecord = templateClassDecl instanceof RecordDeclaration;
 
         // Build complete generated class set for boundary omission
         Set<String> allGeneratedNames = scanAllGeneratedClassNames(parentCu, config);
@@ -110,77 +119,83 @@ public class InlineGenerator {
             }).collect(java.util.stream.Collectors.toList());
         }
 
-        // Generate and append each permuted nested class
+        // Generate and append each permuted nested type
         for (Map<String, Object> vars : filteredCombinations) {
             EvaluationContext ctx = new EvaluationContext(vars);
 
-            ClassOrInterfaceDeclaration generated = templateClassDecl.clone();
+            TypeDeclaration<?> generated = templateClassDecl.clone();
 
-            // Rename the generated nested class
+            // Rename the generated nested type
             String newClassName = ctx.evaluate(config.className);
             generated.setName(newClassName);
+            // Rename constructors (only applies to class/record, not interface)
             generated.getConstructors().forEach(ctor -> ctor.setName(newClassName));
 
             // Apply transformations (null messager — Maven plugin has no Messager)
             PermuteTypeParamTransformer.transform(generated, ctx, null, null);
 
-            // Capture post-G1 type parameter names for extends expansion
-            List<String> postG1TypeParams = new ArrayList<>();
-            generated.getTypeParameters().forEach(tp -> postG1TypeParams.add(tp.getNameAsString()));
+            if (!isRecord) {
+                ClassOrInterfaceDeclaration coid = (ClassOrInterfaceDeclaration) generated;
 
-            // @PermuteMethod: generate overloads with (i,j) context — before other transforms
-            applyPermuteMethod(generated, ctx, config, vars, allGeneratedNames);
+                // Capture post-G1 type parameter names for extends expansion
+                List<String> postG1TypeParams = new ArrayList<>();
+                coid.getTypeParameters().forEach(tp -> postG1TypeParams.add(tp.getNameAsString()));
 
-            PermuteDeclrTransformer.transform(generated, ctx, null);
-            PermuteParamTransformer.transform(generated, ctx, null);
+                // @PermuteMethod: generate overloads with (i,j) context — before other transforms
+                applyPermuteMethod(coid, ctx, config, vars, allGeneratedNames);
 
-            // Apply @PermuteReturn — explicit override; boundary omission
-            // Track names of processed methods to prevent implicit inference from overwriting them
-            Set<String> explicitReturnMethods = collectExplicitReturnMethodNames(generated);
-            applyPermuteReturn(generated, ctx, allGeneratedNames);
+                PermuteDeclrTransformer.transform(generated, ctx, null);
+                PermuteParamTransformer.transform(generated, ctx, null);
 
-            // Apply implicit return type + parameter type inference (Mechanism 1)
-            // Skip methods that had explicit @PermuteReturn (they were just processed above)
-            applyImplicitInference(generated, ctx, allGeneratedNames, explicitReturnMethods);
+                // Apply @PermuteReturn — explicit override; boundary omission
+                Set<String> explicitReturnMethods = collectExplicitReturnMethodNames(coid);
+                applyPermuteReturn(coid, ctx, allGeneratedNames);
 
-            // @PermuteCase — expand switch statement cases per permutation
-            PermuteCaseTransformer.transform(generated, ctx);
+                // Apply implicit return type + parameter type inference (Mechanism 1)
+                applyImplicitInference(coid, ctx, allGeneratedNames, explicitReturnMethods);
 
-            // @PermuteValue — replace field initializers and method statement RHS
-            PermuteValueTransformer.transform(generated, ctx);
+                // @PermuteCase — expand switch statement cases per permutation
+                PermuteCaseTransformer.transform(generated, ctx);
 
-            // @PermuteStatements — insert accumulated statements into method bodies
-            PermuteStatementsTransformer.transform(generated, ctx);
+                // @PermuteValue — replace field initializers and method statement RHS
+                PermuteValueTransformer.transform(generated, ctx);
 
-            // @PermuteImport — add evaluated imports to the parent CU
-            for (String importStr : collectInlinePermuteImports(generated, ctx)) {
-                boolean alreadyPresent = outputCu.getImports().stream()
-                        .anyMatch(imp -> imp.getNameAsString().equals(importStr));
-                if (!alreadyPresent) {
-                    outputCu.addImport(importStr);
+                // @PermuteStatements — insert accumulated statements into method bodies
+                PermuteStatementsTransformer.transform(generated, ctx);
+
+                // @PermuteImport — add evaluated imports to the parent CU
+                for (String importStr : collectInlinePermuteImports(coid, ctx)) {
+                    boolean alreadyPresent = outputCu.getImports().stream()
+                            .anyMatch(imp -> imp.getNameAsString().equals(importStr));
+                    if (!alreadyPresent) {
+                        outputCu.addImport(importStr);
+                    }
                 }
-            }
-            // Strip @PermuteImport annotations from the generated inner class
-            generated.getAnnotations().removeIf(a -> {
-                String n = a.getNameAsString();
-                return n.equals("PermuteImport") || n.equals("io.quarkiverse.permuplate.PermuteImport")
-                        || n.equals("PermuteImports") || n.equals("io.quarkiverse.permuplate.PermuteImports");
-            });
+                // Strip @PermuteImport annotations from the generated inner class
+                generated.getAnnotations().removeIf(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteImport") || n.equals("io.quarkiverse.permuplate.PermuteImport")
+                            || n.equals("PermuteImports") || n.equals("io.quarkiverse.permuplate.PermuteImports");
+                });
 
-            // @PermuteExtends — explicit override of extends/implements clause.
-            // When @PermuteExtends fires, skip the automatic same-N expansion to avoid
-            // overriding the explicit clause.
-            boolean permuteExtendsApplied = hasPermuteExtendsAnnotation(generated);
-            applyPermuteExtendsAnnotation(generated, ctx);
+                // @PermuteExtends — explicit override of extends/implements clause.
+                boolean permuteExtendsApplied = hasPermuteExtendsAnnotation(coid);
+                applyPermuteExtendsAnnotation(coid, ctx);
 
-            // Extends/implements clause expansion (same-N formula) — only when no explicit override
-            if (!permuteExtendsApplied) {
-                int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
-                int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
-                if (templateEmbeddedNum >= 0 && currentEmbeddedNum >= 0) {
-                    applyExtendsExpansion(generated, templateClassName, templateEmbeddedNum, currentEmbeddedNum,
-                            postG1TypeParams);
+                // Extends/implements clause expansion (same-N formula) — only when no explicit override
+                if (!permuteExtendsApplied) {
+                    int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
+                    int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
+                    if (templateEmbeddedNum >= 0 && currentEmbeddedNum >= 0) {
+                        applyExtendsExpansion(coid, templateClassName, templateEmbeddedNum, currentEmbeddedNum,
+                                postG1TypeParams);
+                    }
                 }
+            } else {
+                // Record path: apply param + declr transforms (no extends, no methods/return/case)
+                PermuteDeclrTransformer.transform(generated, ctx, null);
+                PermuteParamTransformer.transform(generated, ctx, null);
+                PermuteValueTransformer.transform(generated, ctx);
             }
 
             // Strip @Permute, @PermuteFilter, @PermuteFilters
@@ -209,15 +224,19 @@ public class InlineGenerator {
         Set<String> names = new HashSet<>();
         addNamesFromConfig(thisConfig, names);
 
-        parentCu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> classDecl.getAnnotations().stream()
-                .filter(a -> a.getNameAsString().equals("Permute")
-                        || a.getNameAsString().equals("io.quarkiverse.permuplate.Permute"))
-                .forEach(ann -> {
-                    try {
-                        addNamesFromConfig(AnnotationReader.readPermute(ann), names);
-                    } catch (Exception ignored) {
-                    }
-                }));
+        parentCu.findAll(TypeDeclaration.class).forEach(td -> {
+            @SuppressWarnings("unchecked")
+            TypeDeclaration<?> typeDecl = (TypeDeclaration<?>) td;
+            typeDecl.getAnnotations().stream()
+                    .filter(a -> a.getNameAsString().equals("Permute")
+                            || a.getNameAsString().equals("io.quarkiverse.permuplate.Permute"))
+                    .forEach(ann -> {
+                        try {
+                            addNamesFromConfig(AnnotationReader.readPermute(ann), names);
+                        } catch (Exception ignored) {
+                        }
+                    });
+        });
         return names;
     }
 
@@ -1101,11 +1120,11 @@ public class InlineGenerator {
     }
 
     /**
-     * Reads all {@code @PermuteFilter} expression strings from the template class's annotations.
+     * Reads all {@code @PermuteFilter} expression strings from the template type's annotations.
      * Handles both the single {@code @PermuteFilter} and the {@code @PermuteFilters} container.
      */
     private static List<String> readFilterExpressions(
-            ClassOrInterfaceDeclaration templateClass) {
+            TypeDeclaration<?> templateClass) {
         List<String> result = new ArrayList<>();
         for (com.github.javaparser.ast.expr.AnnotationExpr ann : templateClass.getAnnotations()) {
             String name = ann.getNameAsString();
@@ -1153,10 +1172,10 @@ public class InlineGenerator {
 
     /**
      * Strips all Permuplate annotations ({@code @Permute}, {@code @PermuteDeclr},
-     * {@code @PermuteParam}) from a class declaration and all of its members,
+     * {@code @PermuteParam}) from a type declaration and all of its members,
      * including field-level and parameter-level annotations.
      */
-    private static void stripPermuteAnnotations(ClassOrInterfaceDeclaration classDecl) {
+    private static void stripPermuteAnnotations(TypeDeclaration<?> classDecl) {
         Set<String> PERMUPLATE_ANNOTATIONS = Set.of(
                 "Permute", "io.quarkiverse.permuplate.Permute",
                 "PermuteDeclr", "io.quarkiverse.permuplate.PermuteDeclr",
@@ -1179,10 +1198,18 @@ public class InlineGenerator {
         classDecl.findAll(FieldDeclaration.class)
                 .forEach(field -> field.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
 
-        // Strip from class type parameters (e.g. @PermuteTypeParam on sentinel C)
-        classDecl.getTypeParameters()
-                .forEach(tp -> tp.getAnnotations()
-                        .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+        // Strip from type parameters (e.g. @PermuteTypeParam on sentinel C)
+        // TypeDeclaration<?> does not expose getTypeParameters() — branch on concrete type.
+        if (classDecl instanceof ClassOrInterfaceDeclaration coid) {
+            coid.getTypeParameters().forEach(tp -> tp.getAnnotations()
+                    .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+        } else if (classDecl instanceof RecordDeclaration rd) {
+            rd.getTypeParameters().forEach(tp -> tp.getAnnotations()
+                    .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+            // Also strip from record components (analogous to constructor parameters)
+            rd.getParameters().forEach(param -> param.getAnnotations()
+                    .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+        }
 
         // Strip from method annotations, method type parameters, and method parameters
         classDecl.findAll(MethodDeclaration.class).forEach(method -> {

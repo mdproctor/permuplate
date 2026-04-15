@@ -3,7 +3,7 @@ package io.quarkiverse.permuplate.maven;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.ArrayInitializerExpr;
 import com.github.javaparser.ast.expr.Expression;
@@ -28,19 +28,19 @@ public class AnnotationReader {
     }
 
     /**
-     * Convenience method: finds the {@code @Permute} annotation on the given class
-     * declaration and converts it to a {@link PermuteConfig}.
+     * Convenience method: finds the {@code @Permute} annotation on the given type
+     * declaration (class, interface, or record) and converts it to a {@link PermuteConfig}.
      *
      * @throws MojoAnnotationException if the annotation is missing or malformed
      */
-    public PermuteConfig readPermuteConfig(ClassOrInterfaceDeclaration classDecl)
+    public PermuteConfig readPermuteConfig(TypeDeclaration<?> typeDecl)
             throws MojoAnnotationException {
-        AnnotationExpr ann = classDecl.getAnnotations().stream()
+        AnnotationExpr ann = typeDecl.getAnnotations().stream()
                 .filter(a -> a.getNameAsString().equals("Permute")
                         || a.getNameAsString().equals("io.quarkiverse.permuplate.Permute"))
                 .findFirst()
                 .orElseThrow(() -> new MojoAnnotationException(
-                        "Class " + classDecl.getNameAsString() + " has no @Permute annotation"));
+                        "Type " + typeDecl.getNameAsString() + " has no @Permute annotation"));
         return readPermute(ann);
     }
 

@@ -300,6 +300,56 @@ public class InlineGenerationTest {
     }
 
     // -------------------------------------------------------------------------
+    // Record template in inline mode — @PermuteParam + @PermuteTypeParam on record
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testRecordInlineModeWithPermuteParam() throws Exception {
+        // inline=true record template generating Tuple3 and Tuple4 as nested siblings
+        String parentSrc = "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "import io.quarkiverse.permuplate.PermuteParam;\n" +
+                "import io.quarkiverse.permuplate.PermuteTypeParam;\n" +
+                "public class Tuples {\n" +
+                "    @Permute(varName=\"i\", from=\"3\", to=\"4\", className=\"Tuple${i}\",\n" +
+                "             inline=true, keepTemplate=false)\n" +
+                "    public static record Tuple2<\n" +
+                "        @PermuteTypeParam(varName=\"k\", from=\"1\", to=\"${i}\",\n" +
+                "                          name=\"${alpha(k)}\") A\n" +
+                "    >(\n" +
+                "        @PermuteParam(varName=\"j\", from=\"1\", to=\"${i}\",\n" +
+                "                      type=\"${alpha(j)}\", name=\"${lower(j)}\")\n" +
+                "        A a\n" +
+                "    ) {}\n" +
+                "}";
+
+        com.github.javaparser.ast.CompilationUnit cu = com.github.javaparser.StaticJavaParser.parse(parentSrc);
+        com.github.javaparser.ast.body.ClassOrInterfaceDeclaration parent = cu.getClassByName("Tuples").orElseThrow();
+        // Find the nested record
+        com.github.javaparser.ast.body.RecordDeclaration template = parent.getMembers().stream()
+                .filter(m -> m instanceof com.github.javaparser.ast.body.RecordDeclaration)
+                .map(m -> (com.github.javaparser.ast.body.RecordDeclaration) m)
+                .findFirst().orElseThrow();
+
+        io.quarkiverse.permuplate.maven.AnnotationReader reader = new io.quarkiverse.permuplate.maven.AnnotationReader();
+        io.quarkiverse.permuplate.core.PermuteConfig config = reader.readPermuteConfig(template);
+        java.util.List<java.util.Map<String, Object>> allCombinations = io.quarkiverse.permuplate.core.PermuteConfig
+                .buildAllCombinations(config);
+
+        com.github.javaparser.ast.CompilationUnit result = new io.quarkiverse.permuplate.maven.InlineGenerator()
+                .generate(cu, template, config, allCombinations);
+
+        String output = result.toString();
+        assertThat(output).contains("Tuple3");
+        assertThat(output).contains("A a");
+        assertThat(output).contains("B b");
+        assertThat(output).contains("C c");
+        assertThat(output).contains("Tuple4");
+        assertThat(output).contains("D d");
+        assertThat(output).doesNotContain("Tuple2"); // keepTemplate=false
+    }
+
+    // -------------------------------------------------------------------------
     // AnnotationReader: reads @Permute values from JavaParser AST
     // -------------------------------------------------------------------------
 
