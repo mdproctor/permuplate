@@ -388,6 +388,8 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
                 "public class Join2 {\n" +
                 "    public Object c2;\n" +
                 "}");
+        // Generated siblings use the same field name as the template (no @PermuteDeclr rename here).
+        // addGeneratedFamilyRenames() looks up fields by name, so the names must match.
         myFixture.addFileToProject("Join3.java",
                 "package io.example;\n" +
                 "public class Join3 {\n" +

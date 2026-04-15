@@ -336,6 +336,8 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
         if (element instanceof PsiMethod method) {
             for (PsiAnnotation ann : method.getModifierList().getAnnotations()) {
                 String fqn = ann.getQualifiedName();
+                // fqn is FQN when import is resolved; short name (no dot) when unresolved.
+                // !contains(".") prevents matching third-party annotations named PermuteMethod.
                 if ("io.quarkiverse.permuplate.PermuteMethod".equals(fqn)
                         || (fqn != null && !fqn.contains(".") && "PermuteMethod".equals(fqn))) {
                     return;
@@ -355,7 +357,7 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
         String pkg = javaFile.getPackageName();
 
         Project project = element.getProject();
-        GlobalSearchScope scope = GlobalSearchScope.allScope(project);
+        GlobalSearchScope scope = GlobalSearchScope.projectScope(project);
         if (!(element instanceof PsiNamedElement named)) return;
         String elementName = named.getName();
         if (elementName == null) return;
