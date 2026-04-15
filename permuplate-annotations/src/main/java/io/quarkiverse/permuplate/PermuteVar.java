@@ -42,13 +42,48 @@ public @interface PermuteVar {
      * Inclusive lower bound as a JEXL expression string (e.g. {@code "2"} or
      * {@code "${start}"}). The outer variable and all named constants from
      * {@code @Permute.strings} are available.
+     *
+     * <p>
+     * System properties ({@code -Dpermuplate.*}) and APT options
+     * ({@code -Apermuplate.*}) are also available — same resolution order as
+     * {@link Permute#from()}.
+     *
+     * <p>
+     * Omit (or leave as {@code ""}) when {@link #values()} is used instead.
      */
-    String from();
+    String from() default "";
 
     /**
      * Inclusive upper bound as a JEXL expression string. Must evaluate to a value
      * &gt;= {@code from}. The outer variable (e.g. {@code i}) is available, enabling
      * patterns like {@code to = "${i}"}.
+     *
+     * <p>
+     * System properties ({@code -Dpermuplate.*}) and APT options
+     * ({@code -Apermuplate.*}) are also available — same resolution order as
+     * {@link Permute#to()}.
+     *
+     * <p>
+     * Omit (or leave as {@code ""}) when {@link #values()} is used instead.
      */
-    String to();
+    String to() default "";
+
+    /**
+     * String values to iterate over instead of an integer range.
+     * Mutually exclusive with {@link #from()} and {@link #to()}.
+     *
+     * <p>
+     * Example:
+     *
+     * <pre>{@code
+     * &#64;Permute(varName = "i", from = "2", to = "4",
+     *          className = "Matrix${i}x${k}",
+     *          extraVars = { @PermuteVar(varName = "k", values = {"A","B","C"}) })
+     * }</pre>
+     *
+     * <p>
+     * The APT processor reports a compile error if both {@code values} and
+     * {@code from}/{@code to} are specified, or if {@code values} is empty.
+     */
+    String[] values() default {};
 }

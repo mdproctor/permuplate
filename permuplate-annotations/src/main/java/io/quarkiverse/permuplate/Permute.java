@@ -121,8 +121,16 @@ public @interface Permute {
      * constants ({@code "${start}"}) are both supported. Named constants come from
      * {@code strings}, system properties ({@code -Dpermuplate.start=3}), or APT
      * options ({@code -Apermuplate.start=3}, APT mode only).
+     *
+     * <p>
+     * <b>APT vs Maven plugin:</b> APT options ({@code -A}) are only available in
+     * the APT annotation processor, not in the Maven plugin. Use system properties
+     * ({@code -D}) for configuration that must work in both modes.
+     *
+     * <p>
+     * Omit (or leave as {@code ""}) when {@link #values()} is used instead.
      */
-    String from();
+    String from() default "";
 
     /**
      * Inclusive upper bound for the primary variable, as a JEXL expression string.
@@ -135,8 +143,31 @@ public @interface Permute {
      * <b>APT vs Maven plugin:</b> APT options ({@code -A}) are only available in
      * the APT annotation processor, not in the Maven plugin. Use system properties
      * ({@code -D}) for configuration that must work in both modes.
+     *
+     * <p>
+     * Omit (or leave as {@code ""}) when {@link #values()} is used instead.
      */
-    String to();
+    String to() default "";
+
+    /**
+     * String values to iterate over instead of an integer range.
+     * Mutually exclusive with {@link #from()} and {@link #to()}.
+     *
+     * <p>
+     * Example:
+     *
+     * <pre>{@code
+     * &#64;Permute(varName="T", values={"Byte","Short","Int","Long"},
+     *          className="To${T}Function")
+     * public interface ToTypeFunction { ... }
+     * // Generates: ToByteFunction, ToShortFunction, ToIntFunction, ToLongFunction
+     * }</pre>
+     *
+     * <p>
+     * The APT processor reports a compile error if both {@code values} and
+     * {@code from}/{@code to} are specified, or if {@code values} is empty.
+     */
+    String[] values() default {};
 
     /**
      * Output type/class name template. For type permutation, evaluated per combination
