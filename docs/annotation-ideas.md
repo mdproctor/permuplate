@@ -79,7 +79,13 @@ public record Tuple2<A, B>(
 // Generates: record Tuple3<A,B,C>(A a, B b, C c) etc.
 ```
 
-**Design note:** Need to verify whether `@PermuteParam` on record canonical constructors already works. If not, `@PermuteStatements` workaround can partially fill the gap.
+**Verified 2026-04-15: NOT currently supported — two blockers:**
+
+1. `StaticJavaParser` defaults to Java 11, which predates records. The processor throws `ParseProblemException` on any record template. Fix: call `StaticJavaParser.getParserConfiguration().setLanguageLevel(JAVA_17)` in `PermuteProcessor.init()`.
+
+2. The processor looks for `ClassOrInterfaceDeclaration` in the parsed AST. Records are `RecordDeclaration` — a different JavaParser node type. Even with Blocker 1 fixed, the template class is not found and compilation fails. All transformer methods take `ClassOrInterfaceDeclaration` — updating them to `TypeDeclaration<?>` is a significant refactor throughout `permuplate-core` and `permuplate-processor`.
+
+Tests documenting both blockers: `RecordExpansionTest.java` in `permuplate-tests/`.
 
 ---
 
@@ -149,7 +155,7 @@ The preprocessor strips the block when the condition is false. Trade-off: breaks
 | String-set iteration | Medium | High | **Done** (#27) |
 | `@PermuteFilter` | Low | Medium | **Done** (#28) |
 | `@PermuteAnnotation` | Medium | Medium | Future |
-| Record component expansion | Low (verify first) | Medium | Future |
+| Record component expansion | High (two blockers) | Medium | Blocked — needs parser + AST refactor |
 | `@PermuteThrows` | Low | Low | Future |
 | Template composition | High | High | Long-term |
 | Retrograde mode | High | Medium | Long-term |
