@@ -159,25 +159,61 @@ public class PermuteProcessor extends AbstractProcessor {
         Permute permute = typeElement.getAnnotation(Permute.class);
         AnnotationMirror permuteMirror = findAnnotationMirror(typeElement, "io.quarkiverse.permuplate.Permute");
 
-        // Evaluate from/to using the base context (external properties + strings)
-        PermuteConfig permuteConfig = PermuteConfig.from(permute);
-        EvaluationContext baseCtx = new EvaluationContext(
-                PermuteConfig.buildBaseVars(permuteConfig, externalProperties));
-        int fromVal, toVal;
-        try {
-            fromVal = baseCtx.evaluateInt(permute.from());
-            toVal = baseCtx.evaluateInt(permute.to());
-        } catch (Exception e) {
-            error("@Permute from/to expression failed to evaluate: " + e.getMessage(),
-                    typeElement, permuteMirror, findAnnotationValue(permuteMirror, "from"));
+        // --- values XOR from/to validation ---
+        String[] values = permute.values();
+        boolean hasValues = values.length > 0;
+        boolean hasFrom = !permute.from().isEmpty();
+        boolean hasTo = !permute.to().isEmpty();
+
+        AnnotationValue valuesAttr = findAnnotationValue(permuteMirror, "values");
+        boolean valuesExplicit = valuesAttr != null; // true only if user wrote values={...}
+
+        // Case 1: values explicitly provided but empty
+        if (valuesExplicit && !hasValues) {
+            error("@Permute 'values' must not be empty — provide at least one string",
+                    typeElement, permuteMirror, valuesAttr);
             return;
         }
-        if (fromVal > toVal) {
-            error(String.format(
-                    "@Permute has invalid range: from=%d is greater than to=%d — no classes will be generated",
-                    fromVal, toVal),
-                    typeElement, permuteMirror, findAnnotationValue(permuteMirror, "from"));
+
+        // Case 2: values + from/to both specified
+        if (hasValues && (hasFrom || hasTo)) {
+            error("@Permute 'values' and 'from'/'to' are mutually exclusive — use one or the other",
+                    typeElement, permuteMirror, valuesAttr);
             return;
+        }
+
+        // Case 3: neither values nor from/to
+        if (!hasValues && (!hasFrom || !hasTo)) {
+            AnnotationValue fromAttr = findAnnotationValue(permuteMirror, "from");
+            error("@Permute requires either 'values' (non-empty) or both 'from' and 'to' — "
+                    + "specify values={...} for a string set or from=\"N\", to=\"M\" for an integer range",
+                    typeElement, permuteMirror, fromAttr);
+            return;
+        }
+
+        // Build PermuteConfig now that mode is determined
+        PermuteConfig permuteConfig = PermuteConfig.from(permute);
+
+        // Integer-mode only: validate from <= to
+        if (!hasValues) {
+            EvaluationContext baseCtx = new EvaluationContext(
+                    PermuteConfig.buildBaseVars(permuteConfig, externalProperties));
+            int fromVal, toVal;
+            try {
+                fromVal = baseCtx.evaluateInt(permute.from());
+                toVal = baseCtx.evaluateInt(permute.to());
+            } catch (Exception e) {
+                error("@Permute from/to expression failed to evaluate: " + e.getMessage(),
+                        typeElement, permuteMirror, findAnnotationValue(permuteMirror, "from"));
+                return;
+            }
+            if (fromVal > toVal) {
+                error(String.format(
+                        "@Permute has invalid range: from=%d is greater than to=%d — no classes will be generated",
+                        fromVal, toVal),
+                        typeElement, permuteMirror, findAnnotationValue(permuteMirror, "from"));
+                return;
+            }
         }
 
         // Check for inline — APT cannot generate inline (requires Maven plugin)
@@ -263,7 +299,12 @@ public class PermuteProcessor extends AbstractProcessor {
         Optional<ClassOrInterfaceDeclaration> foundForValidation = templateCu.findFirst(
                 ClassOrInterfaceDeclaration.class,
                 c -> c.getNameAsString().equals(templateSimpleName));
-        if (foundForValidation.isPresent()) {
+        // Skip all @PermuteDeclr and @PermuteParam prefix validation in string-set mode.
+        // R4 (no-anchor) fires spuriously for pure-variable expressions like "${T}" where
+        // the variable substitutes the entire type name with no literal prefix.
+        // R2 (unmatched literal) and R3 (orphan variable) are also skipped as a consequence —
+        // a reasonable trade-off since string-typed variables have no integer anchor.
+        if (!hasValues && foundForValidation.isPresent()) {
             ClassOrInterfaceDeclaration templateClassDecl = foundForValidation.get();
             Map<String, String> stringConstants = buildStringConstants(permute);
             boolean declrValid = PermuteDeclrTransformer.validatePrefixes(
@@ -464,24 +505,60 @@ public class PermuteProcessor extends AbstractProcessor {
         Permute permute = methodElement.getAnnotation(Permute.class);
         AnnotationMirror permuteMirror = findAnnotationMirror(methodElement, "io.quarkiverse.permuplate.Permute");
 
-        PermuteConfig methodConfig = PermuteConfig.from(permute);
-        EvaluationContext methodBaseCtx = new EvaluationContext(
-                PermuteConfig.buildBaseVars(methodConfig, externalProperties));
-        int methodFromVal, methodToVal;
-        try {
-            methodFromVal = methodBaseCtx.evaluateInt(permute.from());
-            methodToVal = methodBaseCtx.evaluateInt(permute.to());
-        } catch (Exception e) {
-            error("@Permute from/to expression failed to evaluate: " + e.getMessage(),
-                    methodElement, permuteMirror, findAnnotationValue(permuteMirror, "from"));
+        // --- values XOR from/to validation ---
+        String[] methodValues = permute.values();
+        boolean methodHasValues = methodValues.length > 0;
+        boolean methodHasFrom = !permute.from().isEmpty();
+        boolean methodHasTo = !permute.to().isEmpty();
+
+        AnnotationValue methodValuesAttr = findAnnotationValue(permuteMirror, "values");
+        boolean methodValuesExplicit = methodValuesAttr != null; // true only if user wrote values={...}
+
+        // Case 1: values explicitly provided but empty
+        if (methodValuesExplicit && !methodHasValues) {
+            error("@Permute 'values' must not be empty — provide at least one string",
+                    methodElement, permuteMirror, methodValuesAttr);
             return;
         }
-        if (methodFromVal > methodToVal) {
-            error(String.format(
-                    "@Permute has invalid range: from=%d is greater than to=%d — no methods will be generated",
-                    methodFromVal, methodToVal),
-                    methodElement, permuteMirror, findAnnotationValue(permuteMirror, "from"));
+
+        // Case 2: values + from/to both specified
+        if (methodHasValues && (methodHasFrom || methodHasTo)) {
+            error("@Permute 'values' and 'from'/'to' are mutually exclusive — use one or the other",
+                    methodElement, permuteMirror, methodValuesAttr);
             return;
+        }
+
+        // Case 3: neither values nor from/to
+        if (!methodHasValues && (!methodHasFrom || !methodHasTo)) {
+            AnnotationValue methodFromAttr = findAnnotationValue(permuteMirror, "from");
+            error("@Permute requires either 'values' (non-empty) or both 'from' and 'to' — "
+                    + "specify values={...} for a string set or from=\"N\", to=\"M\" for an integer range",
+                    methodElement, permuteMirror, methodFromAttr);
+            return;
+        }
+
+        PermuteConfig methodConfig = PermuteConfig.from(permute);
+
+        // Integer-mode only: validate from <= to
+        if (!methodHasValues) {
+            EvaluationContext methodBaseCtx = new EvaluationContext(
+                    PermuteConfig.buildBaseVars(methodConfig, externalProperties));
+            int methodFromVal, methodToVal;
+            try {
+                methodFromVal = methodBaseCtx.evaluateInt(permute.from());
+                methodToVal = methodBaseCtx.evaluateInt(permute.to());
+            } catch (Exception e) {
+                error("@Permute from/to expression failed to evaluate: " + e.getMessage(),
+                        methodElement, permuteMirror, findAnnotationValue(permuteMirror, "from"));
+                return;
+            }
+            if (methodFromVal > methodToVal) {
+                error(String.format(
+                        "@Permute has invalid range: from=%d is greater than to=%d — no methods will be generated",
+                        methodFromVal, methodToVal),
+                        methodElement, permuteMirror, findAnnotationValue(permuteMirror, "from"));
+                return;
+            }
         }
 
         if (!validateStrings(permute, methodElement, permuteMirror))

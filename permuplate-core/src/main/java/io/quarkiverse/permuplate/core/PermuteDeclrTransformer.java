@@ -100,7 +100,7 @@ public class PermuteDeclrTransformer {
                 continue;
 
             String newType = ctx.evaluate(params[0]);
-            String newName = ctx.evaluate(params[1]);
+            String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]); // "" = keep original name
 
             // There should be exactly one declarator on an annotated field
             VariableDeclarator declarator = field.getVariable(0);
@@ -108,13 +108,15 @@ public class PermuteDeclrTransformer {
 
             // Update the declaration
             declarator.setType(StaticJavaParser.parseType(newType));
-            declarator.setName(newName);
 
             // Remove the annotation
             field.getAnnotations().remove(ann);
 
-            // Propagate: rename all usages of oldName in the entire class body
-            renameAllUsages(classDecl, oldName, newName);
+            if (!newName.isEmpty()) {
+                declarator.setName(newName);
+                // Propagate: rename all usages of oldName in the entire class body
+                renameAllUsages(classDecl, oldName, newName);
+            }
         }
     }
 
@@ -255,16 +257,18 @@ public class PermuteDeclrTransformer {
                     continue;
 
                 String newType = ctx.evaluate(params[0]);
-                String newName = ctx.evaluate(params[1]);
+                String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]); // "" = keep original name
                 String oldName = param.getNameAsString();
 
                 param.setType(StaticJavaParser.parseType(newType));
-                param.setName(newName);
                 param.getAnnotations().remove(ann);
 
-                // Propagate rename within the constructor body only.
-                // ConstructorDeclaration.getBody() returns BlockStmt directly (always present).
-                renameAllUsages(constructor.getBody(), oldName, newName);
+                if (!newName.isEmpty()) {
+                    param.setName(newName);
+                    // Propagate rename within the constructor body only.
+                    // ConstructorDeclaration.getBody() returns BlockStmt directly (always present).
+                    renameAllUsages(constructor.getBody(), oldName, newName);
+                }
             }
         });
     }
@@ -289,18 +293,20 @@ public class PermuteDeclrTransformer {
                 return;
 
             String newType = ctx.evaluate(params[0]);
-            String newName = ctx.evaluate(params[1]);
+            String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]); // "" = keep original name
             String oldName = varDeclExpr.getVariables().get(0).getNameAsString();
 
             // Update declaration — type lives on the VariableDeclarator in JavaParser
             varDeclExpr.getVariables().get(0).setType(StaticJavaParser.parseType(newType));
-            varDeclExpr.getVariables().get(0).setName(newName);
 
             // Remove annotation
             varDeclExpr.getAnnotations().remove(ann);
 
-            // Propagate: rename usages only within the loop body
-            renameAllUsages(forEachStmt.getBody(), oldName, newName);
+            if (!newName.isEmpty()) {
+                varDeclExpr.getVariables().get(0).setName(newName);
+                // Propagate: rename usages only within the loop body
+                renameAllUsages(forEachStmt.getBody(), oldName, newName);
+            }
         });
     }
 
