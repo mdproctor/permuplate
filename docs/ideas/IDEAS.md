@@ -38,39 +38,13 @@ VS Code: out of scope — extension parked.
 ## 2026-04-07 — IDE refactoring safety for templates and generated code
 
 **Priority:** high
-**Status:** active
+**Status:** resolved (2026-04-15)
 
-Two coupled IDE tooling problems with no solution yet:
+1. **Template refactor propagation** — DONE. `addGeneratedFamilyRenames()` in `AnnotationStringRenameProcessor` adds corresponding methods/fields from all generated sibling classes to IntelliJ's `allRenames` map. Call sites across the entire family are updated atomically in one undo step. 6 tests. Closes #25, epic #24.
 
-1. **Template refactor propagation** — when a developer renames a method in a
-   Permuplate template (e.g. `join()` → `combine()` in `Join0Second`), IntelliJ
-   and VS Code rename refactoring only touches the template occurrence. The N
-   generated permutations (`Join1Second.join()` through `Join6Second.join()`) are
-   not updated because they're generated files outside the rename scope. The
-   developer must manually hunt down all call sites in the generated output — or
-   worse, doesn't realise the rename didn't propagate.
+2. **Generated code modification warning** — DONE (existing). `GeneratedFileNotification` already shows a banner on open: "Edits will be overwritten on the next build." + "Go to Template" action. Decided this is sufficient; no modify-time warning needed.
 
-2. **Generated code modification warning** — if a developer edits a generated
-   class directly (e.g. adds a method to `Join3First.java` in
-   `target/generated-sources/permuplate/`), their change is silently overwritten
-   on the next build. No warning, no error — the edit disappears. For `inline=true`
-   mode the risk is even higher since generated files live in `src/`.
-
-**Questions to explore:**
-- Can a Permuplate IDE plugin intercept rename refactors on annotated templates
-  and replay them across all generated permutations?
-- Should generated files be marked `@Generated` or with a file header so IDEs
-  can warn on edit?
-- Is there a Maven/Gradle hook that could detect source-level edits to generated
-  files and fail the build with an explanation?
-- For IntelliJ: can a plugin suppress refactoring on generated files and redirect
-  the developer to the template?
-
-**Context:** Raised during session wrap 2026-04-07. Affects anyone using
-Permuplate in a real project — not just the Drools sandbox. Particularly sharp
-for the migration phase where generated Drools classes will be actively worked on.
-
-**Promoted to:**
+**Promoted to:** #24 (closed), #25 (closed)
 
 ---
 
