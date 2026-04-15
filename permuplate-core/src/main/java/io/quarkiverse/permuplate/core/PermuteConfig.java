@@ -46,6 +46,8 @@ public final class PermuteConfig {
     public final String from;
     /** JEXL expression string for the upper bound (e.g. {@code "10"} or {@code "${max}"}). */
     public final String to;
+    /** String values to iterate over instead of an integer range. Empty when from/to is used. */
+    public final String[] values;
     public final String className;
     public final String[] strings;
     public final PermuteVarConfig[] extraVars;
@@ -55,9 +57,16 @@ public final class PermuteConfig {
     public PermuteConfig(String varName, String from, String to, String className,
             String[] strings, PermuteVarConfig[] extraVars,
             boolean inline, boolean keepTemplate) {
+        this(varName, from, to, null, className, strings, extraVars, inline, keepTemplate);
+    }
+
+    public PermuteConfig(String varName, String from, String to, String[] values, String className,
+            String[] strings, PermuteVarConfig[] extraVars,
+            boolean inline, boolean keepTemplate) {
         this.varName = varName;
         this.from = from;
         this.to = to;
+        this.values = values == null ? new String[0] : values.clone();
         this.className = className;
         this.strings = strings != null ? strings : new String[0];
         this.extraVars = extraVars != null ? extraVars : new PermuteVarConfig[0];
@@ -72,8 +81,9 @@ public final class PermuteConfig {
             extraVars[i] = PermuteVarConfig.from(permute.extraVars()[i]);
         }
         return new PermuteConfig(
-                permute.varName(), permute.from(), permute.to(), permute.className(),
-                permute.strings(), extraVars, permute.inline(), permute.keepTemplate());
+                permute.varName(), permute.from(), permute.to(), permute.values(),
+                permute.className(), permute.strings(), extraVars,
+                permute.inline(), permute.keepTemplate());
     }
 
     /**
@@ -154,31 +164,51 @@ public final class PermuteConfig {
             if (sep >= 0)
                 baseVars.put(entry.substring(0, sep).trim(), entry.substring(sep + 1));
         }
-        EvaluationContext baseCtx = new EvaluationContext(baseVars);
-
-        // Evaluate from and to
-        int fromVal = baseCtx.evaluateInt(config.from);
-        int toVal = baseCtx.evaluateInt(config.to);
-
-        // Start with the primary variable's range
+        // Start with the primary variable's range (string-set or integer)
         List<Map<String, Object>> result = new ArrayList<>();
-        for (int i = fromVal; i <= toVal; i++) {
-            Map<String, Object> vars = new HashMap<>(baseVars);
-            vars.put(config.varName, i);
-            result.add(vars);
+        if (config.values.length > 0) {
+            // String-set path: bind varName to each string value (no JEXL needed)
+            for (String value : config.values) {
+                Map<String, Object> vars = new HashMap<>(baseVars);
+                vars.put(config.varName, value);
+                result.add(vars);
+            }
+        } else {
+            // Integer path: evaluate from/to as JEXL and iterate
+            if (config.from == null || config.from.isEmpty() || config.to == null || config.to.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "@Permute without 'values' must specify non-empty 'from' and 'to' — " +
+                                "varName='" + config.varName + "', className='" + config.className + "'");
+            }
+            EvaluationContext baseCtx = new EvaluationContext(baseVars);
+            int fromVal = baseCtx.evaluateInt(config.from);
+            int toVal = baseCtx.evaluateInt(config.to);
+            for (int i = fromVal; i <= toVal; i++) {
+                Map<String, Object> vars = new HashMap<>(baseVars);
+                vars.put(config.varName, i);
+                result.add(vars);
+            }
         }
 
-        // Expand by each extraVar (cross-product)
+        // Expand by each extraVar (cross-product — each extraVar can be integer or string-set)
         for (PermuteVarConfig extra : config.extraVars) {
             List<Map<String, Object>> expanded = new ArrayList<>();
             for (Map<String, Object> base : result) {
-                EvaluationContext innerCtx = new EvaluationContext(base);
-                int extraFrom = innerCtx.evaluateInt(extra.from);
-                int extraTo = innerCtx.evaluateInt(extra.to);
-                for (int v = extraFrom; v <= extraTo; v++) {
-                    Map<String, Object> copy = new HashMap<>(base);
-                    copy.put(extra.varName, v);
-                    expanded.add(copy);
+                if (extra.values.length > 0) {
+                    for (String value : extra.values) {
+                        Map<String, Object> copy = new HashMap<>(base);
+                        copy.put(extra.varName, value);
+                        expanded.add(copy);
+                    }
+                } else {
+                    EvaluationContext innerCtx = new EvaluationContext(base);
+                    int extraFrom = innerCtx.evaluateInt(extra.from);
+                    int extraTo = innerCtx.evaluateInt(extra.to);
+                    for (int v = extraFrom; v <= extraTo; v++) {
+                        Map<String, Object> copy = new HashMap<>(base);
+                        copy.put(extra.varName, v);
+                        expanded.add(copy);
+                    }
                 }
             }
             result = expanded;
