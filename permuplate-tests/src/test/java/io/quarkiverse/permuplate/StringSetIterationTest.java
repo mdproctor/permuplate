@@ -121,6 +121,24 @@ public class StringSetIterationTest {
     }
 
     /**
+     * @PermuteVar cannot have both values and from/to — compile error.
+     */
+    @Test
+    public void testExtraVarValuesAndFromToMutuallyExclusiveError() {
+        Compilation compilation = compile("io.example.BiJoin2x1",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteVar;\n" +
+                        "@Permute(varName=\"i\", from=\"2\", to=\"3\",\n" +
+                        "         className=\"BiJoin${i}x${k}\",\n" +
+                        "         extraVars={@PermuteVar(varName=\"k\", values={\"A\",\"B\"}, from=\"1\")})\n" +
+                        "public class BiJoin2x1 {}");
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("mutually exclusive");
+    }
+
+    /**
      * Specifying neither values nor from/to is a compile error.
      */
     @Test

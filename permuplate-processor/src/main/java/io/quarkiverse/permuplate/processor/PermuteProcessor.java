@@ -760,20 +760,42 @@ public class PermuteProcessor extends AbstractProcessor {
         }
 
         for (PermuteVar extra : permute.extraVars()) {
+            // values XOR from/to validation for @PermuteVar
+            boolean extraHasValues = extra.values() != null && extra.values().length > 0;
+            boolean extraHasFrom = !extra.from().isEmpty();
+            boolean extraHasTo = !extra.to().isEmpty();
+
+            if (extraHasValues && (extraHasFrom || extraHasTo)) {
+                error(String.format(
+                        "@PermuteVar \"%s\" 'values' and 'from'/'to' are mutually exclusive — use one or the other",
+                        extra.varName()),
+                        element, mirror, findAnnotationValue(mirror, "extraVars"));
+                return false;
+            }
+            if (!extraHasValues && (!extraHasFrom || !extraHasTo)) {
+                error(String.format(
+                        "@PermuteVar \"%s\" requires either 'values' (non-empty) or both 'from' and 'to'",
+                        extra.varName()),
+                        element, mirror, findAnnotationValue(mirror, "extraVars"));
+                return false;
+            }
+
             // Note: extra.from()/to() are now String — evaluate with baseCtx for validation
             // Use a simple parse attempt; full evaluation happens in buildAllCombinations
-            try {
-                int extraFrom = Integer.parseInt(extra.from().trim());
-                int extraTo = Integer.parseInt(extra.to().trim());
-                if (extraFrom > extraTo) {
-                    error(String.format(
-                            "@PermuteVar \"%s\" has invalid range: from=%d is greater than to=%d",
-                            extra.varName(), extraFrom, extraTo),
-                            element, mirror, findAnnotationValue(mirror, "extraVars"));
-                    return false;
+            if (!extraHasValues) {
+                try {
+                    int extraFrom = Integer.parseInt(extra.from().trim());
+                    int extraTo = Integer.parseInt(extra.to().trim());
+                    if (extraFrom > extraTo) {
+                        error(String.format(
+                                "@PermuteVar \"%s\" has invalid range: from=%d is greater than to=%d",
+                                extra.varName(), extraFrom, extraTo),
+                                element, mirror, findAnnotationValue(mirror, "extraVars"));
+                        return false;
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Expression-based from/to — skip static validation, will fail at eval time
                 }
-            } catch (NumberFormatException ignored) {
-                // Expression-based from/to — skip static validation, will fail at eval time
             }
             if (seen.contains(extra.varName())) {
                 error(String.format(
