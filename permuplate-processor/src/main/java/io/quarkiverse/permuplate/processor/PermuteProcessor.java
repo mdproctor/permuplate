@@ -385,10 +385,13 @@ public class PermuteProcessor extends AbstractProcessor {
         // 5g. @PermuteStatements — insert accumulated statements into method bodies
         PermuteStatementsTransformer.transform(classDecl, ctx);
 
-        // 6. Remove @Permute from the class
+        // TODO: extract PermuteFilter/PermuteFilters predicate to a shared constant — used in 3 places
+        // 6. Remove @Permute and @PermuteFilter / @PermuteFilters from the class
         classDecl.getAnnotations().removeIf(a -> {
             String name = a.getNameAsString();
-            return name.equals("Permute") || name.equals("io.quarkiverse.permuplate.Permute");
+            return name.equals("Permute") || name.equals("io.quarkiverse.permuplate.Permute")
+                    || name.equals("PermuteFilter") || name.equals("io.quarkiverse.permuplate.PermuteFilter")
+                    || name.equals("PermuteFilters") || name.equals("io.quarkiverse.permuplate.PermuteFilters");
         });
 
         // Build a fresh CompilationUnit, copying package and non-permuplate imports.
@@ -504,10 +507,12 @@ public class PermuteProcessor extends AbstractProcessor {
             EvaluationContext ctx = new EvaluationContext(vars);
             MethodDeclaration clone = foundMethod.get().clone();
 
-            // Strip @Permute from the clone — it belongs on the template, not the output
+            // Strip @Permute and @PermuteFilter / @PermuteFilters from the clone
             clone.getAnnotations().removeIf(a -> {
                 String name = a.getNameAsString();
-                return name.equals("Permute") || name.equals("io.quarkiverse.permuplate.Permute");
+                return name.equals("Permute") || name.equals("io.quarkiverse.permuplate.Permute")
+                        || name.equals("PermuteFilter") || name.equals("io.quarkiverse.permuplate.PermuteFilter")
+                        || name.equals("PermuteFilters") || name.equals("io.quarkiverse.permuplate.PermuteFilters");
             });
 
             // Wrap in a temporary class so the existing transformers can operate normally
@@ -528,7 +533,9 @@ public class PermuteProcessor extends AbstractProcessor {
         }
         generatedClass.getAnnotations().removeIf(a -> {
             String name = a.getNameAsString();
-            return name.equals("Permute") || name.equals("io.quarkiverse.permuplate.Permute");
+            return name.equals("Permute") || name.equals("io.quarkiverse.permuplate.Permute")
+                    || name.equals("PermuteFilter") || name.equals("io.quarkiverse.permuplate.PermuteFilter")
+                    || name.equals("PermuteFilters") || name.equals("io.quarkiverse.permuplate.PermuteFilters");
         });
         generatedClass.setMembers(new NodeList<>());
         for (MethodDeclaration m : methods) {
