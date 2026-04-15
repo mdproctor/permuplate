@@ -88,6 +88,9 @@ public class PermuteProcessor extends AbstractProcessor {
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
+        // Enable Java 17 syntax (records, sealed classes) in JavaParser
+        com.github.javaparser.StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_17);
         super.init(processingEnv);
         try {
             trees = Trees.instance(processingEnv);
