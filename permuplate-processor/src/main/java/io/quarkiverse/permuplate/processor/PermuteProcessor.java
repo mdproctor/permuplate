@@ -27,6 +27,8 @@ import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.RecordDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.sun.source.util.TreePath;
@@ -299,16 +301,14 @@ public class PermuteProcessor extends AbstractProcessor {
         if (templateCu == null)
             return;
 
-        Optional<ClassOrInterfaceDeclaration> foundForValidation = templateCu.findFirst(
-                ClassOrInterfaceDeclaration.class,
-                c -> c.getNameAsString().equals(templateSimpleName));
+        Optional<TypeDeclaration<?>> foundForValidation = findTemplateType(templateCu, templateSimpleName);
         // Skip all @PermuteDeclr and @PermuteParam prefix validation in string-set mode.
         // R4 (no-anchor) fires spuriously for pure-variable expressions like "${T}" where
         // the variable substitutes the entire type name with no literal prefix.
         // R2 (unmatched literal) and R3 (orphan variable) are also skipped as a consequence —
         // a reasonable trade-off since string-typed variables have no integer anchor.
         if (!hasValues && foundForValidation.isPresent()) {
-            ClassOrInterfaceDeclaration templateClassDecl = foundForValidation.get();
+            TypeDeclaration<?> templateClassDecl = foundForValidation.get();
             Map<String, String> stringConstants = buildStringConstants(permute);
             boolean declrValid = PermuteDeclrTransformer.validatePrefixes(
                     templateClassDecl, processingEnv.getMessager(), typeElement, stringConstants);
@@ -371,26 +371,25 @@ public class PermuteProcessor extends AbstractProcessor {
         String templateClassName = typeElement.getSimpleName().toString();
         AnnotationMirror permuteMirror = findAnnotationMirror(typeElement, "io.quarkiverse.permuplate.Permute");
 
-        // Find the class by name anywhere in the compilation unit (handles nested classes)
-        Optional<ClassOrInterfaceDeclaration> found = templateCu.findFirst(
-                ClassOrInterfaceDeclaration.class,
-                c -> c.getNameAsString().equals(templateClassName));
+        // Find the type (class, interface, or record) by name anywhere in the compilation unit
+        Optional<TypeDeclaration<?>> found = findTemplateType(templateCu, templateClassName);
         if (!found.isPresent()) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                     "Cannot find class " + templateClassName + " in source", typeElement);
             return;
         }
 
-        // Clone just the class declaration — handles both top-level and nested types.
-        ClassOrInterfaceDeclaration classDecl = found.get().clone();
+        // Clone just the type declaration — handles both top-level and nested types.
+        TypeDeclaration<?> classDecl = (TypeDeclaration<?>) found.get().clone();
 
-        // If the template was a nested type, strip modifiers that don't apply to top-level
-        classDecl.setStatic(false);
+        // If the template was a nested type, strip modifiers that don't apply to top-level.
+        // removeModifier is on Node/TypeDeclaration so it works for both classes and records.
+        classDecl.removeModifier(Modifier.Keyword.STATIC);
         if (!classDecl.isPublic()) {
             classDecl.setModifier(Modifier.Keyword.PUBLIC, true);
         }
 
-        // 1. Rename the class
+        // 1. Rename the class/record
         String newClassName;
         try {
             newClassName = ctx.evaluate(permute.className());
@@ -407,6 +406,7 @@ public class PermuteProcessor extends AbstractProcessor {
         classDecl.setName(newClassName);
         // Constructor names must match the class name — rename them all to match.
         // JavaParser does not propagate class renames to constructors automatically.
+        // getConstructors() is on TypeDeclaration<?> — works for both classes and records.
         classDecl.getConstructors().forEach(ctor -> ctor.setName(newClassName));
 
         // 1b. Expand class type parameters (@PermuteTypeParam — explicit and implicit)
@@ -418,15 +418,17 @@ public class PermuteProcessor extends AbstractProcessor {
         PermuteTypeParamTransformer.transform(classDecl, ctx,
                 processingEnv.getMessager(), typeElement, globalGeneratedNames);
 
-        // 1c. Extends clause expansion — update base class name to same-N sibling.
+        // 1c. Extends clause expansion — only applies to classes/interfaces, not records.
         // Must run after @PermuteTypeParam so postG1TypeParams reflects the expanded list.
-        java.util.List<String> postG1TypeParams = classDecl.getTypeParameters().stream()
-                .map(tp -> tp.getNameAsString())
-                .collect(java.util.stream.Collectors.toList());
-        int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
-        int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
-        applyExtendsExpansion(classDecl, templateClassName, templateEmbeddedNum,
-                currentEmbeddedNum, postG1TypeParams);
+        if (classDecl instanceof ClassOrInterfaceDeclaration coid) {
+            java.util.List<String> postG1TypeParams = coid.getTypeParameters().stream()
+                    .map(tp -> tp.getNameAsString())
+                    .collect(java.util.stream.Collectors.toList());
+            int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
+            int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
+            applyExtendsExpansion(coid, templateClassName, templateEmbeddedNum,
+                    currentEmbeddedNum, postG1TypeParams);
+        }
 
         // 2, 3 & 4. @PermuteDeclr — fields, constructor params, then for-each vars
         PermuteDeclrTransformer.transform(classDecl, ctx, processingEnv.getMessager());
@@ -440,18 +442,24 @@ public class PermuteProcessor extends AbstractProcessor {
         // no annotations — so @PermuteTypeParam disappears by construction. No explicit removal needed.
 
         // 5b. @PermuteMethod — generate overloads with explicit @PermuteReturn
-        applyPermuteMethodApt(classDecl, ctx, permute, typeElement);
+        // Only applies to class/interface declarations (records don't support arbitrary methods).
+        if (classDecl instanceof ClassOrInterfaceDeclaration coid) {
+            applyPermuteMethodApt(coid, ctx, permute, typeElement);
+        }
 
         // 5c. @PermuteReturn — replace Object sentinel return type + boundary omission.
         // Collect explicit-return method keys BEFORE applyPermuteReturn removes annotations,
         // so that step 5d can exclude them from implicit inference.
-        java.util.Set<String> explicitReturnMethods = collectExplicitReturnMethods(classDecl);
-        applyPermuteReturn(classDecl, ctx, generatedSet, typeElement);
+        // Only applies to class/interface declarations.
+        if (classDecl instanceof ClassOrInterfaceDeclaration coid) {
+            java.util.Set<String> explicitReturnMethods = collectExplicitReturnMethods(coid);
+            applyPermuteReturn(coid, ctx, generatedSet, typeElement);
 
-        // 5d. Implicit return type inference — fires on methods with T+number growing tips
-        // that have no explicit @PermuteReturn. Uses globalGeneratedNames for cross-template
-        // boundary omission. Runs AFTER applyPermuteReturn so explicit return types are already set.
-        applyImplicitInference(classDecl, globalGeneratedNames, explicitReturnMethods);
+            // 5d. Implicit return type inference — fires on methods with T+number growing tips
+            // that have no explicit @PermuteReturn. Uses globalGeneratedNames for cross-template
+            // boundary omission. Runs AFTER applyPermuteReturn so explicit return types are already set.
+            applyImplicitInference(coid, globalGeneratedNames, explicitReturnMethods);
+        }
 
         // 5e. @PermuteCase — expand switch statement cases per permutation
         io.quarkiverse.permuplate.core.PermuteCaseTransformer.transform(classDecl, ctx);
@@ -1366,7 +1374,7 @@ public class PermuteProcessor extends AbstractProcessor {
 
     /** Collects method keys that already have explicit @PermuteReturn (to exclude from inference). */
     private static java.util.Set<String> collectExplicitReturnMethods(
-            com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classDecl) {
+            com.github.javaparser.ast.body.TypeDeclaration<?> classDecl) {
         java.util.Set<String> keys = new java.util.HashSet<>();
         classDecl.getMethods().forEach(m -> m.getAnnotations().stream()
                 .filter(a -> a.getNameAsString().equals("PermuteReturn")
@@ -1701,7 +1709,7 @@ public class PermuteProcessor extends AbstractProcessor {
      * repeatable container form.
      */
     private static java.util.List<String> collectPermuteImports(
-            com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classDecl) {
+            com.github.javaparser.ast.body.TypeDeclaration<?> classDecl) {
         java.util.List<String> imports = new java.util.ArrayList<>();
         classDecl.getAnnotations().forEach(ann -> {
             String name = ann.getNameAsString();
@@ -1811,6 +1819,23 @@ public class PermuteProcessor extends AbstractProcessor {
             }
             return true;
         }).collect(java.util.stream.Collectors.toList());
+    }
+
+    // =========================================================================
+    // Template type lookup — handles class, interface, and record declarations
+    // =========================================================================
+
+    /**
+     * Finds a class, interface, or record by simple name in the given compilation unit.
+     * Tries ClassOrInterfaceDeclaration first, then RecordDeclaration.
+     */
+    private static Optional<TypeDeclaration<?>> findTemplateType(
+            CompilationUnit cu, String simpleName) {
+        return cu.findFirst(ClassOrInterfaceDeclaration.class,
+                c -> c.getNameAsString().equals(simpleName))
+                .<TypeDeclaration<?>> map(c -> c)
+                .or(() -> cu.findFirst(RecordDeclaration.class,
+                        r -> r.getNameAsString().equals(simpleName)));
     }
 
     private void writeGeneratedClass(TypeElement typeElement, String newClassName, String source) {

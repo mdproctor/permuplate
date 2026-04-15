@@ -14,11 +14,12 @@ import javax.tools.Diagnostic;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
+import com.github.javaparser.ast.nodeTypes.NodeWithTypeParameters;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.TypeParameter;
 
@@ -317,7 +318,7 @@ public class PermuteTypeParamTransformer {
         Set<String> sentinels = new HashSet<>();
 
         // Explicit: type params with @PermuteTypeParam annotation
-        for (TypeParameter tp : classDecl.getTypeParameters()) {
+        for (TypeParameter tp : getTypeParameters(classDecl)) {
             if (hasAnnotation(tp.getAnnotations(), ANNOTATION_SIMPLE)) {
                 sentinels.add(tp.getNameAsString());
             }
@@ -420,7 +421,7 @@ public class PermuteTypeParamTransformer {
             Messager messager,
             Element element) {
         Set<String> expanded = new HashSet<>();
-        NodeList<TypeParameter> current = classDecl.getTypeParameters();
+        NodeList<TypeParameter> current = getTypeParameters(classDecl);
         NodeList<TypeParameter> result = new NodeList<>();
 
         for (TypeParameter tp : current) {
@@ -482,7 +483,7 @@ public class PermuteTypeParamTransformer {
             }
         }
 
-        classDecl.setTypeParameters(result);
+        setTypeParameters(classDecl, result);
         return expanded;
     }
 
@@ -542,7 +543,7 @@ public class PermuteTypeParamTransformer {
                 expanded.add(sentinelName);
 
                 // Replace the sentinel with j expanded type params
-                NodeList<TypeParameter> current = classDecl.getTypeParameters();
+                NodeList<TypeParameter> current = getTypeParameters(classDecl);
                 NodeList<TypeParameter> result = new NodeList<>();
                 for (TypeParameter tp : current) {
                     if (!tp.getNameAsString().equals(sentinelName)) {
@@ -554,7 +555,7 @@ public class PermuteTypeParamTransformer {
                         result.add(buildTypeParam(newName, tp, sentinelName));
                     }
                 }
-                classDecl.setTypeParameters(result);
+                setTypeParameters(classDecl, result);
             }
         }
         return expanded;
@@ -601,10 +602,35 @@ public class PermuteTypeParamTransformer {
 
     private static Set<String> typeParamNames(TypeDeclaration<?> classDecl) {
         Set<String> names = new HashSet<>();
-        for (TypeParameter tp : classDecl.getTypeParameters()) {
+        for (TypeParameter tp : getTypeParameters(classDecl)) {
             names.add(tp.getNameAsString());
         }
         return names;
+    }
+
+    /**
+     * Returns the type parameters of a TypeDeclaration.
+     * Both ClassOrInterfaceDeclaration and RecordDeclaration implement NodeWithTypeParameters,
+     * but TypeDeclaration itself does not — so we cast through the common interface.
+     */
+    @SuppressWarnings("unchecked")
+    private static NodeList<TypeParameter> getTypeParameters(TypeDeclaration<?> classDecl) {
+        if (classDecl instanceof NodeWithTypeParameters<?> nwtp) {
+            return ((NodeWithTypeParameters<TypeDeclaration<?>>) nwtp).getTypeParameters();
+        }
+        return new NodeList<>();
+    }
+
+    /**
+     * Sets the type parameters of a TypeDeclaration.
+     * Both ClassOrInterfaceDeclaration and RecordDeclaration implement NodeWithTypeParameters.
+     */
+    @SuppressWarnings("unchecked")
+    private static void setTypeParameters(TypeDeclaration<?> classDecl,
+            NodeList<TypeParameter> typeParameters) {
+        if (classDecl instanceof NodeWithTypeParameters<?> nwtp) {
+            ((NodeWithTypeParameters<TypeDeclaration<?>>) nwtp).setTypeParameters(typeParameters);
+        }
     }
 
     private static boolean hasAnnotation(NodeList<AnnotationExpr> annotations, String simpleName) {

@@ -12,9 +12,10 @@ import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.FieldDeclaration;
-import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.RecordDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
@@ -70,6 +71,10 @@ public class PermuteDeclrTransformer {
         transformConstLocals(classDecl, ctx);
         // Object creation expressions — update constructor class name via @PermuteDeclr TYPE_USE
         transformNewExpressions(classDecl, ctx);
+        // Record components — @PermuteDeclr on record parameters (RecordDeclaration only)
+        if (classDecl instanceof RecordDeclaration recordDecl) {
+            transformRecordComponents(recordDecl, ctx, messager);
+        }
         // Constructor parameters (scope = constructor body)
         transformConstructorParams(classDecl, ctx, messager);
         // For-each variables (narrowest scope — loop body only)
@@ -271,6 +276,49 @@ public class PermuteDeclrTransformer {
                 }
             }
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // Record components (RecordDeclaration parameters)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Handles {@code @PermuteDeclr} on record component parameters.
+     * Record components are {@code Parameter} nodes attached directly to the
+     * {@code RecordDeclaration} — they are not in a constructor or method.
+     * Type-only transforms ({@code name=""}) just update the component type.
+     * Name changes propagate through the record's compact constructor body if present,
+     * or through all member methods if none.
+     */
+    private static void transformRecordComponents(RecordDeclaration recordDecl,
+            EvaluationContext ctx,
+            Messager messager) {
+        // Snapshot to avoid ConcurrentModification while iterating
+        List<Parameter> annotated = new ArrayList<>();
+        recordDecl.getParameters().forEach(p -> {
+            if (hasPermuteDeclr(p.getAnnotations()))
+                annotated.add(p);
+        });
+
+        for (Parameter param : annotated) {
+            AnnotationExpr ann = getPermuteDeclr(param.getAnnotations());
+            String[] params = extractTwoParams(ann, messager);
+            if (params == null)
+                continue;
+
+            String newType = ctx.evaluate(params[0]);
+            String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]);
+            String oldName = param.getNameAsString();
+
+            param.setType(StaticJavaParser.parseType(newType));
+            param.getAnnotations().remove(ann);
+
+            if (!newName.isEmpty()) {
+                param.setName(newName);
+                // Propagate rename through all member bodies (methods, constructors)
+                recordDecl.getMembers().forEach(member -> renameAllUsages(member, oldName, newName));
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -506,6 +554,26 @@ public class PermuteDeclrTransformer {
                     valid[0] = false;
             });
         });
+
+        // Record components — validated like constructor params
+        if (classDecl instanceof RecordDeclaration rec) {
+            rec.getParameters().forEach(param -> {
+                if (!hasPermuteDeclr(param.getAnnotations()))
+                    return;
+                AnnotationExpr ann = getPermuteDeclr(param.getAnnotations());
+                String[] params = extractTwoParams(ann, messager);
+                if (params == null) {
+                    valid[0] = false;
+                    return;
+                }
+                if (!checkAnnotationString("@PermuteDeclr type", params[0], "record component type",
+                        param.getType().asString(), messager, element, stringConstants))
+                    valid[0] = false;
+                if (!checkAnnotationString("@PermuteDeclr name", params[1], "record component name",
+                        param.getNameAsString(), messager, element, stringConstants))
+                    valid[0] = false;
+            });
+        }
 
         // For-each variables
         classDecl.walk(ForEachStmt.class, forEachStmt -> {
