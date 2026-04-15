@@ -74,6 +74,7 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 | `@PermuteReturn` | method | Control return type per permutation |
 | `@PermuteMethod` | method | Generate multiple overloads per permutation |
 | `@PermuteExtends` | class | Set the extends/implements clause from JEXL expression (inline mode only) |
+| `@PermuteFilter` | class, method | Skip a permutation when the JEXL expression is false (repeatable — conditions ANDed) |
 
 **`from`/`to` are JEXL expression strings**, not int literals — `"3"`, `"${i-1}"`, `"${max}"` are all valid. Named constants resolve in priority order: system properties (`-Dpermuplate.*`) < APT options (`-Apermuplate.*`, APT only) < annotation `strings`. See [OVERVIEW.md § External Property Injection](OVERVIEW.md#external-property-injection).
 
@@ -123,6 +124,8 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 | `@PermuteImport` in inline mode | Imports are added to the parent CU (not to a per-generated-class CU) because inline classes share the parent's import list. Duplicate-check before adding prevents duplicate imports when multiple permutations share the same base import. |
 | `@PermuteExtends` blocks automatic expansion | When `@PermuteExtends` is present, `applyExtendsExpansion()` is skipped entirely for that class — the explicit override takes precedence. The annotation is always stripped from the generated output. |
 | `@PermuteExtends` `interfaceIndex` | `0` = extends clause; `1+` = implements interface at `(interfaceIndex - 1)` in the `implementedTypes` list (0-indexed among implements). |
+| `@PermuteFilter` all-filtered-out in Maven plugin | Maven plugin has no `Messager` — silently produces zero output rather than erroring. APT errors with annotation-mirror precision. |
+| `@PermuteFilter` and `@PermuteVar` cross-product | Filters applied AFTER `buildAllCombinations()` — each combination (i,j,...) evaluated independently. |
 | Lambda `@PermuteParam` — scoped anchor expansion | `@PermuteParam` on a typed lambda parameter (valid Java syntax) expands the lambda's param list and expands call sites **within the lambda body only** via `expandAnchorInStatement`. Method-body anchors do not bleed into lambdas; lambda anchors do not bleed into the outer method body. |
 | Pure-variable `@PermuteParam.name` — R4 exemption | `name="${lower(j)}"` and `name="${alpha(j)}"` have no static literal, which would normally trigger R4. For `@PermuteParam.name`, if the template has no static literals the R4/R2/R3 check is skipped entirely — the generated param names are fresh and have no obligation to match the sentinel's placeholder name. Literal+variable names like `name="o${j}"` still receive full R2/R3 validation. |
 | `@PermuteTypeParam` R1 skips `@PermuteReturn` methods | `validateR1()` in `PermuteTypeParamTransformer` skips methods annotated with `@PermuteReturn` — such methods explicitly manage their own return type, so the restriction against expanding type params in the return type is inapplicable. |
