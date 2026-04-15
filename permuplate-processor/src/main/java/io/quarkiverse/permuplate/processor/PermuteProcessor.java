@@ -272,7 +272,11 @@ public class PermuteProcessor extends AbstractProcessor {
 
         // Build generated set once for boundary omission in @PermuteReturn
         Set<String> generatedSet = buildGeneratedSet(permute);
-        for (Map<String, Object> vars : PermuteConfig.buildAllCombinations(permuteConfig, externalProperties)) {
+        List<String> filterExprs = readFilterExpressions(typeElement);
+        List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(permuteConfig, externalProperties);
+        List<Map<String, Object>> filteredCombinations = applyFilters(allCombinations, filterExprs, typeElement);
+
+        for (Map<String, Object> vars : filteredCombinations) {
             generatePermutation(templateCu, typeElement, permute, new EvaluationContext(vars), generatedSet);
         }
     }
@@ -1592,6 +1596,73 @@ public class PermuteProcessor extends AbstractProcessor {
                             .stripQuotes(p.getValue().toString()));
         }
         return java.util.Optional.empty();
+    }
+
+    /**
+     * Reads all @PermuteFilter expression strings from the given element via annotation mirrors.
+     * Handles both the single-annotation case and the @PermuteFilters container.
+     * Returns an empty list when no filters are present.
+     */
+    private List<String> readFilterExpressions(Element element) {
+        List<String> result = new java.util.ArrayList<>();
+        for (AnnotationMirror mirror : processingEnv.getElementUtils()
+                .getAllAnnotationMirrors(element)) {
+            TypeElement annType = (TypeElement) mirror.getAnnotationType().asElement();
+            String fqn = annType.getQualifiedName().toString();
+            if ("io.quarkiverse.permuplate.PermuteFilter".equals(fqn)) {
+                mirror.getElementValues().forEach((k, v) -> {
+                    if ("value".equals(k.getSimpleName().toString())) {
+                        result.add(v.getValue().toString());
+                    }
+                });
+            } else if ("io.quarkiverse.permuplate.PermuteFilters".equals(fqn)) {
+                mirror.getElementValues().forEach((k, v) -> {
+                    if ("value".equals(k.getSimpleName().toString())
+                            && v.getValue() instanceof java.util.List<?> list) {
+                        for (Object item : list) {
+                            if (item instanceof AnnotationValue av
+                                    && av.getValue() instanceof AnnotationMirror inner) {
+                                inner.getElementValues().forEach((ik, iv) -> {
+                                    if ("value".equals(ik.getSimpleName().toString())) {
+                                        result.add(iv.getValue().toString());
+                                    }
+                                });
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Applies @PermuteFilter expressions to a list of combinations.
+     * Returns the subset where ALL filter expressions evaluate to true.
+     * On evaluation error, logs a warning and keeps the combination.
+     */
+    private List<Map<String, Object>> applyFilters(
+            List<Map<String, Object>> combinations,
+            List<String> filterExprs,
+            Element element) {
+        if (filterExprs.isEmpty())
+            return combinations;
+        return combinations.stream().filter(vars -> {
+            EvaluationContext ctx = new EvaluationContext(vars);
+            for (String expr : filterExprs) {
+                try {
+                    if (!ctx.evaluateBoolean(expr))
+                        return false;
+                } catch (Exception e) {
+                    processingEnv.getMessager().printMessage(
+                            javax.tools.Diagnostic.Kind.WARNING,
+                            "@PermuteFilter expression error (combination kept): "
+                                    + expr + " — " + e.getMessage(),
+                            element);
+                }
+            }
+            return true;
+        }).collect(java.util.stream.Collectors.toList());
     }
 
     private void writeGeneratedClass(TypeElement typeElement, String newClassName, String source) {

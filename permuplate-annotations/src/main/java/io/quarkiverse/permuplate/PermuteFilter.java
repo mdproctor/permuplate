@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
  * }</pre>
  *
  * <p>
- * Compile error if all values in the range are filtered out.
+ * The APT processor reports a compile error if all values in the range are filtered out.
  */
 @Repeatable(PermuteFilters.class)
 @Retention(RetentionPolicy.SOURCE)

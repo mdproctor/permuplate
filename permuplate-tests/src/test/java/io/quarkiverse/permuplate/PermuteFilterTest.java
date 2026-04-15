@@ -34,11 +34,54 @@ public class PermuteFilterTest {
                         "public class Join2 {}");
 
         assertThat(compilation).succeeded();
-        // Filter not yet applied in processor — all three are generated.
-        // TODO: Once Task 3 wires up filter evaluation, Join4 will be absent.
+    }
+
+    // -------------------------------------------------------------------------
+    // EvaluationContext.evaluateBoolean() — unit tests
+    // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // APT processor — filter application
+    // -------------------------------------------------------------------------
+
+    /**
+     * @PermuteFilter("${i} != 4") on range 3..5 skips Join4, generating only Join3 and Join5.
+     */
+    @Test
+    public void testFilterSkipsSpecificValue() {
+        Compilation compilation = compile("io.example.Join2",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteFilter;\n" +
+                        "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                        "@PermuteFilter(\"${i} != 4\")\n" +
+                        "public class Join2 {}");
+
+        assertThat(compilation).succeeded();
         assertThat(compilation.generatedSourceFile("io.example.Join3").isPresent()).isTrue();
-        assertThat(compilation.generatedSourceFile("io.example.Join4").isPresent()).isTrue();
         assertThat(compilation.generatedSourceFile("io.example.Join5").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.example.Join4").isPresent()).isFalse();
+    }
+
+    /**
+     * Multiple @PermuteFilter annotations are ANDed — range 3..6, skip 4 and skip 6 → Join3 and Join5 only.
+     */
+    @Test
+    public void testMultipleFiltersAreAnded() {
+        Compilation compilation = compile("io.example.Join2",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteFilter;\n" +
+                        "@Permute(varName=\"i\", from=\"3\", to=\"6\", className=\"Join${i}\")\n" +
+                        "@PermuteFilter(\"${i} != 4\")\n" +
+                        "@PermuteFilter(\"${i} != 6\")\n" +
+                        "public class Join2 {}");
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation.generatedSourceFile("io.example.Join3").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.example.Join5").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.example.Join4").isPresent()).isFalse();
+        assertThat(compilation.generatedSourceFile("io.example.Join6").isPresent()).isFalse();
     }
 
     // -------------------------------------------------------------------------
