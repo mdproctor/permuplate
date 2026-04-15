@@ -40,4 +40,32 @@ public class PermuteFilterTest {
         assertThat(compilation.generatedSourceFile("io.example.Join4").isPresent()).isTrue();
         assertThat(compilation.generatedSourceFile("io.example.Join5").isPresent()).isTrue();
     }
+
+    // -------------------------------------------------------------------------
+    // EvaluationContext.evaluateBoolean() — unit tests
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testEvaluateBooleanTrueExpression() {
+        io.quarkiverse.permuplate.core.EvaluationContext ctx = new io.quarkiverse.permuplate.core.EvaluationContext(
+                java.util.Map.of("i", 3));
+        assertThat(ctx.evaluateBoolean("${i} != 4")).isTrue();
+    }
+
+    @Test
+    public void testEvaluateBooleanFalseExpression() {
+        io.quarkiverse.permuplate.core.EvaluationContext ctx = new io.quarkiverse.permuplate.core.EvaluationContext(
+                java.util.Map.of("i", 4));
+        assertThat(ctx.evaluateBoolean("${i} != 4")).isFalse();
+    }
+
+    @Test
+    public void testEvaluateBooleanWithTwoVariables() {
+        io.quarkiverse.permuplate.core.EvaluationContext ctx = new io.quarkiverse.permuplate.core.EvaluationContext(
+                java.util.Map.of("i", 2, "j", 2));
+        assertThat(ctx.evaluateBoolean("${i} != ${j}")).isFalse();
+        io.quarkiverse.permuplate.core.EvaluationContext ctx2 = new io.quarkiverse.permuplate.core.EvaluationContext(
+                java.util.Map.of("i", 2, "j", 3));
+        assertThat(ctx2.evaluateBoolean("${i} != ${j}")).isTrue();
+    }
 }

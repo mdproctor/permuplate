@@ -228,6 +228,31 @@ public class EvaluationContext {
     }
 
     /**
+     * Evaluates a JEXL boolean expression and returns its boolean value.
+     *
+     * <p>
+     * Accepts both bare expressions ({@code "i != 1"}) and wrapped ones
+     * ({@code "${i != 1}"}). Also handles interpolated forms such as
+     * {@code "${i} != 4"} by stripping each {@code ${...}} wrapper to produce
+     * a plain JEXL expression ({@code "i != 4"}) before evaluation.
+     * Used by {@code @PermuteFilter} to decide whether a permutation combination
+     * should be generated.
+     *
+     * @throws IllegalArgumentException if the expression does not evaluate to a boolean
+     */
+    public boolean evaluateBoolean(String expression) {
+        // Strip ${...} wrappers from each interpolation segment to produce a plain JEXL expression.
+        // e.g. "${i} != 4" → "i != 4"; "${i} != ${j}" → "i != j"; "${i != 4}" → "i != 4"
+        String expr = INTERPOLATION.matcher(expression.trim()).replaceAll("$1");
+        MapContext jexlCtx = buildJexlContext();
+        Object result = JEXL.createExpression(expr).evaluate(jexlCtx);
+        if (result instanceof Boolean b)
+            return b;
+        throw new IllegalArgumentException(
+                "Filter expression did not evaluate to boolean: \"" + expression + "\" → " + result);
+    }
+
+    /**
      * Evaluates a string that is expected to be a pure integer expression (no surrounding text),
      * returning an integer. Used for the {@code from} and {@code to} values of
      * {@link io.quarkiverse.permuplate.PermuteParam}.
