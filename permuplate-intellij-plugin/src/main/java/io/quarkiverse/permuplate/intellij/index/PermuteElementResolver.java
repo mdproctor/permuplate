@@ -77,17 +77,26 @@ public final class PermuteElementResolver {
                             && vlit.getValue() instanceof String vs ? vs : null;
                     String className = classVal instanceof PsiLiteralExpression clit
                             && clit.getValue() instanceof String cs ? cs : null;
-                    // from/to changed from int to String (JEXL expressions) in issue #16.
-                    // Handle both int literals (legacy) and plain-integer String literals (current).
-                    int from = parseLiteralInt(fromVal, 1);
-                    int to   = parseLiteralInt(toVal,   1);
 
                     if (varName == null || className == null) continue;
+                    PsiAnnotationMemberValue valuesVal = ann.findAttributeValue("values");
+                    String[] valuesArr = getStringArrayFromPsi(valuesVal);
                     String placeholder = "${" + varName + "}";
-                    for (int v = from; v <= to; v++) {
-                        if (generatedName.equals(className.replace(placeholder, String.valueOf(v)))) {
-                            found.set(cls);
-                            return false;
+                    if (valuesArr.length > 0) {
+                        for (String v : valuesArr) {
+                            if (generatedName.equals(className.replace(placeholder, v))) {
+                                found.set(cls);
+                                return false;
+                            }
+                        }
+                    } else {
+                        int from = parseLiteralInt(fromVal, 1);
+                        int to   = parseLiteralInt(toVal,   1);
+                        for (int v = from; v <= to; v++) {
+                            if (generatedName.equals(className.replace(placeholder, String.valueOf(v)))) {
+                                found.set(cls);
+                                return false;
+                            }
                         }
                     }
                 }
@@ -137,6 +146,23 @@ public final class PermuteElementResolver {
             }
         }
         return defaultVal;
+    }
+
+    private static String[] getStringArrayFromPsi(@Nullable PsiAnnotationMemberValue v) {
+        if (v == null) return new String[0];
+        if (v instanceof PsiArrayInitializerMemberValue arr) {
+            java.util.List<String> vals = new java.util.ArrayList<>();
+            for (PsiAnnotationMemberValue init : arr.getInitializers()) {
+                if (init instanceof PsiLiteralExpression lit && lit.getValue() instanceof String s) {
+                    vals.add(s);
+                }
+            }
+            return vals.toArray(new String[0]);
+        }
+        if (v instanceof PsiLiteralExpression lit && lit.getValue() instanceof String s) {
+            return new String[]{ s };
+        }
+        return new String[0];
     }
 
     @Nullable

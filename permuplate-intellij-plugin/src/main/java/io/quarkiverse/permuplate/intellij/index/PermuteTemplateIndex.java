@@ -47,12 +47,14 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
                 if (templateName == null) continue;
 
                 String varName    = getStringAttr(permute, "varName");
-                int    from       = getIntAttr(permute, "from", 1);
-                int    to         = getIntAttr(permute, "to", 1);
                 String className  = getStringAttr(permute, "className");
                 if (varName == null || className == null) continue;
 
-                List<String> generatedNames = computeGeneratedNames(varName, from, to, className);
+                String[] values = getStringArrayAttr(permute, "values");
+                int    from       = values.length > 0 ? 0 : getIntAttr(permute, "from", 1);
+                int    to         = values.length > 0 ? 0 : getIntAttr(permute, "to",   1);
+
+                List<String> generatedNames = computeGeneratedNames(varName, from, to, values, className);
                 List<String> memberStrings  = collectMemberAnnotationStrings(cls);
 
                 result.put(templateName, new PermuteTemplateData(
@@ -115,12 +117,42 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
     }
 
     /**
-     * Simple variable substitution for the common case: "Join${i}" with i from 3 to 10.
-     * Handles only single-variable integer substitution — sufficient for index purposes.
+     * Reads a String[] annotation attribute value from PSI.
+     * Handles array form {@code values={"Byte","Short"}} and single-element form {@code values="Byte"}.
+     * Returns an empty array if the attribute is absent or not a string literal.
      */
-    private static List<String> computeGeneratedNames(String varName, int from, int to, String template) {
-        List<String> names = new ArrayList<>(to - from + 1);
+    private static String[] getStringArrayAttr(PsiAnnotation ann, String attr) {
+        PsiAnnotationMemberValue v = ann.findAttributeValue(attr);
+        if (v == null) return new String[0];
+        if (v instanceof PsiArrayInitializerMemberValue arr) {
+            java.util.List<String> vals = new java.util.ArrayList<>();
+            for (PsiAnnotationMemberValue init : arr.getInitializers()) {
+                if (init instanceof PsiLiteralExpression lit && lit.getValue() instanceof String s) {
+                    vals.add(s);
+                }
+            }
+            return vals.toArray(new String[0]);
+        }
+        if (v instanceof PsiLiteralExpression lit && lit.getValue() instanceof String s) {
+            return new String[]{ s };
+        }
+        return new String[0];
+    }
+
+    /**
+     * Simple variable substitution. When {@code values} is non-empty, generates one name
+     * per string value (string-set mode). Otherwise generates one name per integer in
+     * [from, to] (integer-range mode).
+     */
+    private static List<String> computeGeneratedNames(
+            String varName, int from, int to, String[] values, String template) {
         String placeholder = "${" + varName + "}";
+        if (values.length > 0) {
+            return java.util.Arrays.stream(values)
+                    .map(v -> template.replace(placeholder, v))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        List<String> names = new ArrayList<>(to - from + 1);
         for (int v = from; v <= to; v++) {
             names.add(template.replace(placeholder, String.valueOf(v)));
         }
@@ -164,7 +196,7 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
         return PermuteTemplateDataExternalizer.INSTANCE;
     }
 
-    @Override public int getVersion() { return 4; } // bumped: from/to now parsed as String (issue #16)
+    @Override public int getVersion() { return 5; } // bumped: string-set values[] support
 
     @Override public @NotNull FileBasedIndex.InputFilter getInputFilter() {
         return (VirtualFile file) -> "java".equals(file.getExtension());

@@ -82,6 +82,30 @@ public class PermuteTemplateIndexTest extends BasePlatformTestCase {
         assertTrue("Non-template class should produce no index entries", result.isEmpty());
     }
 
+    /**
+     * When @Permute uses values={"Byte","Short","Int"}, the forward index must compute
+     * generatedNames as ["ToByteFunction","ToShortFunction","ToIntFunction"].
+     */
+    @org.junit.Test
+    public void testForwardIndexWithStringSetValues() {
+        myFixture.configureByText("ToTypeFunction.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"T\", values={\"Byte\",\"Short\",\"Int\"},\n" +
+                "         className=\"To${T}Function\")\n" +
+                "public interface ToTypeFunction {}");
+
+        Map<String, PermuteTemplateData> result = invokeForwardIndexer();
+        assertEquals(1, result.size());
+
+        PermuteTemplateData data = result.get("ToTypeFunction");
+        assertNotNull("Expected key 'ToTypeFunction' in index", data);
+        assertEquals("T", data.varName);
+        assertEquals("To${T}Function", data.classNameTemplate);
+        assertEquals(List.of("ToByteFunction", "ToShortFunction", "ToIntFunction"),
+                data.generatedNames);
+    }
+
     // Test: member annotation strings are collected
     public void testMemberAnnotationStringsCollected() {
         myFixture.configureByText("Join2.java",

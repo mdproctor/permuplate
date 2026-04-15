@@ -162,6 +162,25 @@ public class PermuteElementResolverTest extends BasePlatformTestCase {
         assertEquals("Expected c2 in template", "c2", ((PsiField) result).getName());
     }
 
+    /**
+     * PSI fallback scan finds the template class for a string-set generated name.
+     */
+    @org.junit.Test
+    public void testFindTemplateClassViaFallbackPsiScanWithStringSet() {
+        myFixture.addFileToProject("ToTypeFunction.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"T\", values={\"Byte\",\"Short\"},\n" +
+                "         className=\"To${T}Function\")\n" +
+                "public interface ToTypeFunction {}");
+
+        PsiClass template = PermuteElementResolver.findTemplateClass(
+                "ToByteFunction", getProject());
+
+        assertNotNull("findTemplateClass must find ToTypeFunction for ToByteFunction", template);
+        assertEquals("ToTypeFunction", template.getName());
+    }
+
     // --- negative path tests ---
 
     public void testReturnsElementForNonGeneratedFile() {
