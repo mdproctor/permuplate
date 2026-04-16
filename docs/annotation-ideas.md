@@ -110,12 +110,6 @@ Apply transformations to a generated family without re-writing the original temp
 
 ---
 
-### Retrograde mode (template from existing)
-
-Given `Join3First..Join6First` (hand-written), infer what the template would look like. The bootstrapping problem: you have an existing family and want to migrate to Permuplate without rewriting everything. Particularly relevant for Drools migration.
-
----
-
 ### Functional `from`/`to` references
 
 Reference another template's range to keep families in sync without magic number duplication:
@@ -153,6 +147,5 @@ The preprocessor strips the block when the condition is false. Trade-off: breaks
 | Record component expansion | High | Medium | **Done** (#29) |
 | `@PermuteThrows` | Low | Low | **Done** (#32) |
 | Template composition | High | High | Long-term |
-| Retrograde mode | High | Medium | Long-term |
 | Functional from/to refs | Medium | Medium | Long-term |
 | `@PermuteConditional` | High | Medium | Long-term |
