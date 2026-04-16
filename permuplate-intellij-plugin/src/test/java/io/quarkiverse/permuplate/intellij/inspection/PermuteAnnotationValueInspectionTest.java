@@ -58,6 +58,33 @@ public class PermuteAnnotationValueInspectionTest extends BasePlatformTestCase {
                         h.getDescription().startsWith("Permuplate:")));
     }
 
+    /** Explicit value= form (@PermuteAnnotation(value="...")) must be handled identically. */
+    public void testValidAnnotationExplicitValueFormNoWarning() {
+        myFixture.enableInspections(new PermuteAnnotationValueInspection());
+        myFixture.configureByText("Foo.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.PermuteAnnotation;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"1\", to=\"3\", className=\"Foo${i}\")\n" +
+                "@PermuteAnnotation(value=\"@Override\")\n" +
+                "public class Foo2 {}");
+        List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
+        assertTrue("Explicit value= form must be handled: no warning on valid @Override", warnings.isEmpty());
+    }
+
+    public void testInvalidValueExplicitFormWarning() {
+        myFixture.enableInspections(new PermuteAnnotationValueInspection());
+        myFixture.configureByText("Foo.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.PermuteAnnotation;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"1\", to=\"3\", className=\"Foo${i}\")\n" +
+                "@PermuteAnnotation(value=\"not-an-annotation\")\n" +
+                "public class Foo2 {}");
+        List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
+        assertFalse("Explicit value= form must be handled: warning expected for invalid value", warnings.isEmpty());
+    }
+
     /** Filters highlights to only Permuplate WARNING-level entries. */
     private static List<HighlightInfo> warningsOnly(List<HighlightInfo> all) {
         return all.stream()

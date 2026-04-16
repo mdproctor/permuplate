@@ -67,6 +67,37 @@ public class PermuteThrowsTypeInspectionTest extends BasePlatformTestCase {
                         h.getDescription().startsWith("Permuplate:")));
     }
 
+    /** Explicit value= form (@PermuteThrows(value="...")) must be handled identically. */
+    public void testValidTypeExplicitValueFormNoWarning() {
+        myFixture.enableInspections(new PermuteThrowsTypeInspection());
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.PermuteThrows;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteThrows(value=\"IOException\")\n" +
+                "    public void doSomething() {}\n" +
+                "}");
+        List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
+        assertTrue("Explicit value= form must be handled: no warning on valid IOException type", warnings.isEmpty());
+    }
+
+    public void testInvalidTypeExplicitValueFormWarning() {
+        myFixture.enableInspections(new PermuteThrowsTypeInspection());
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.PermuteThrows;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteThrows(value=\"123BadType\")\n" +
+                "    public void doSomething() {}\n" +
+                "}");
+        List<HighlightInfo> warnings = warningsOnly(myFixture.doHighlighting());
+        assertFalse("Explicit value= form must be handled: warning expected for invalid type name", warnings.isEmpty());
+    }
+
     /** Filters highlights to only Permuplate WARNING-level entries. */
     private static List<HighlightInfo> warningsOnly(List<HighlightInfo> all) {
         return all.stream()

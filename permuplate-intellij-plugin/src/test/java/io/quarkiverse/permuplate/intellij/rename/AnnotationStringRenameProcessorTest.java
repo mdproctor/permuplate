@@ -696,6 +696,49 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
                 foundPermuteAnnotation);
     }
 
+    /**
+     * Explicit value= form: @PermuteThrows(value="IOException") must be detected
+     * by findAffectedLiterals exactly like the shorthand @PermuteThrows("IOException").
+     * PSI getParameterList().getAttributes() covers both NormalAnnotation and SingleMember forms.
+     */
+    public void testFindAffectedLiteralsDetectsPermuteThrowsExplicitValueForm() {
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteThrows(value=\"IOException\")\n" +
+                "    public void call() {}\n" +
+                "}");
+
+        java.util.List<com.intellij.psi.PsiLiteralExpression> affected =
+                AnnotationStringRenameProcessor.findAffectedLiterals(myFixture.getFile(), "IOException");
+
+        assertFalse("Explicit value= form of @PermuteThrows must be found", affected.isEmpty());
+        assertTrue("findAffectedLiterals must find the 'IOException' literal",
+                affected.stream().anyMatch(lit -> "IOException".equals(lit.getValue())));
+    }
+
+    /**
+     * Explicit value= form: @PermuteAnnotation(value="@MyAnnotation") must be detected
+     * by findAffectedLiterals exactly like the shorthand @PermuteAnnotation("@MyAnnotation").
+     */
+    public void testFindAffectedLiteralsDetectsPermuteAnnotationExplicitValueForm() {
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "@PermuteAnnotation(value=\"@MyAnnotation\")\n" +
+                "public class Join2 {}");
+
+        java.util.List<com.intellij.psi.PsiLiteralExpression> affected =
+                AnnotationStringRenameProcessor.findAffectedLiterals(myFixture.getFile(), "MyAnnotation");
+
+        assertFalse("Explicit value= form of @PermuteAnnotation must be found", affected.isEmpty());
+        assertTrue("findAffectedLiterals must find the '@MyAnnotation' literal",
+                affected.stream().anyMatch(lit -> "@MyAnnotation".equals(lit.getValue())));
+    }
+
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
         com.intellij.openapi.vfs.VirtualFile generatedFile =
                 myFixture.getTempDirFixture().createFile(
