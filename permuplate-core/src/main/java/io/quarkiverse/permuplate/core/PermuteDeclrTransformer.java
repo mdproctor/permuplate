@@ -531,8 +531,10 @@ public class PermuteDeclrTransformer {
             if (!checkAnnotationString("@PermuteDeclr type", params[0], "field type",
                     declarator.getType().asString(), messager, element, stringConstants))
                 valid[0] = false;
-            if (!checkAnnotationString("@PermuteDeclr name", params[1], "field name",
-                    declarator.getNameAsString(), messager, element, stringConstants))
+            // Empty name means type-only change — skip name validation
+            if (!params[1].isEmpty() &&
+                    !checkAnnotationString("@PermuteDeclr name", params[1], "field name",
+                            declarator.getNameAsString(), messager, element, stringConstants))
                 valid[0] = false;
         }
 
@@ -588,12 +590,23 @@ public class PermuteDeclrTransformer {
                 return;
             }
             VariableDeclarator v = varDeclExpr.getVariables().get(0);
-            if (!checkAnnotationString("@PermuteDeclr type", params[0], "for-each variable type",
-                    v.getType().asString(), messager, element, stringConstants))
+            // Pure-variable expressions (e.g. "${alpha(i)}") have no static literal to
+            // anchor against the sentinel — skip R4/R2/R3 as for @PermuteParam.name.
+            AnnotationStringTemplate typeTemplate = AnnotationStringAlgorithm.expandStringConstants(
+                    AnnotationStringAlgorithm.parse(params[0]), stringConstants);
+            if (!typeTemplate.hasNoLiteral() &&
+                    !checkAnnotationString("@PermuteDeclr type", params[0], "for-each variable type",
+                            v.getType().asString(), messager, element, stringConstants))
                 valid[0] = false;
-            if (!checkAnnotationString("@PermuteDeclr name", params[1], "for-each variable name",
-                    v.getNameAsString(), messager, element, stringConstants))
-                valid[0] = false;
+            // Empty name means type-only change; pure-variable name (e.g. "${lower(i)}") skipped
+            if (!params[1].isEmpty()) {
+                AnnotationStringTemplate nameTemplate = AnnotationStringAlgorithm.expandStringConstants(
+                        AnnotationStringAlgorithm.parse(params[1]), stringConstants);
+                if (!nameTemplate.hasNoLiteral() &&
+                        !checkAnnotationString("@PermuteDeclr name", params[1], "for-each variable name",
+                                v.getNameAsString(), messager, element, stringConstants))
+                    valid[0] = false;
+            }
         });
 
         // Note: Method parameters are NOT validated here because they fundamentally differ

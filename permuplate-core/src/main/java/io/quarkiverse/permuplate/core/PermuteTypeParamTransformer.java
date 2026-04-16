@@ -510,6 +510,14 @@ public class PermuteTypeParamTransformer {
                 if (typeAtFrom == null)
                     continue;
 
+                // Implicit expansion requires the sentinel to end in a digit (e.g. "T1", "A2").
+                // Pure-letter sentinels like "A" or "B" arise from alpha(j) expressions and must
+                // NOT trigger implicit expansion — they are generated names, not growing-tip
+                // placeholders. The T${j} naming convention (documented in CLAUDE.md) produces
+                // sentinels like "T1" which do end in a digit and correctly trigger expansion.
+                if (typeAtFrom.isEmpty() || !Character.isDigit(typeAtFrom.charAt(typeAtFrom.length() - 1)))
+                    continue;
+
                 // Note: R2 (duplicate expansion: both @PermuteTypeParam and @PermuteParam
                 // target the same type param) is intentionally not an error here — it is
                 // silently skipped. R2 validation is deferred (rare edge case).

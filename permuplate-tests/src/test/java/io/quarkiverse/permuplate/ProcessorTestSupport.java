@@ -105,20 +105,25 @@ class ProcessorTestSupport {
     /** Generates a {@code Callable{n}} source in the same package as the template class. */
     static JavaFileObject callableSource(Class<?> templateClass, int n) {
         String pkg = templateClass.getPackageName();
+        StringBuilder typeParams = new StringBuilder();
         StringBuilder params = new StringBuilder();
         for (int j = 1; j <= n; j++) {
-            if (j > 1)
+            char letter = (char) ('A' + j - 1);
+            if (j > 1) {
+                typeParams.append(", ");
                 params.append(", ");
-            params.append("Object o").append(j);
+            }
+            typeParams.append(letter);
+            params.append(letter).append(" ").append((char) ('a' + j - 1));
         }
         return JavaFileObjects.forSourceString(
                 pkg + ".Callable" + n,
                 """
                         package %s;
-                        public interface Callable%d {
+                        public interface Callable%d<%s> {
                             void call(%s);
                         }
-                        """.formatted(pkg, n, params));
+                        """.formatted(pkg, n, typeParams, params));
     }
 
     /** Compiles a real template class with the processor and the necessary Callable support sources. */
@@ -321,7 +326,7 @@ class ProcessorTestSupport {
      * captured by the callable in order.
      *
      * <p>
-     * The call-site string (e.g. {@code c3.call(o1, o2, o3)}) is intentionally absent
+     * The call-site string (e.g. {@code c3.call(a, b, c)}) is intentionally absent
      * from the structural checks — the behavioural assertion makes it redundant.
      */
     static void assertJoinN(Compilation compilation, ClassLoader loader,
@@ -330,14 +335,20 @@ class ProcessorTestSupport {
         String src = sourceOf(compilation.generatedSourceFile(className)
                 .orElseThrow(() -> new AssertionError(className + ".java was not generated")));
 
-        assertThat(src).contains("Callable" + i + " c" + i);
+        // For Join3 (i=3): type param C (A+2), var name c (a+2)
+        char typeChar = (char) ('A' + i - 1);
+        char varChar = (char) ('a' + i - 1);
+
+        assertThat(src).contains("Callable" + i + "<"); // generic callable present
+        assertThat(src).contains(" c" + i); // field renamed (c2→c3 etc.)
         assertThat(src).doesNotContain("Callable2");
-        assertThat(src).doesNotContain("c2");
-        assertThat(src).contains("for (Object o" + i + " : right)");
+        assertThat(src).doesNotContain("c2;");
+        assertThat(src).contains("for (" + typeChar + " " + varChar + " : right)");
         assertThat(src).doesNotContain("@PermuteDeclr");
         assertThat(src).doesNotContain("@PermuteParam");
         assertThat(src).doesNotContain("@Permute");
 
+        // Behavioral: invoke left(arg1..arg{i-1}) with right=[lastArg]; callable should capture all
         Object[] leftArgs = IntStream.rangeClosed(1, i - 1).mapToObj(j -> "arg" + j).toArray();
         var fixture = prepareJoin(loader, className, List.of("R"));
         fixture.invoke("left", leftArgs);

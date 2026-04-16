@@ -1,5 +1,5 @@
 package io.quarkiverse.permuplate.example;
 
-public interface Callable2 {
-    void call(Object o1, Object o2);
+public interface Callable2<A, B> {
+    void call(A a, B b);
 }
