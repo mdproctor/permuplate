@@ -258,6 +258,34 @@ Placed on a `@Permute`-annotated class or method. Evaluated once per permutation
 
 **`buildGeneratedSet` is filter-aware:** when `@PermuteFilter` excludes a class, that class is also absent from the set used by `@PermuteReturn` boundary omission. Methods that would reference the filtered-out class are correctly omitted.
 
+### `@PermuteAnnotation`
+
+```java
+@Repeatable(PermuteAnnotations.class)
+@Retention(RetentionPolicy.SOURCE)
+@Target({ ElementType.TYPE, ElementType.METHOD, ElementType.FIELD })
+public @interface PermuteAnnotation {
+    String value();          // JEXL-evaluated Java annotation literal
+    String when() default ""; // JEXL boolean condition; empty = always apply
+}
+```
+
+Adds a Java annotation to the generated element. `value` is JEXL-evaluated and parsed with `StaticJavaParser.parseAnnotation()`. `when` is optional. Runs last in the transform pipeline.
+
+### `@PermuteThrows`
+
+```java
+@Repeatable(PermuteThrowsList.class)
+@Retention(RetentionPolicy.SOURCE)
+@Target(ElementType.METHOD)
+public @interface PermuteThrows {
+    String value();           // JEXL-evaluated exception class name
+    String when() default ""; // JEXL boolean condition; empty = always add
+}
+```
+
+Adds an exception type to a method's `throws` clause. Add-only. `value` parsed with `StaticJavaParser.parseClassOrInterfaceType()`. Multiple entries are supported via stacking.
+
 ---
 
 ## External Property Injection

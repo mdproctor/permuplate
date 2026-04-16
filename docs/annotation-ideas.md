@@ -149,9 +149,9 @@ The preprocessor strips the block when the condition is false. Trade-off: breaks
 |---|---|---|---|
 | String-set iteration | Medium | High | **Done** (#27) |
 | `@PermuteFilter` | Low | Medium | **Done** (#28) |
-| `@PermuteAnnotation` | Medium | Medium | Future |
+| `@PermuteAnnotation` | Medium | Medium | **Done** (#31) |
 | Record component expansion | High | Medium | **Done** (#29) |
-| `@PermuteThrows` | Low | Low | Future |
+| `@PermuteThrows` | Low | Low | **Done** (#32) |
 | Template composition | High | High | Long-term |
 | Retrograde mode | High | Medium | Long-term |
 | Functional from/to refs | Medium | Medium | Long-term |
