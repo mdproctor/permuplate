@@ -1,51 +1,37 @@
-# Handover — 2026-04-15
+# Handover — 2026-04-16
 
-**Head commit:** `abb8b76` — docs: add record expansion implementation plan
-**Session ended:** Disk space exhausted in /tmp (Claude agent output files). Git repo on main drive is fine.
+**Head commit:** `b1eaa20` — docs: template composition in README, OVERVIEW, CLAUDE.md, roadmap
+**GitHub:** All issues closed. Zero open issues.
 
 ---
 
 ## What Changed This Session
 
-### Features shipped
-- **`@Permute(values={...})`** — string-set iteration (#27, closed). APT + Maven plugin + IntelliJ indexes (version 5). 8 tests.
-- **`@PermuteFilter`** — skip specific permutation values (#28, closed). APT + Maven plugin. `@PermuteVar` XOR validation. `buildGeneratedSet` filter-aware. 9 tests.
-- **CLAUDE.md trimmed** — 47% reduction; annotation API detail moved to OVERVIEW.md.
-- **IntelliJ plugin**: `from`/`to` String-vs-int index bug fixed (was silently breaking 14 tests after #16). Plugin now at 58 tests.
-- **Generated family rename propagation** (#25, closed) — `addGeneratedFamilyRenames()` propagates renames to generated siblings atomically.
-- **IDE refactoring safety epic** (#24, closed).
-- **Documentation**: README + OVERVIEW + `permuplate-apt-examples/` updated (`FormatSerializer.java`, `FilteredCallable2.java`, `Tuple2Record.java` example not yet done).
-- **Record expansion**: Two blockers documented (`RecordExpansionTest.java`). Design spec and implementation plan written. **NOT YET IMPLEMENTED.**
-- **Vol2 + epics #5/#6/#7/#14/#23//#24/#25/#26/#27/#28** — all closed/resolved.
+### Major features shipped
+- **`@PermuteAnnotation` + `@PermuteThrows`** (#31, #32, epic #30) — conditional annotations and throws clause additions. Both work in APT + Maven plugin. IntelliJ inspections for value validation.
+- **Record template support** (#29) — full parity. `@Permute` on records works with `@PermuteDeclr`, `@PermuteParam`, `@PermuteTypeParam`, `@PermuteFilter`. `TypeDeclaration<?>` generalization across all transformers. 11 new tests.
+- **Template composition** (#33–#37) — `@PermuteSource` + `@PermuteDelegate`. Three capabilities: ordering+type inference (A), delegation synthesis (B), builder synthesis from records (C). Individual demos + EventSystem cohesive story. All issues closed.
+- **Documentation**: README, OVERVIEW, CLAUDE.md updated for all new features. Example templates in `permuplate-mvn-examples/src/main/permuplate/.../composition/`.
 
-### Open GitHub issues
-| # | Status |
-|---|---|
-| #5 (Drools migration) | Open — ctx position deferred |
-| #4 (VS Code) | Parked |
+### Annotation roadmap (docs/annotation-ideas.md)
+All Tier 1 and Tier 2 items done. Only long-term remain:
+- **Functional from/to refs** — reference another template's range
+- **`@PermuteConditional`** — annotation-based conditional blocks (hard, breaks valid-Java guarantee)
+
+### Clean state
+- 208 tests, 0 failures
+- Zero open GitHub issues
+- **Unstaged changes** in working tree: `PermuteAnnotation.java`, `PermuteStatementsTransformer.java`, `PermuteValueTransformer.java`, and a stray `com/` directory — likely linter reformats from subagents. Investigate before next commit.
 
 ---
 
 ## Immediate Next Step
 
-**Record expansion — Task 1** (plan: `docs/superpowers/plans/2026-04-15-record-expansion.md`):
-
-1. Clear `/private/tmp/claude-501/` — disk was full, blocked agent tools
-2. `gh issue create` for record template support (#29)
-3. Add `StaticJavaParser.getParserConfiguration().setLanguageLevel(JAVA_17)` to `PermuteProcessor.init()`
-4. Rewrite `RecordExpansionTest.java` with 4 target-state failing tests (see plan Task 1)
-5. Commit `Refs #29`
-6. Continue with Task 2–6 per plan (subagent-driven recommended)
-
----
-
-## Annotation Roadmap
-
-`docs/annotation-ideas.md` — full list. Remaining actionable:
-- **Record expansion** — plan written, **not started** (6-task plan ready)
-- **`@PermuteAnnotation`** — add class-level annotations per permutation
-- **`@PermuteThrows`** — low priority
-- Long-term: template composition, retrograde mode, functional from/to refs
+No tracked work remains. Options:
+1. **`@PermuteConditional`** — highest complexity remaining; needs design before implementing
+2. **Functional from/to refs** — moderate effort, clear design
+3. **`@PermuteAnnotation` in APT mode** — currently Maven-plugin only (same limitation as `@PermuteSource`)
+4. **Brainstorm a new use case** — template composition + existing features may unlock new patterns
 
 ---
 
@@ -53,11 +39,8 @@
 
 | Context | Where |
 |---|---|
-| Record expansion plan | `docs/superpowers/plans/2026-04-15-record-expansion.md` |
-| Record expansion spec | `docs/superpowers/specs/2026-04-15-record-expansion-design.md` |
 | Annotation roadmap | `docs/annotation-ideas.md` |
+| Template composition spec | `docs/superpowers/specs/2026-04-16-template-composition-design.md` |
+| Composition examples | `permuplate-mvn-examples/src/main/permuplate/.../composition/` |
 | IDEAS.md | `docs/ideas/IDEAS.md` (ctx position only active entry) |
 | Previous handover | `git show HEAD~1:HANDOFF.md` |
- (plugin done) | `docs/blog/2026-04-08-mdp02-plugin-complete-drools-waits.md` |
-| Vol2 reference | `/Users/mdproctor/dev/droolsoct2025/droolsvol2/` |
-| Drools gap issues | `apache/incubator-kie-drools` #6639–#6647 |
