@@ -240,15 +240,9 @@ public class TemplateCompositionTest {
 
     @Test
     public void testEventSystemCohesiveExample() throws Exception {
-        // Placeholder — full test in InlineGenerationTest (Task 7)
-        assertThat(new PermuteSource() {
-            public Class<? extends java.lang.annotation.Annotation> annotationType() {
-                return PermuteSource.class;
-            }
-
-            public String value() {
-                return "Test${i}";
-            }
-        }.value()).isEqualTo("Test${i}");
+        // Full end-to-end test: InlineGenerationTest.testEventSystemAllCapabilities()
+        // This verifies the annotation types exist and are importable.
+        assertThat(PermuteSource.class.getSimpleName()).isEqualTo("PermuteSource");
+        assertThat(PermuteDelegate.class.getSimpleName()).isEqualTo("PermuteDelegate");
     }
 }

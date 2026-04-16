@@ -10,6 +10,7 @@ import org.junit.Test;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteVarConfig;
@@ -347,6 +348,89 @@ public class InlineGenerationTest {
         assertThat(output).contains("Tuple4");
         assertThat(output).contains("D d");
         assertThat(output).doesNotContain("Tuple2"); // keepTemplate=false
+    }
+
+    // -------------------------------------------------------------------------
+    // End-to-end: EventSystem cohesive example — all composition capabilities
+    // -------------------------------------------------------------------------
+
+    /**
+     * End-to-end: Event system cohesive example — all composition capabilities together.
+     * Event${i} records → Event${i}Builder (Capability C), EventFilter${i} (Capability A).
+     */
+    @Test
+    public void testEventSystemAllCapabilities() throws Exception {
+        com.github.javaparser.StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_17);
+        CompilationUnit cu = com.github.javaparser.StaticJavaParser.parse(
+                new java.io.File(
+                        "/Users/mdproctor/claude/permuplate/permuplate-mvn-examples" +
+                                "/src/main/permuplate/io/quarkiverse/permuplate/example/composition/EventSystem.java"));
+
+        ClassOrInterfaceDeclaration parent = cu.getClassByName("EventSystem").orElseThrow();
+
+        io.quarkiverse.permuplate.maven.AnnotationReader reader = new io.quarkiverse.permuplate.maven.AnnotationReader();
+
+        // Find templates by their sentinel names
+        TypeDeclaration<?> eventTemplate = findNestedType(parent, "Event2");
+        TypeDeclaration<?> builderTemplate = findNestedType(parent, "Event3Builder");
+        TypeDeclaration<?> filterTemplate = findNestedType(parent, "EventFilter3");
+
+        // Pass 1: generate Event records (root family)
+        io.quarkiverse.permuplate.core.PermuteConfig eventConfig = reader.readPermuteConfig(eventTemplate);
+        List<Map<String, Object>> eventCombos = io.quarkiverse.permuplate.core.PermuteConfig.buildAllCombinations(eventConfig);
+        CompilationUnit afterEvents = new io.quarkiverse.permuplate.maven.InlineGenerator().generate(cu, eventTemplate,
+                eventConfig, eventCombos);
+
+        // Pass 2: generate EventBuilders (Capability C — builder synthesis)
+        io.quarkiverse.permuplate.core.PermuteConfig builderConfig = reader.readPermuteConfig(builderTemplate);
+        List<Map<String, Object>> builderCombos = io.quarkiverse.permuplate.core.PermuteConfig
+                .buildAllCombinations(builderConfig);
+        CompilationUnit afterBuilders = new io.quarkiverse.permuplate.maven.InlineGenerator().generate(afterEvents,
+                builderTemplate, builderConfig, builderCombos);
+
+        // Pass 3: generate EventFilters (Capability A — type param inference)
+        io.quarkiverse.permuplate.core.PermuteConfig filterConfig = reader.readPermuteConfig(filterTemplate);
+        List<Map<String, Object>> filterCombos = io.quarkiverse.permuplate.core.PermuteConfig
+                .buildAllCombinations(filterConfig);
+        CompilationUnit afterFilters = new io.quarkiverse.permuplate.maven.InlineGenerator().generate(afterBuilders,
+                filterTemplate, filterConfig, filterCombos);
+
+        String output = afterFilters.toString();
+
+        // All event records generated
+        assertThat(output).contains("Event3");
+        assertThat(output).contains("Event4");
+        assertThat(output).contains("Event5");
+
+        // Capability C: builders generated with build() and return this
+        assertThat(output).contains("Event3Builder");
+        assertThat(output).contains("Event4Builder");
+        assertThat(output).contains("Event5Builder");
+        assertThat(output).contains("build()");
+        assertThat(output).contains("return this");
+
+        // Capability A: EventFilter classes with type params inferred from Event${i}
+        assertThat(output).contains("EventFilter3");
+        assertThat(output).contains("EventFilter4");
+        assertThat(output).contains("EventFilter5");
+
+        // Template sentinels removed (keepTemplate=false)
+        assertThat(output).doesNotContain("record Event2"); // root template gone
+        assertThat(output).doesNotContain("class Event3Builder {}"); // empty template body gone
+
+        // No permuplate loop annotation residue on declarations
+        assertThat(output).doesNotContain("@Permute(varName");
+    }
+
+    private static TypeDeclaration<?> findNestedType(
+            ClassOrInterfaceDeclaration parent, String name) {
+        return parent.getMembers().stream()
+                .filter(m -> m instanceof TypeDeclaration<?>)
+                .map(m -> (TypeDeclaration<?>) m)
+                .filter(t -> t.getNameAsString().equals(name))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Type not found: " + name));
     }
 
     // -------------------------------------------------------------------------
