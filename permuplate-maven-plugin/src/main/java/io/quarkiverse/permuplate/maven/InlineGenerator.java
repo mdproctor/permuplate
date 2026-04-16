@@ -138,14 +138,22 @@ public class InlineGenerator {
             // Rename constructors (only applies to class/record, not interface)
             generated.getConstructors().forEach(ctor -> ctor.setName(newClassName));
 
-            // Infer type parameters from @PermuteSource if present
+            // Apply @PermuteTypeParam transformations first — must run before @PermuteSource
+            // type param injection so that implicit expansion (triggered by @PermuteParam type=T${j}
+            // matching a class type param) does not fire on source-injected params.
+            PermuteTypeParamTransformer.transform(generated, ctx, null, null);
+
+            // Infer type parameters from @PermuteSource if present — after @PermuteTypeParam so
+            // that implicit expansion does not confuse source-injected params with sentinel params.
             applySourceTypeParams(generated, templateClassDecl, parentCu, ctx);
 
-            // Builder synthesis: empty body + record source → complete fluent builder
-            applyBuilderSynthesis(generated, templateClassDecl, parentCu, ctx);
+            // Update type references from template sentinel (e.g. Callable2<Object>)
+            // to generated source (e.g. Callable3<A, B, C>) throughout the class body.
+            applySourceTypeRefUpdate(generated, templateClassDecl, parentCu, ctx);
 
-            // Apply transformations (null messager — Maven plugin has no Messager)
-            PermuteTypeParamTransformer.transform(generated, ctx, null, null);
+            // Builder synthesis: empty body + record source → complete fluent builder
+            // (runs after applySourceTypeParams so type param names are already set)
+            applyBuilderSynthesis(generated, templateClassDecl, parentCu, ctx);
 
             if (!isRecord) {
                 ClassOrInterfaceDeclaration coid = (ClassOrInterfaceDeclaration) generated;
@@ -235,12 +243,14 @@ public class InlineGenerator {
             // Synthesise @PermuteDelegate method bodies
             applyPermuteDelegate(generated, parentCu);
 
-            // Strip @Permute, @PermuteFilter, @PermuteFilters
+            // Strip @Permute, @PermuteFilter, @PermuteFilters, @PermuteSource, @PermuteSources
             generated.getAnnotations().removeIf(a -> {
                 String n = a.getNameAsString();
                 return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute")
                         || n.equals("PermuteFilter") || n.equals("io.quarkiverse.permuplate.PermuteFilter")
-                        || n.equals("PermuteFilters") || n.equals("io.quarkiverse.permuplate.PermuteFilters");
+                        || n.equals("PermuteFilters") || n.equals("io.quarkiverse.permuplate.PermuteFilters")
+                        || n.equals("PermuteSource") || n.equals("io.quarkiverse.permuplate.PermuteSource")
+                        || n.equals("PermuteSources") || n.equals("io.quarkiverse.permuplate.PermuteSources");
             });
 
             outputParent.addMember(generated);
@@ -1294,6 +1304,137 @@ public class InlineGenerator {
     }
 
     /**
+     * Rewrites all type references of the form {@code TemplateSourceN<...>} to
+     * {@code CurrentSourceN<A, B, ...>} throughout the generated class body.
+     *
+     * <p>
+     * Example: template says {@code implements Callable2<Object>}; for i=3 the
+     * source is {@code Callable3<A,B,C>}, so the implements clause becomes
+     * {@code implements Callable3<A, B, C>}.
+     *
+     * <p>
+     * The template source name (e.g. {@code Callable2}) is read from the first
+     * {@code @PermuteSource} pattern evaluated with the <em>template</em>'s sentinel
+     * value (the embedded number in the template class name). The current source name
+     * is the same pattern evaluated with the current context.
+     *
+     * <p>
+     * Rewrites:
+     * <ul>
+     * <li>implements / extends type arguments on the class declaration</li>
+     * <li>field declared types</li>
+     * <li>method parameter types</li>
+     * <li>constructor parameter types</li>
+     * </ul>
+     */
+    private static void applySourceTypeRefUpdate(TypeDeclaration<?> generated,
+            TypeDeclaration<?> templateClass,
+            CompilationUnit parentCu,
+            EvaluationContext ctx) {
+        List<String> patterns = readSourceNamePatterns(templateClass);
+        if (patterns.isEmpty())
+            return;
+
+        // Determine the template's embedded sentinel number from templateClass name
+        String templateClassName = templateClass.getNameAsString();
+        int templateEmbedded = firstEmbeddedNumber(templateClassName);
+
+        // Current generated source name (e.g. "Callable3" for i=3)
+        String currentSourceName = ctx.evaluate(patterns.get(0));
+
+        // Template sentinel source name (e.g. "Callable2"): evaluate pattern with
+        // the template's embedded number substituted for the primary var.
+        // We derive this by replacing the number in templateClassName with the
+        // pattern to find what the source pattern resolves to at template time.
+        // Simpler: just look for any ClassOrInterfaceType whose name ends with a
+        // number that, when the number is replaced by the template's sentinel,
+        // matches the current source name prefix.
+        // Even simpler approach: for each @PermuteSource pattern, build all source
+        // names the pattern can produce and find the one that appears in the class body.
+
+        // Find the source type in parentCu to get its type parameter names
+        Optional<TypeDeclaration<?>> sourceTypeOpt = parentCu.findFirst(ClassOrInterfaceDeclaration.class,
+                c -> c.getNameAsString().equals(currentSourceName))
+                .<TypeDeclaration<?>> map(c -> c)
+                .or(() -> parentCu.findFirst(RecordDeclaration.class,
+                        r -> r.getNameAsString().equals(currentSourceName)));
+        if (sourceTypeOpt.isEmpty())
+            return;
+
+        // Build the new type arg string from the current source's type parameters
+        String newTypeArgStr;
+        TypeDeclaration<?> sourceType = sourceTypeOpt.get();
+        if (sourceType instanceof NodeWithTypeParameters<?> nwtp) {
+            @SuppressWarnings("unchecked")
+            NodeList<TypeParameter> tps = ((NodeWithTypeParameters<TypeDeclaration<?>>) nwtp).getTypeParameters();
+            if (tps.isEmpty())
+                return; // no type params to substitute
+            newTypeArgStr = tps.stream().map(TypeParameter::getNameAsString).collect(Collectors.joining(", "));
+        } else {
+            return;
+        }
+
+        // Determine the template sentinel source name (what the template literally contains,
+        // e.g. "Callable2" or "SyncCallable2"). Strategy: find the source name prefix
+        // (everything before the number in currentSourceName) and add templateEmbedded.
+        String currentPrefix = prefixBeforeFirstDigit(currentSourceName);
+        String templateSourceName = templateEmbedded >= 0
+                ? currentPrefix + templateEmbedded
+                : currentSourceName;
+
+        // New type string to replace with (e.g. "Callable3<A, B, C>")
+        String newTypeStr = currentSourceName + "<" + newTypeArgStr + ">";
+
+        // Rewrite all ClassOrInterfaceType nodes whose simple name equals templateSourceName
+        // (or currentSourceName when they already match — handles cases where the template
+        // uses a name that doesn't have an embedded number).
+        generated.walk(com.github.javaparser.ast.type.ClassOrInterfaceType.class, typeRef -> {
+            String refName = typeRef.getNameAsString();
+            if (refName.equals(templateSourceName) || refName.equals(currentSourceName)) {
+                // Only rewrite if type args are present (don't touch raw type references)
+                if (typeRef.getTypeArguments().isPresent()) {
+                    try {
+                        com.github.javaparser.ast.type.ClassOrInterfaceType replacement = StaticJavaParser
+                                .parseClassOrInterfaceType(newTypeStr);
+                        typeRef.setName(replacement.getNameAsString());
+                        typeRef.setTypeArguments(replacement.getTypeArguments().orElse(null));
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        });
+
+        // Also rewrite the implements/extends clause on the class declaration itself
+        if (generated instanceof ClassOrInterfaceDeclaration coid) {
+            rewriteTypeList(coid.getImplementedTypes(), templateSourceName, currentSourceName, newTypeStr);
+            rewriteTypeList(coid.getExtendedTypes(), templateSourceName, currentSourceName, newTypeStr);
+        }
+    }
+
+    /**
+     * Rewrites any entry in {@code types} whose simple name is {@code templateSourceName}
+     * or {@code currentSourceName} and that carries type arguments, replacing it with
+     * the fully-specified {@code newTypeStr}.
+     */
+    private static void rewriteTypeList(
+            NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> types,
+            String templateSourceName,
+            String currentSourceName,
+            String newTypeStr) {
+        for (int idx = 0; idx < types.size(); idx++) {
+            com.github.javaparser.ast.type.ClassOrInterfaceType t = types.get(idx);
+            String name = t.getNameAsString();
+            if ((name.equals(templateSourceName) || name.equals(currentSourceName))
+                    && t.getTypeArguments().isPresent()) {
+                try {
+                    types.set(idx, StaticJavaParser.parseClassOrInterfaceType(newTypeStr));
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    /**
      * If the template has @PermuteSource referencing a RecordDeclaration AND the
      * generated class body is empty (no declared members), synthesises a complete
      * fluent builder:
@@ -1411,11 +1552,15 @@ public class InlineGenerator {
             String fieldName = field.getVariables().get(0).getNameAsString();
 
             // Find that type in parentCu
-            Optional<TypeDeclaration<?>> sourceType = parentCu.findFirst(ClassOrInterfaceDeclaration.class,
+            Optional<TypeDeclaration<?>> sourceTypeOpt2 = parentCu.findFirst(ClassOrInterfaceDeclaration.class,
                     c -> c.getNameAsString().equals(fieldTypeName))
                     .<TypeDeclaration<?>> map(c -> c);
-            if (sourceType.isEmpty())
+            if (sourceTypeOpt2.isEmpty())
                 continue;
+
+            // Interface methods are implicitly public — the synthesised delegate must be public.
+            ClassOrInterfaceDeclaration sourceInterface = (ClassOrInterfaceDeclaration) sourceTypeOpt2.get();
+            boolean sourceIsInterface = sourceInterface.isInterface();
 
             // Collect method names already declared in the generated class (user takes precedence)
             Set<String> declaredMethods = generated.getMethods().stream()
@@ -1425,7 +1570,7 @@ public class InlineGenerator {
             // Synthesise delegating methods for each undeclared source method
             final String mod = modifier;
             final String fname = fieldName;
-            sourceType.get().getMethods().forEach(srcMethod -> {
+            sourceTypeOpt2.get().getMethods().forEach(srcMethod -> {
                 if (declaredMethods.contains(srcMethod.getNameAsString()))
                     return;
 
@@ -1445,7 +1590,11 @@ public class InlineGenerator {
                         : " throws " + srcMethod.getThrownExceptions().stream()
                                 .map(Object::toString).collect(Collectors.joining(", "));
 
-                String methodSrc = (mod.isEmpty() ? "" : mod + " ")
+                // Interface methods are implicitly public — emit "public" so the implementing
+                // class does not weaken the access privilege.
+                String accessMod = sourceIsInterface ? "public " : "";
+
+                String methodSrc = accessMod + (mod.isEmpty() ? "" : mod + " ")
                         + srcMethod.getTypeAsString() + " " + srcMethod.getNameAsString()
                         + "(" + paramDecls + ")" + throws_ + " " + body;
 

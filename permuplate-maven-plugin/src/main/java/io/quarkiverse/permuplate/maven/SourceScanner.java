@@ -13,6 +13,8 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.RecordDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 
 /**
@@ -24,7 +26,13 @@ public class SourceScanner {
     private SourceScanner() {
     }
 
-    public record AnnotatedType(CompilationUnit cu, ClassOrInterfaceDeclaration classDecl,
+    /**
+     * Holds a class, interface, or record annotated with {@code @Permute}.
+     * Use {@code typeDecl} for the general TypeDeclaration API.
+     * Cast to {@code ClassOrInterfaceDeclaration} or {@code RecordDeclaration}
+     * when type-specific operations are needed.
+     */
+    public record AnnotatedType(CompilationUnit cu, TypeDeclaration<?> typeDecl,
             AnnotationExpr permuteAnn, Path sourceFile) {
     }
 
@@ -37,7 +45,7 @@ public class SourceScanner {
 
     /**
      * Scans {@code directory} recursively for {@code .java} files and returns all
-     * classes and methods annotated with {@code @Permute}.
+     * classes, interfaces, records, and methods annotated with {@code @Permute}.
      */
     public static ScanResult scan(File directory) throws IOException {
         List<AnnotatedType> types = new ArrayList<>();
@@ -52,9 +60,14 @@ public class SourceScanner {
                 .forEach(path -> {
                     try {
                         CompilationUnit cu = StaticJavaParser.parse(path);
+                        // Scan classes and interfaces
                         cu.findAll(ClassOrInterfaceDeclaration.class)
                                 .forEach(classDecl -> findPermuteAnnotation(classDecl.getAnnotations())
                                         .ifPresent(ann -> types.add(new AnnotatedType(cu, classDecl, ann, path))));
+                        // Scan records (e.g. template records for Capability C builder synthesis)
+                        cu.findAll(RecordDeclaration.class)
+                                .forEach(recordDecl -> findPermuteAnnotation(recordDecl.getAnnotations())
+                                        .ifPresent(ann -> types.add(new AnnotatedType(cu, recordDecl, ann, path))));
                         cu.findAll(MethodDeclaration.class).forEach(method -> findPermuteAnnotation(method.getAnnotations())
                                 .ifPresent(ann -> methods.add(new AnnotatedMethod(cu, method, ann, path))));
                     } catch (Exception e) {

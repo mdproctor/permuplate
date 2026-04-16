@@ -22,6 +22,8 @@ import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.RecordDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
@@ -147,7 +149,7 @@ public class PermuteMojo extends AbstractMojo {
                     } catch (AnnotationReader.MojoAnnotationException e) {
                         throw new MojoExecutionException(entry.sourceFile() + ": " + e.getMessage(), e);
                     }
-                    boolean isNested = entry.classDecl().isNestedType();
+                    boolean isNested = entry.typeDecl().isNestedType();
                     if (config.inline && !isNested) {
                         throw new MojoExecutionException(entry.sourceFile() +
                                 ": @Permute inline=true is only valid on nested static classes");
@@ -183,7 +185,7 @@ public class PermuteMojo extends AbstractMojo {
         }
 
         // Validate inline only on nested classes
-        boolean isNested = entry.classDecl().isNestedType();
+        boolean isNested = entry.typeDecl().isNestedType();
         if (config.inline && !isNested) {
             throw new MojoExecutionException(entry.sourceFile() +
                     ": @Permute inline=true is only valid on nested static classes");
@@ -252,7 +254,7 @@ public class PermuteMojo extends AbstractMojo {
 
     private void generateTopLevel(SourceScanner.AnnotatedType entry, PermuteConfig config)
             throws Exception {
-        String templateClassName = entry.classDecl().getNameAsString();
+        String templateClassName = entry.typeDecl().getNameAsString();
         List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
 
         // Prefix check using full substring matching — consistent with APT processor.
@@ -269,9 +271,15 @@ public class PermuteMojo extends AbstractMojo {
                     "\" — the className expression must reference the template class name");
         }
 
+        if (!(entry.typeDecl() instanceof ClassOrInterfaceDeclaration)) {
+            throw new MojoExecutionException(entry.sourceFile() +
+                    ": top-level (non-inline) @Permute templates must be classes or interfaces;" +
+                    " records require inline=true");
+        }
+
         for (Map<String, Object> vars : allCombinations) {
             EvaluationContext ctx = new EvaluationContext(vars);
-            ClassOrInterfaceDeclaration classDecl = entry.classDecl().clone();
+            ClassOrInterfaceDeclaration classDecl = ((ClassOrInterfaceDeclaration) entry.typeDecl()).clone();
             classDecl.setStatic(false);
             if (!classDecl.isPublic())
                 classDecl.setModifier(Modifier.Keyword.PUBLIC, true);
@@ -309,7 +317,7 @@ public class PermuteMojo extends AbstractMojo {
             throws Exception {
         List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
         CompilationUnit outputCu = InlineGenerator.generate(
-                entry.cu(), entry.classDecl(), config, allCombinations);
+                entry.cu(), entry.typeDecl(), config, allCombinations);
 
         // Write the augmented parent using the TOP-LEVEL class name
         String parentClassName = entry.cu().findFirst(ClassOrInterfaceDeclaration.class,
@@ -343,14 +351,19 @@ public class PermuteMojo extends AbstractMojo {
         com.github.javaparser.ast.CompilationUnit currentCu = entries.get(0).cu();
 
         for (SourceScanner.AnnotatedType entry : entries) {
-            String templateName = entry.classDecl().getNameAsString();
+            String templateName = entry.typeDecl().getNameAsString();
 
             // Find the template in the CURRENT CU — may be output of a previous call.
-            ClassOrInterfaceDeclaration currentTemplate = currentCu.findFirst(
-                    ClassOrInterfaceDeclaration.class,
-                    c -> c.getNameAsString().equals(templateName))
+            // Supports both class/interface and record templates.
+            final String tName = templateName;
+            final com.github.javaparser.ast.CompilationUnit searchCu = currentCu;
+            TypeDeclaration<?> currentTemplate = searchCu.findFirst(ClassOrInterfaceDeclaration.class,
+                    c -> c.getNameAsString().equals(tName))
+                    .<TypeDeclaration<?>> map(c -> c)
+                    .or(() -> searchCu.findFirst(RecordDeclaration.class,
+                            r -> r.getNameAsString().equals(tName)))
                     .orElseThrow(() -> new MojoExecutionException(sourceFile +
-                            ": cannot find template class '" + templateName + "' in current CU"));
+                            ": cannot find template '" + tName + "' in current CU"));
 
             // Re-read @Permute config from the template in the current CU.
             com.github.javaparser.ast.expr.AnnotationExpr permuteAnn = currentTemplate.getAnnotations().stream()
@@ -358,7 +371,7 @@ public class PermuteMojo extends AbstractMojo {
                             || a.getNameAsString().equals("io.quarkiverse.permuplate.Permute"))
                     .findFirst()
                     .orElseThrow(() -> new MojoExecutionException(sourceFile +
-                            ": @Permute annotation missing on '" + templateName + "'"));
+                            ": @Permute annotation missing on '" + tName + "'"));
 
             PermuteConfig config;
             try {
@@ -395,7 +408,7 @@ public class PermuteMojo extends AbstractMojo {
         List<SourceScanner.AnnotatedType> sources = new java.util.ArrayList<>();
         List<SourceScanner.AnnotatedType> derived = new java.util.ArrayList<>();
         for (SourceScanner.AnnotatedType t : templates) {
-            if (reader.readPermuteSourceNames(t.classDecl()).isEmpty()) {
+            if (reader.readPermuteSourceNames(t.typeDecl()).isEmpty()) {
                 sources.add(t);
             } else {
                 derived.add(t);
