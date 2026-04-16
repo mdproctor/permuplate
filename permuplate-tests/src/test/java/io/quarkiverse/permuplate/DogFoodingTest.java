@@ -26,8 +26,6 @@ public class DogFoodingTest {
 
     @Test
     public void testCallable1GeneratesCallable2Through10() {
-        // Callable1 only uses Object, so no support sources are needed;
-        // the processor expands @PermuteParam directly in the interface method.
         var compilation = Compiler.javac()
                 .withProcessors(new PermuteProcessor())
                 .compile(templateSource(Callable1.class));
@@ -43,11 +41,20 @@ public class DogFoodingTest {
                     .orElseThrow(() -> new AssertionError(className + " was not generated")));
             assertThat(src).contains("public interface Callable" + i);
             assertThat(src).doesNotContain("public class");
+            // Type parameters: Callable2<A, B>, Callable3<A, B, C>, etc.
+            var typeParams = new StringBuilder("Callable" + i + "<");
+            for (int j = 1; j <= i; j++) {
+                if (j > 1)
+                    typeParams.append(", ");
+                typeParams.append((char) ('A' + j - 1));
+            }
+            assertThat(src).contains(typeParams.append(">").toString());
+            // Typed parameters: call(A a, B b, ...)
             var params = new StringBuilder("void call(");
             for (int j = 1; j <= i; j++) {
                 if (j > 1)
                     params.append(", ");
-                params.append("Object o").append(j);
+                params.append((char) ('A' + j - 1)).append(" ").append((char) ('a' + j - 1));
             }
             assertThat(src).contains(params.append(")").toString());
             assertThat(src).doesNotContain("@Permute");

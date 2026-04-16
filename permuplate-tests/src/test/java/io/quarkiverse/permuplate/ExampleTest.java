@@ -44,11 +44,11 @@ public class ExampleTest {
         // --- Structural: ProductFilter3 (minimum arity) ---
         var src3 = sourceOf(compilation.generatedSourceFile(
                 generatedClassName(ProductFilter2.class, 3)).orElseThrow());
-        assertThat(src3).contains("Callable3 matchFn3");
+        assertThat(src3).contains("Callable3<A, B, C> matchFn3");
         assertThat(src3).doesNotContain("matchFn2");
-        assertThat(src3).contains("Object criterion1, Object criterion2");
+        assertThat(src3).contains("A criterion1, B criterion2");
         assertThat(src3).contains("List<Object> matches");
-        assertThat(src3).contains("for (Object product3 : catalogue)");
+        assertThat(src3).contains("for (C product3 : catalogue)");
         assertThat(src3).doesNotContain("product2");
         assertThat(src3).doesNotContain("@PermuteDeclr");
         assertThat(src3).doesNotContain("@PermuteParam");
@@ -56,10 +56,11 @@ public class ExampleTest {
         // --- Structural: ProductFilter7 (maximum arity, 6 criteria) ---
         var src7 = sourceOf(compilation.generatedSourceFile(
                 generatedClassName(ProductFilter2.class, 7)).orElseThrow());
-        assertThat(src7).contains("Callable7 matchFn7");
-        assertThat(src7).contains("for (Object product7 : catalogue)");
-        // All 6 generated criteria present in the method signature
-        IntStream.rangeClosed(1, 6).forEach(j -> assertThat(src7).contains("Object criterion" + j));
+        assertThat(src7).contains("Callable7<"); // generic callable present
+        assertThat(src7).contains("matchFn7");
+        assertThat(src7).contains("for (G product7 : catalogue)");
+        // All 6 generated criteria present in the method signature (typed A..F)
+        IntStream.rangeClosed(1, 6).forEach(j -> assertThat(src7).contains("criterion" + j));
 
         // --- Behavioural: ProductFilter3 ---
         // search("Electronics", "under-1000", matches) with catalogue=["laptop"]
@@ -103,27 +104,28 @@ public class ExampleTest {
         // --- Structural: AuditRecord3 ---
         var src3 = sourceOf(compilation.generatedSourceFile(
                 generatedClassName(AuditRecord2.class, 3)).orElseThrow());
-        assertThat(src3).contains("Callable3 writer3");
+        assertThat(src3).contains("Callable3<A, B, C> writer3");
         assertThat(src3).doesNotContain("writer2");
         // Fixed params present in method signature
         assertThat(src3).contains("String eventType");
         assertThat(src3).contains("String severity");
-        // Permuted context fields
-        assertThat(src3).contains("Object context1, Object context2");
-        assertThat(src3).contains("for (Object sink3 : sinks)");
+        // Permuted context fields (now typed A, B)
+        assertThat(src3).contains("A context1, B context2");
+        assertThat(src3).contains("for (C sink3 : sinks)");
         // eventType must appear before the context params (fixed before sentinel)
-        assertThat(src3.indexOf("String eventType")).isLessThan(src3.indexOf("Object context1"));
+        assertThat(src3.indexOf("String eventType")).isLessThan(src3.indexOf("A context1"));
         // severity must appear after the context params (fixed after sentinel)
-        assertThat(src3.indexOf("Object context1")).isLessThan(src3.indexOf("String severity"));
+        assertThat(src3.indexOf("A context1")).isLessThan(src3.indexOf("String severity"));
         assertThat(src3).doesNotContain("@PermuteDeclr");
         assertThat(src3).doesNotContain("@PermuteParam");
 
         // --- Structural: AuditRecord6 (5 context fields) ---
         var src6 = sourceOf(compilation.generatedSourceFile(
                 generatedClassName(AuditRecord2.class, 6)).orElseThrow());
-        assertThat(src6).contains("Callable6 writer6");
-        assertThat(src6).contains("for (Object sink6 : sinks)");
-        IntStream.rangeClosed(1, 5).forEach(j -> assertThat(src6).contains("Object context" + j));
+        assertThat(src6).contains("Callable6<"); // generic callable present
+        assertThat(src6).contains("writer6");
+        assertThat(src6).contains("for (F sink6 : sinks)");
+        IntStream.rangeClosed(1, 5).forEach(j -> assertThat(src6).contains("context" + j));
 
         // --- Behavioural: AuditRecord3 with two sinks ---
         // record("USER_LOGIN", "tenant-1", "user-42", "WARN")
@@ -169,10 +171,10 @@ public class ExampleTest {
         assertThat(src3).contains("public class FieldValidator3");
         assertThat(src3).doesNotContain("public static class FieldValidator3");
         assertThat(src3).doesNotContain("class ValidationSuite");
-        assertThat(src3).contains("Callable3 ruleFn3"); // field renamed
-        assertThat(src3).contains("Object field1, Object field2");
+        assertThat(src3).contains("Callable3<A, B, C> ruleFn3"); // field renamed, now generic
+        assertThat(src3).contains("A field1, B field2");
         assertThat(src3).contains("List<String> errors");
-        assertThat(src3).contains("for (Object rule3 : rules)");
+        assertThat(src3).contains("for (C rule3 : rules)");
         assertThat(src3).doesNotContain("@PermuteDeclr");
         assertThat(src3).doesNotContain("@PermuteParam");
 
@@ -181,8 +183,9 @@ public class ExampleTest {
                 generatedClassName(ValidationSuite.FieldValidator2.class, 6)).orElseThrow());
         assertThat(src6).contains("public class FieldValidator6");
         assertThat(src6).doesNotContain("class ValidationSuite");
-        assertThat(src6).contains("Callable6 ruleFn6");
-        IntStream.rangeClosed(1, 5).forEach(j -> assertThat(src6).contains("Object field" + j));
+        assertThat(src6).contains("Callable6<"); // generic callable present
+        assertThat(src6).contains("ruleFn6");
+        IntStream.rangeClosed(1, 5).forEach(j -> assertThat(src6).contains("field" + j));
 
         // --- Behavioural: FieldValidator3 with two rules ---
         // validate("alice", "alice@example.com", errors) with rules=["notBlank","validEmail"]

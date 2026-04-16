@@ -41,16 +41,15 @@ public class PermuteParamTest {
 
         var loader = classLoaderFor(compilation);
 
-        // ContextJoin3: sentinel expands to (o1, o2), for-each → o3
+        // ContextJoin3: sentinel expands to (a, b), for-each → c (typed)
         var src3 = sourceOf(compilation.generatedSourceFile(generatedClassName(ContextJoin2.class, 3)).orElseThrow());
-        assertThat(src3).contains("Callable3 c3");
+        assertThat(src3).contains("Callable3<A, B, C> c3");
         assertThat(src3).contains("String ctx");
-        assertThat(src3).contains("Object o1, Object o2");
+        assertThat(src3).contains("A a, B b");
         assertThat(src3).contains("List<Object> results");
-        assertThat(src3.indexOf("String ctx")).isLessThan(src3.indexOf("Object o1"));
-        assertThat(src3.indexOf("Object o1")).isLessThan(src3.indexOf("List<Object> results"));
-        assertThat(src3).contains("for (Object o3 : right)");
-        assertThat(src3).doesNotContain("for (Object o2");
+        assertThat(src3.indexOf("String ctx")).isLessThan(src3.indexOf("A a"));
+        assertThat(src3.indexOf("A a")).isLessThan(src3.indexOf("List<Object> results"));
+        assertThat(src3).contains("for (C c : right)");
         assertThat(src3).doesNotContain("@PermuteDeclr");
         assertThat(src3).doesNotContain("@PermuteParam");
 
@@ -61,16 +60,15 @@ public class PermuteParamTest {
         assertThat(fix3.captured).containsExactly("arg1", "arg2", "R").inOrder();
         assertThat(results3).containsExactly("R");
 
-        // ContextJoin4: sentinel expands to (o1, o2, o3), for-each → o4
+        // ContextJoin4: sentinel expands to (a, b, c), for-each → d (typed)
         var src4 = sourceOf(compilation.generatedSourceFile(generatedClassName(ContextJoin2.class, 4)).orElseThrow());
-        assertThat(src4).contains("Callable4 c4");
+        assertThat(src4).contains("Callable4<A, B, C, D> c4");
         assertThat(src4).contains("String ctx");
-        assertThat(src4).contains("Object o1, Object o2, Object o3");
+        assertThat(src4).contains("A a, B b, C c");
         assertThat(src4).contains("List<Object> results");
-        assertThat(src4.indexOf("String ctx")).isLessThan(src4.indexOf("Object o1"));
-        assertThat(src4.indexOf("Object o1")).isLessThan(src4.indexOf("List<Object> results"));
-        assertThat(src4).contains("for (Object o4 : right)");
-        assertThat(src4).doesNotContain("for (Object o2");
+        assertThat(src4.indexOf("String ctx")).isLessThan(src4.indexOf("A a"));
+        assertThat(src4.indexOf("A a")).isLessThan(src4.indexOf("List<Object> results"));
+        assertThat(src4).contains("for (D d : right)");
         assertThat(src4).doesNotContain("@PermuteDeclr");
         assertThat(src4).doesNotContain("@PermuteParam");
 
@@ -100,17 +98,17 @@ public class PermuteParamTest {
 
         var loader = classLoaderFor(compilation);
 
-        // MultiFixed3: tag, source BEFORE; o1, o2 expanded; results, label AFTER
+        // MultiFixed3: tag, source BEFORE; a, b expanded (typed); results, label AFTER
         var src3 = sourceOf(compilation.generatedSourceFile(generatedClassName(MultiFixed2.class, 3)).orElseThrow());
         assertThat(src3).contains("String tag");
         assertThat(src3).contains("String source");
-        assertThat(src3).contains("Object o1, Object o2");
+        assertThat(src3).contains("A a, B b");
         assertThat(src3).contains("List<Object> results");
         assertThat(src3).contains("String label");
         // Positional ordering
         assertThat(src3.indexOf("String tag")).isLessThan(src3.indexOf("String source"));
-        assertThat(src3.indexOf("String source")).isLessThan(src3.indexOf("Object o1"));
-        assertThat(src3.indexOf("Object o1")).isLessThan(src3.indexOf("List<Object> results"));
+        assertThat(src3.indexOf("String source")).isLessThan(src3.indexOf("A a"));
+        assertThat(src3.indexOf("A a")).isLessThan(src3.indexOf("List<Object> results"));
         assertThat(src3.indexOf("List<Object> results")).isLessThan(src3.indexOf("String label"));
         assertThat(src3).doesNotContain("@PermuteParam");
 
@@ -121,11 +119,11 @@ public class PermuteParamTest {
         assertThat(fix3.captured).containsExactly("arg1", "arg2", "R").inOrder();
         assertThat(res3).containsExactly("R");
 
-        // MultiFixed4: three expanded params; same fixed params in same positions
+        // MultiFixed4: three expanded params (typed); same fixed params in same positions
         var src4 = sourceOf(compilation.generatedSourceFile(generatedClassName(MultiFixed2.class, 4)).orElseThrow());
-        assertThat(src4).contains("Object o1, Object o2, Object o3");
-        assertThat(src4.indexOf("String source")).isLessThan(src4.indexOf("Object o1"));
-        assertThat(src4.indexOf("Object o1")).isLessThan(src4.indexOf("List<Object> results"));
+        assertThat(src4).contains("A a, B b, C c");
+        assertThat(src4.indexOf("String source")).isLessThan(src4.indexOf("A a"));
+        assertThat(src4.indexOf("A a")).isLessThan(src4.indexOf("List<Object> results"));
 
         // Behavioural MultiFixed4
         List<Object> res4 = new ArrayList<>();
@@ -201,16 +199,16 @@ public class PermuteParamTest {
 
         var src = sourceOf(compilation.generatedSourceFile(generatedClassName(TwoMethodParam2.class, 3)).orElseThrow());
 
-        // processLeft expanded: sentinel o1 → (o1, o2); call uses o1, o2, o3
-        assertThat(src).contains("void processLeft(Object o1, Object o2)");
-        // processRight expanded: sentinel a1 → (a1, a2); call uses a1, a2, o3
-        assertThat(src).contains("void processRight(Object a1, Object a2)");
+        // processLeft expanded: sentinel a → (a, b) with typed params A, B
+        assertThat(src).contains("void processLeft(A a, B b)");
+        // processRight expanded: sentinel a1 → (a1, a2) with typed params A, B
+        assertThat(src).contains("void processRight(A a1, B a2)");
         assertThat(src).doesNotContain("@PermuteParam");
 
         // Behavioural: each method's anchor is expanded independently
         var loader = classLoaderFor(compilation);
 
-        // processLeft: o1 anchor → callable receives (o1, o2, rightElem)
+        // processLeft: a anchor → callable receives (a, b, rightElem)
         var fixLeft = prepareJoin(loader, generatedClassName(TwoMethodParam2.class, 3), List.of("R"));
         fixLeft.invoke("processLeft", "left1", "left2");
         assertThat(fixLeft.captured).containsExactly("left1", "left2", "R").inOrder();

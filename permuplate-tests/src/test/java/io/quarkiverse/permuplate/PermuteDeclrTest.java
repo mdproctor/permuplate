@@ -60,27 +60,25 @@ public class PermuteDeclrTest {
         var src = sourceOf(compilation.generatedSourceFile(generatedClassName(RichJoin2.class, 3))
                 .orElseThrow(() -> new AssertionError(generatedClassName(RichJoin2.class, 3) + ".java not generated")));
 
-        // Field rename: c2 → c3 everywhere
-        assertThat(src).contains("Callable3 c3");
+        // Field rename: c2 → c3 everywhere (now generic: Callable3<A, B, C>)
+        assertThat(src).contains("Callable3<A, B, C> c3");
         assertThat(src).doesNotContain("c2");
         assertThat(src).contains("\"Processor: \" + c3"); // before loop
         assertThat(src).contains("c3 == null"); // null guard before loop
         assertThat(src).contains("\"Done with \" + c3"); // after loop
 
-        // For-each variable rename: o2 → o3 everywhere inside loop
-        assertThat(src).contains("for (Object o3 : right)");
-        assertThat(src).contains("o3 == null");
-        assertThat(src).contains("skipped.add(o3)");
-        assertThat(src).contains("\"Processed: \" + o3 + \" with \"");
+        // For-each variable rename: b (C type) everywhere inside loop
+        assertThat(src).contains("for (C c : right)");
+        assertThat(src).contains("c == null");
+        assertThat(src).contains("skipped.add(c)");
+        assertThat(src).contains("\"Processed: \" + c + \" with \"");
 
-        // No stale o2 in loop body (generated param "Object o2" is fine)
-        assertThat(src).contains("Object o2");
-        assertThat(src).doesNotContain("o2 == null");
-        assertThat(src).doesNotContain("skipped.add(o2)");
-        assertThat(src).doesNotContain("\"Processed: \" + o2");
+        // No stale for-each variable from template
+        assertThat(src).doesNotContain("b == null");
+        assertThat(src).doesNotContain("skipped.add(b)");
 
-        // Fixed "String label" param preserved after sentinel expansion
-        assertThat(src).contains("Object o1, Object o2");
+        // Typed params: A a, B b (from sentinel expansion); fixed String label preserved
+        assertThat(src).contains("A a, B b");
         assertThat(src).contains("String label");
         assertThat(src).contains("\" with \" + label");
         assertThat(src).contains("count + \" items\"");
@@ -111,7 +109,7 @@ public class PermuteDeclrTest {
         assertThat(compilation).succeeded();
 
         var src = sourceOf(compilation.generatedSourceFile(generatedClassName(FieldDeclr2.class, 3)).orElseThrow());
-        assertThat(src).contains("Callable3 c3");
+        assertThat(src).contains("Callable3<A, B, C> c3");
         assertThat(src).doesNotContain("c2");
         assertThat(src).contains("\"handler: \" + c3"); // describe()
         assertThat(src).contains("c3 == null"); // execute() null guard
@@ -149,9 +147,9 @@ public class PermuteDeclrTest {
         assertThat(compilation).succeeded();
 
         var src = sourceOf(compilation.generatedSourceFile(generatedClassName(ForEachDeclr2.class, 3)).orElseThrow());
-        assertThat(src).contains("for (Object o3 : items)");
-        assertThat(src).contains("\"collected: \" + o3");
-        assertThat(src).doesNotContain("o2");
+        assertThat(src).contains("for (C c : items)");
+        assertThat(src).contains("\"collected: \" + c");
+        assertThat(src).doesNotContain("a2"); // template for-each var gone
         assertThat(src).doesNotContain("@PermuteDeclr");
         assertThat(src).doesNotContain("@Permute");
 
@@ -189,9 +187,9 @@ public class PermuteDeclrTest {
 
         var src = sourceOf(compilation.generatedSourceFile(generatedClassName(TwoFieldDeclr2.class, 3)).orElseThrow());
 
-        // Both fields renamed, neither old name survives
-        assertThat(src).contains("Callable3 primary3");
-        assertThat(src).contains("Callable3 fallback3");
+        // Both fields renamed, neither old name survives (now generic)
+        assertThat(src).contains("Callable3<A, B, C> primary3");
+        assertThat(src).contains("Callable3<A, B, C> fallback3");
         assertThat(src).doesNotContain("primary2");
         assertThat(src).doesNotContain("fallback2");
 
@@ -239,10 +237,10 @@ public class PermuteDeclrTest {
 
         var src = sourceOf(compilation.generatedSourceFile(generatedClassName(DualForEach2.class, 3)).orElseThrow());
 
-        // Both for-each loops renamed — distinct occurrences in source
-        assertThat(src).contains("for (Object o3 : first)");
-        assertThat(src).contains("for (Object o3 : second)");
-        assertThat(src).doesNotContain("for (Object o2");
+        // Both for-each loops renamed — distinct occurrences in source (now typed C)
+        assertThat(src).contains("for (C c : first)");
+        assertThat(src).contains("for (C c : second)");
+        assertThat(src).doesNotContain("for (B b"); // template for-each var gone
         assertThat(src).doesNotContain("@PermuteDeclr");
         assertThat(src).doesNotContain("@PermuteParam");
 
@@ -278,9 +276,9 @@ public class PermuteDeclrTest {
 
         var src = sourceOf(compilation.generatedSourceFile(generatedClassName(CtorDeclr2.class, 3)).orElseThrow());
 
-        // Parameter type and name renamed
-        assertThat(src).contains("Callable3 c3");
-        assertThat(src).doesNotContain("Callable2 c2");
+        // Parameter type and name renamed (now generic)
+        assertThat(src).contains("Callable3<A, B, C> c3");
+        assertThat(src).doesNotContain("Callable2");
 
         // Usage inside the constructor body renamed
         assertThat(src).contains("\"arity=\" + c3");

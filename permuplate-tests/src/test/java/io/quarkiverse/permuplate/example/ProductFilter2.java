@@ -5,6 +5,7 @@ import java.util.List;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteParam;
+import io.quarkiverse.permuplate.PermuteTypeParam;
 
 /**
  * Searches a product catalogue by applying N independent filter criteria.
@@ -27,7 +28,7 @@ import io.quarkiverse.permuplate.PermuteParam;
  * Example usage of the generated {@code ProductFilter5}:
  *
  * <pre>{@code
- * ProductFilter5 filter = new ProductFilter5();
+ * ProductFilter5<String, Double, String, Double, Product> filter = new ProductFilter5<>();
  * filter.matchFn5 = (category, maxPrice, brand, minRating, product) -> {
  *     if (product.matches(category, maxPrice, brand, minRating))
  *         matches.add(product);
@@ -37,17 +38,17 @@ import io.quarkiverse.permuplate.PermuteParam;
  * }</pre>
  */
 @Permute(varName = "i", from = "3", to = "7", className = "ProductFilter${i}")
-public class ProductFilter2 {
+public class ProductFilter2<A, @PermuteTypeParam(varName = "k", from = "2", to = "${i}", name = "${alpha(k)}") B> {
 
     /**
      * The matching function: receives the N-1 filter criteria and one candidate
      * product, and decides whether it belongs in the result set.
      * Renamed to {@code matchFn{i}} in each generated class.
      */
-    private @PermuteDeclr(type = "Callable${i}", name = "matchFn${i}") Callable2 matchFn2;
+    private @PermuteDeclr(type = "Callable${i}<${typeArgList(1,i,'alpha')}>", name = "matchFn${i}") Callable2<A, B> matchFn2;
 
     /** The product catalogue to search through. */
-    private List<Object> catalogue;
+    private @PermuteDeclr(type = "List<${alpha(i)}>") List<B> catalogue;
 
     /**
      * Evaluates every product in {@link #catalogue} against the supplied criteria.
@@ -56,11 +57,11 @@ public class ProductFilter2 {
      * @param matches collector to which qualifying products are added
      */
     public void search(
-            @PermuteParam(varName = "j", from = "1", to = "${i-1}", type = "Object", name = "criterion${j}") Object criterion1,
+            @PermuteParam(varName = "j", from = "1", to = "${i-1}", type = "${alpha(j)}", name = "criterion${j}") A criterion1,
             List<Object> matches) {
         System.out.println("Searching " + catalogue.size() + " products...");
-        for (@PermuteDeclr(type = "Object", name = "product${i}")
-        Object product2 : catalogue) {
+        for (@PermuteDeclr(type = "${alpha(i)}", name = "product${i}")
+        B product2 : catalogue) {
             matchFn2.call(criterion1, product2);
             matches.add(product2);
         }

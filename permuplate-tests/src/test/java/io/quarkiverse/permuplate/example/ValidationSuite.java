@@ -5,6 +5,7 @@ import java.util.List;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteParam;
+import io.quarkiverse.permuplate.PermuteTypeParam;
 
 /**
  * A library of form-validation utilities showing that {@code @Permute} can be placed
@@ -32,7 +33,7 @@ import io.quarkiverse.permuplate.PermuteParam;
  * Example usage of the generated {@code FieldValidator4}:
  *
  * <pre>{@code
- * FieldValidator4 validator = new FieldValidator4();
+ * FieldValidator4<String, String, String, ValidationRule> validator = new FieldValidator4<>();
  * validator.ruleFn4 = (username, email, phone, rule) -> {
  *     String violation = ((ValidationRule) rule).check(username, email, phone);
  *     if (violation != null)
@@ -54,16 +55,16 @@ public class ValidationSuite {
      * values so the call site's field count is verified at compile time.
      */
     @Permute(varName = "i", from = "3", to = "6", className = "FieldValidator${i}")
-    public static class FieldValidator2 {
+    public static class FieldValidator2<A, @PermuteTypeParam(varName = "k", from = "2", to = "${i}", name = "${alpha(k)}") B> {
 
         /**
          * The rule-application function: given the N-1 field values and one rule,
          * check the values and report any violation. Renamed to {@code ruleFn{i}}.
          */
-        private @PermuteDeclr(type = "Callable${i}", name = "ruleFn${i}") Callable2 ruleFn2;
+        private @PermuteDeclr(type = "Callable${i}<${typeArgList(1,i,'alpha')}>", name = "ruleFn${i}") Callable2<A, B> ruleFn2;
 
         /** Shared validation rules applied to every combination of field values. */
-        private List<Object> rules;
+        private @PermuteDeclr(type = "List<${alpha(i)}>") List<B> rules;
 
         /** Identifies the form being validated; appears in log output. */
         private String formId;
@@ -76,11 +77,11 @@ public class ValidationSuite {
          * @param errors collector for human-readable error messages
          */
         public void validate(
-                @PermuteParam(varName = "j", from = "1", to = "${i-1}", type = "Object", name = "field${j}") Object field1,
+                @PermuteParam(varName = "j", from = "1", to = "${i-1}", type = "${alpha(j)}", name = "field${j}") A field1,
                 List<String> errors) {
             System.out.println("Validating form [" + formId + "] — " + rules.size() + " rule(s) to check...");
-            for (@PermuteDeclr(type = "Object", name = "rule${i}")
-            Object rule2 : rules) {
+            for (@PermuteDeclr(type = "${alpha(i)}", name = "rule${i}")
+            B rule2 : rules) {
                 ruleFn2.call(field1, rule2);
             }
             System.out.println("Done: " + errors.size() + " violation(s) found.");

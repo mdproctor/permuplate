@@ -86,8 +86,11 @@ public class PermuteTest {
             assertThat(src).contains("public class FilterJoin" + fi);
             assertThat(src).doesNotContain("public static class FilterJoin" + fi);
             assertThat(src).doesNotContain("class JoinLibrary");
-            assertThat(src).contains("Callable" + fi + " c" + fi);
-            assertThat(src).contains("for (Object o" + fi + " : right)");
+            assertThat(src).contains("Callable" + fi + "<"); // generic callable
+            assertThat(src).contains(" c" + fi);
+            char typeChar = (char) ('A' + fi - 1);
+            char varChar = (char) ('a' + fi - 1);
+            assertThat(src).contains("for (" + typeChar + " " + varChar + " : right)");
             assertThat(src).contains("String label");
             assertThat(src).doesNotContain("@PermuteDeclr");
             assertThat(src).doesNotContain("@PermuteParam");
@@ -130,12 +133,12 @@ public class PermuteTest {
             assertThat(src).doesNotContain("static interface");
             assertThat(src).doesNotContain("class InterfaceLibrary");
 
-            // Method signature correctly expanded: o1 .. o{i}
+            // Method signature correctly expanded with typed params: A a, B b, ...
             var params = new StringBuilder("void merge(");
             for (int j = 1; j <= fi; j++) {
                 if (j > 1)
                     params.append(", ");
-                params.append("Object o").append(j);
+                params.append((char) ('A' + j - 1)).append(" ").append((char) ('a' + j - 1));
             }
             assertThat(src).contains(params.append(")").toString());
 
@@ -207,9 +210,9 @@ public class PermuteTest {
 
         var src3 = sourceOf(compilation.generatedSourceFile(pkg + ".BufferedJoin3").orElseThrow());
         assertThat(src3).contains("public class BufferedJoin3");
-        assertThat(src3).contains("Callable3 c3");
-        assertThat(src3).contains("for (Object o3 : right)");
-        assertThat(src3).contains("Object o1, Object o2");
+        assertThat(src3).contains("Callable3<A, B, C> c3");
+        assertThat(src3).contains("for (C c : right)");
+        assertThat(src3).contains("A a, B b");
 
         // No leftover variable expressions or annotations
         assertThat(src3).doesNotContain("${prefix}");

@@ -2,6 +2,7 @@ package io.quarkiverse.permuplate.example;
 
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteParam;
+import io.quarkiverse.permuplate.PermuteTypeParam;
 
 /**
  * Host class for a nested static interface template.
@@ -14,8 +15,8 @@ import io.quarkiverse.permuplate.PermuteParam;
 public class InterfaceLibrary {
 
     @Permute(varName = "i", from = "3", to = "4", className = "Merger${i}")
-    public static interface Merger2 {
+    public static interface Merger2<@PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A> {
         void merge(
-                @PermuteParam(varName = "j", from = "1", to = "${i}", type = "Object", name = "o${j}") Object o1);
+                @PermuteParam(varName = "j", from = "1", to = "${i}", type = "${alpha(j)}", name = "${lower(j)}") A a);
     }
 }

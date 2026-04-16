@@ -5,6 +5,7 @@ import java.util.List;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteParam;
+import io.quarkiverse.permuplate.PermuteTypeParam;
 
 /**
  * Records a compliance audit event to multiple sinks with N contextual fields.
@@ -30,23 +31,23 @@ import io.quarkiverse.permuplate.PermuteParam;
  * Example usage of the generated {@code AuditRecord4}:
  *
  * <pre>{@code
- * AuditRecord4 audit = new AuditRecord4();
+ * AuditRecord4<String, String, String, AuditSink> audit = new AuditRecord4<>();
  * audit.writer4 = (tenantId, userId, resourceId, sink) -> ((AuditSink) sink).write(tenantId, userId, resourceId);
  * audit.sinks = List.of(database, siemConnector, messageBus);
  * audit.record("RECORD_DELETED", tenantId, userId, resourceId, "WARN");
  * }</pre>
  */
 @Permute(varName = "i", from = "3", to = "6", className = "AuditRecord${i}")
-public class AuditRecord2 {
+public class AuditRecord2<A, @PermuteTypeParam(varName = "k", from = "2", to = "${i}", name = "${alpha(k)}") B> {
 
     /**
      * The writer function: dispatches the N-1 context fields plus one sink to
      * the underlying audit infrastructure. Renamed to {@code writer{i}}.
      */
-    private @PermuteDeclr(type = "Callable${i}", name = "writer${i}") Callable2 writer2;
+    private @PermuteDeclr(type = "Callable${i}<${typeArgList(1,i,'alpha')}>", name = "writer${i}") Callable2<A, B> writer2;
 
     /** The audit sinks to write to (database, SIEM system, message queue, …). */
-    private List<Object> sinks;
+    private @PermuteDeclr(type = "List<${alpha(i)}>") List<B> sinks;
 
     /**
      * Writes the audit event to every sink in {@link #sinks}.
@@ -57,11 +58,11 @@ public class AuditRecord2 {
      */
     public void record(
             String eventType,
-            @PermuteParam(varName = "j", from = "1", to = "${i-1}", type = "Object", name = "context${j}") Object context1,
+            @PermuteParam(varName = "j", from = "1", to = "${i-1}", type = "${alpha(j)}", name = "context${j}") A context1,
             String severity) {
         System.out.println("[" + severity + "] EVENT: " + eventType);
-        for (@PermuteDeclr(type = "Object", name = "sink${i}")
-        Object sink2 : sinks) {
+        for (@PermuteDeclr(type = "${alpha(i)}", name = "sink${i}")
+        B sink2 : sinks) {
             writer2.call(context1, sink2);
         }
     }
