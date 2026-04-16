@@ -146,6 +146,6 @@ The preprocessor strips the block when the condition is false. Trade-off: breaks
 | `@PermuteAnnotation` | Medium | Medium | **Done** (#31) |
 | Record component expansion | High | Medium | **Done** (#29) |
 | `@PermuteThrows` | Low | Low | **Done** (#32) |
-| Template composition | High | High | Long-term |
+| Template composition | High | High | **Done** (#33) |
 | Functional from/to refs | Medium | Medium | Long-term |
 | `@PermuteConditional` | High | Medium | Long-term |

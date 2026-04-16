@@ -864,6 +864,48 @@ public record Tuple2<
 
 ---
 
+### Template composition — `@PermuteSource` and `@PermuteDelegate`
+
+**Maven plugin only.** Generate a second class family derived from an existing one. Type parameters are inferred automatically — no `@PermuteTypeParam` needed on the derived template.
+
+#### Capability A — ordering + type inference
+
+```java
+@Permute(varName="i", from="2", to="6", className="TimedCallable${i}", inline=true)
+@PermuteSource("Callable${i}")   // type params A..N inferred from Callable${i}
+public class TimedCallable2 implements Callable2<A, B, R> {
+    // A, B, R are inferred — no @PermuteTypeParam
+    private final Callable2<A, B, R> delegate;
+    public R result(A a, B b) throws Exception { ... }
+}
+// Generates: TimedCallable3<A,B,C,R>, TimedCallable4<A,B,C,D,R>, ...
+```
+
+#### Capability B — `@PermuteDelegate` (delegation synthesis)
+
+```java
+@Permute(varName="i", from="2", to="6", className="SynchronizedCallable${i}", inline=true)
+@PermuteSource("Callable${i}")
+public class SynchronizedCallable2 {
+    @PermuteDelegate(modifier = "synchronized")
+    private final Callable2<Object> delegate;
+    // All Callable${i} methods synthesised as synchronized delegating calls
+}
+```
+
+#### Capability C — builder synthesis (empty body)
+
+```java
+@Permute(varName="i", from="3", to="6", className="Tuple${i}Builder", inline=true)
+@PermuteSource("Tuple${i}")
+public class Tuple3Builder {}   // empty — processor generates complete builder
+// Generates: Tuple3Builder<A,B,C> with fields, setters, build()
+```
+
+See `permuplate-mvn-examples/.../composition/` for complete working examples including the `EventSystem` showing all three capabilities building a typed event system.
+
+---
+
 ## Expression syntax
 
 All `${...}` placeholders are evaluated by [Apache Commons JEXL3](https://commons.apache.org/proper/commons-jexl/). The loop variable (`varName`) is an integer; arithmetic expressions are natively supported:

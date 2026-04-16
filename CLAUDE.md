@@ -57,7 +57,7 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 
 ## The annotations
 
-14 annotations in `permuplate-annotations/`. For per-annotation API detail and usage examples, see [OVERVIEW.md § Annotation API Detail](OVERVIEW.md#annotation-api-detail).
+18 annotations in `permuplate-annotations/`. For per-annotation API detail and usage examples, see [OVERVIEW.md § Annotation API Detail](OVERVIEW.md#annotation-api-detail).
 
 | Annotation | Target | Purpose |
 |---|---|---|
@@ -77,6 +77,8 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 | `@PermuteFilter` | class, method | Skip a permutation when the JEXL expression is false (repeatable — conditions ANDed) |
 | `@PermuteAnnotation` | class, interface, method, field | Add a Java annotation to the generated element per permutation; JEXL condition optional; repeatable |
 | `@PermuteThrows` | method | Add an exception to a method's throws clause per permutation; JEXL condition optional; add-only; repeatable |
+| `@PermuteSource` | class | Declare dependency on generated class family; enables ordering + type param inference; Maven plugin only (repeatable) |
+| `@PermuteDelegate` | field | Synthesise delegating method bodies from source interface; optional modifier (e.g. "synchronized") |
 
 **`from`/`to` are JEXL expression strings**, not int literals — `"3"`, `"${i-1}"`, `"${max}"` are all valid. Named constants resolve in priority order: system properties (`-Dpermuplate.*`) < APT options (`-Apermuplate.*`, APT only) < annotation `strings`. See [OVERVIEW.md § External Property Injection](OVERVIEW.md#external-property-injection).
 
@@ -168,6 +170,11 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 | `ParametersFirst` is the canonical entry point; `RuleBuilder.from()` is a shorthand | In vol2, every rule starts with `builder.rule("name")`. Our `builder.from(source)` is a shorthand equivalent to `builder.rule("rule").from(source)`. The canonical form for migration-ready code is always `builder.rule("name")`. |
 | Record template support | `StaticJavaParser` configured for Java 17 in `PermuteProcessor.init()` and `InlineGenerator` static initializer. All 6 transformer signatures generalized from `ClassOrInterfaceDeclaration` to `TypeDeclaration<?>`. `RecordDeclaration.getParameters()` are `Parameter` nodes — `@PermuteParam` and `@PermuteDeclr` on record components work via `transformRecordComponents()` in both transformers. `@PermuteMethod`, `@PermuteReturn`, and extends expansion are COID-only and skipped for records. `TypeDeclaration<?>` doesn't implement `NodeWithTypeParameters` — `getTypeParameters()`/`setTypeParameters()` helpers cast through `NodeWithTypeParameters<?>`. |
 | Record in IntelliJ plugin | The plugin's PSI (IntelliJ's own AST) already supports Java 17 records — no index version bump needed. The `PermuteTemplateIndex`, `PermuteGeneratedIndex`, and `PermuteElementResolver` work with record templates without changes because PSI resolution handles record declarations transparently. |
+| `@PermuteSource` reads from `parentCu` | PermuteMojo chains generate() calls — Template A's output becomes Template B's parentCu. applySourceTypeParams() finds the already-generated class by name in parentCu. No separate file I/O needed — the chain handles ordering. |
+| Builder synthesis trigger condition | applyBuilderSynthesis() fires only when: (1) @PermuteSource references a RecordDeclaration AND (2) the generated class body is empty. Non-empty body = skip synthesis entirely. |
+| @PermuteDelegate synthesised methods need public | Source interface methods are implicitly public. When synthesising delegation, the method must be explicitly declared public or the override weakens access — which is a compile error. |
+| SourceScanner scans RecordDeclaration | Before template composition, SourceScanner only found ClassOrInterfaceDeclaration templates. Records as templates (Tuple2Record.java pattern) needed RecordDeclaration added to the scan. |
+| @PermuteSource stripped from output | @PermuteSource and @PermuteSources annotations are stripped from generated classes (same as @Permute, @PermuteFilter etc.) to prevent "cannot find symbol" compile errors on the generated output. |
 
 ---
 

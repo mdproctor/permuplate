@@ -286,6 +286,38 @@ public @interface PermuteThrows {
 
 Adds an exception type to a method's `throws` clause. Add-only. `value` parsed with `StaticJavaParser.parseClassOrInterfaceType()`. Multiple entries are supported via stacking.
 
+### `@PermuteSource`
+
+```java
+@Repeatable(PermuteSources.class)
+@Retention(RetentionPolicy.SOURCE)
+@Target(ElementType.TYPE)
+public @interface PermuteSource {
+    String value(); // JEXL-evaluated source class name per permutation
+}
+```
+
+**Maven plugin only.** Declares a dependency on another generated class family. Enables:
+1. **Ordering** — source template generates before the derived template
+2. **Type parameter inference** — the processor reads the generated source class from `parentCu` and copies its type parameters to the derived class automatically (no `@PermuteTypeParam` needed)
+3. **Structural access** — record components available for builder synthesis
+
+### `@PermuteDelegate`
+
+```java
+@Retention(RetentionPolicy.SOURCE)
+@Target(ElementType.FIELD)
+public @interface PermuteDelegate {
+    String modifier() default ""; // e.g. "synchronized"
+}
+```
+
+On a field whose type is the source generated class. Synthesises delegating method bodies for all methods in the source not explicitly declared in the derived template. User-declared methods take precedence.
+
+### Builder synthesis
+
+When `@PermuteSource` references a `RecordDeclaration` source AND the template body is empty, the processor automatically generates a complete fluent builder: private fields per component, fluent setters (returning `this`), and a `build()` method returning a new record instance.
+
 ---
 
 ## External Property Injection
