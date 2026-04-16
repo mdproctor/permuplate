@@ -445,6 +445,14 @@ public class PermuteProcessor extends AbstractProcessor {
         // Only applies to class/interface declarations (records don't support arbitrary methods).
         if (classDecl instanceof ClassOrInterfaceDeclaration coid) {
             applyPermuteMethodApt(coid, ctx, permute, typeElement);
+        } else {
+            // For records: @PermuteMethod is not processed, but the annotation must be stripped
+            // from the generated output — the permuplate import is removed from the CU, so any
+            // surviving @PermuteMethod reference would fail to compile.
+            classDecl.getMethods().forEach(m -> m.getAnnotations().removeIf(a -> {
+                String n = a.getNameAsString();
+                return n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod");
+            }));
         }
 
         // 5c. @PermuteReturn — replace Object sentinel return type + boundary omission.

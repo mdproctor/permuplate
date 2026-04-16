@@ -420,7 +420,7 @@ public class JoinLibrary {
 
 Drives the outer loop. Supported in two positions:
 
-**On a class or interface** (top-level or nested static) — generates N new types, one per permutation value. Nested types are promoted to top-level.
+**On a class, interface, or record** (top-level or nested static) — generates N new types, one per permutation value. Nested types are promoted to top-level.
 
 **On a method** — generates a single new class containing one overload of the method per permutation value. Useful for utility classes with multi-arity method families.
 
@@ -825,6 +825,42 @@ Multiple filters are ANDed:
 The APT processor reports a compile error if all values in the range are filtered out. The Maven plugin silently produces no output in that case.
 
 Works with `@PermuteVar` cross-products — each combination (i, j, ...) is evaluated independently.
+
+---
+
+### Records as templates
+
+Java records work as `@Permute` templates with full annotation parity. The canonical use case is generating immutable typed tuples:
+
+```java
+@Permute(varName = "i", from = "3", to = "6", className = "Tuple${i}")
+public record Tuple2<
+        @PermuteTypeParam(varName = "k", from = "1", to = "${i}",
+                          name = "${alpha(k)}") A>(
+        @PermuteParam(varName = "j", from = "1", to = "${i}",
+                      type = "${alpha(j)}", name = "${lower(j)}")
+        A a) {
+}
+// Generates:
+//   record Tuple3<A,B,C>(A a, B b, C c)
+//   record Tuple4<A,B,C,D>(A a, B b, C c, D d)
+//   record Tuple5<A,B,C,D,E>(A a, B b, C c, D d, E e)
+//   record Tuple6<A,B,C,D,E,F>(A a, B b, C c, D d, E e, F f)
+```
+
+**What works on records:**
+- `@PermuteDeclr` — renames component types per permutation
+- `@PermuteTypeParam` — expands record type parameters
+- `@PermuteParam` — expands the record component list (the Tuple pattern)
+- `@PermuteConst` / `@PermuteValue` — replaces static field initializers
+- `@PermuteFilter` — skips specific permutation values
+- `@PermuteVar` — cross-product generation
+- `@PermuteImport` — adds per-permutation imports
+
+**Not applicable to records** (silently skipped):
+- `@PermuteMethod` — records cannot have overloaded method families in the same way
+- `@PermuteReturn` — records use component types, not method return types
+- `@PermuteExtends` — records cannot extend classes
 
 ---
 

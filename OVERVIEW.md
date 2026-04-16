@@ -72,6 +72,8 @@ public @interface Permute {
 
 **Nested types:** when placed on a nested `static` class or interface, the processor finds the nested declaration inside the compilation unit (using `cu.findFirst()` — the recursive form, not `cu.getClassByName()` which only searches top-level types), clones it, strips the `static` modifier, and generates it as a top-level type. The package is resolved by walking up `getEnclosingElement()` until a `PackageElement` is found — the immediate enclosing element of a nested type is the outer class, not the package.
 
+**Record templates:** `@Permute` also works on record declarations. Records use the same transformation pipeline with two differences: `@PermuteMethod`, `@PermuteReturn`, and extends expansion are skipped (records don't support these patterns); and `@PermuteParam` on record components expands the component list directly via `RecordDeclaration.getParameters()` rather than a constructor parameter list. See `permuplate-apt-examples/example/Tuple2Record.java` for the canonical Tuple pattern.
+
 ### `@PermuteVar`
 
 ```java
@@ -132,6 +134,8 @@ The expanded parameter list is rebuilt as: params before sentinel + generated pa
 **Anchor expansion at call sites:** a `ModifierVisitor` walks all `MethodCallExpr` nodes in the method body. For each call whose argument list contains a `NameExpr` matching the anchor name, that single argument is replaced by the full generated argument sequence (preserving arguments before and after the anchor). This is why `c2.call(o1, o2)` becomes `c3.call(o1, o2, o3)` with no annotation on the call site.
 
 **Prefix validation:** all sentinels are validated (not just the first). The static part of each `name` must be a prefix of that sentinel's parameter name. The `type` attribute is intentionally not checked — it describes the generated parameter type, not the sentinel's placeholder type.
+
+Works on **record components** (via `RecordDeclaration.getParameters()`) as well as method and constructor parameters.
 
 ### `@PermuteConst`
 
