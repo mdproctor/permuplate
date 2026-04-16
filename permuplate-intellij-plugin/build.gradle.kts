@@ -26,6 +26,10 @@ dependencies {
     // Run from permuplate root before building this module.
     implementation(files("../permuplate-ide-support/target/quarkus-permuplate-ide-support-1.0.0-SNAPSHOT.jar"))
 
+    // JavaParser — used by PermuteAnnotationValueInspection and PermuteThrowsTypeInspection
+    // to validate annotation/type syntax after stubbing JEXL expressions.
+    implementation("com.github.javaparser:javaparser-core:3.25.9")
+
     intellijPlatform {
         intellijIdeaCommunity("2023.2")
         bundledPlugin("com.intellij.java")   // Java PSI APIs

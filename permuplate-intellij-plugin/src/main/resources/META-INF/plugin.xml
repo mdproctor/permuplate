@@ -52,6 +52,20 @@
             enabledByDefault="true"
             level="WARNING"
             implementationClass="io.quarkiverse.permuplate.intellij.inspection.BoundaryOmissionInspection"/>
+        <localInspection language="JAVA"
+                         shortName="PermuteAnnotationValue"
+                         displayName="@PermuteAnnotation value syntax"
+                         groupName="Permuplate"
+                         enabledByDefault="true"
+                         level="WARNING"
+                         implementationClass="io.quarkiverse.permuplate.intellij.inspection.PermuteAnnotationValueInspection"/>
+        <localInspection language="JAVA"
+                         shortName="PermuteThrowsType"
+                         displayName="@PermuteThrows value type"
+                         groupName="Permuplate"
+                         enabledByDefault="true"
+                         level="WARNING"
+                         implementationClass="io.quarkiverse.permuplate.intellij.inspection.PermuteThrowsTypeInspection"/>
     </extensions>
 
     <actions>
