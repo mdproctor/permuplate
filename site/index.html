@@ -10,7 +10,7 @@ description: "Permuplate is a Java annotation processor that generates type-safe
   <section class="hero">
     <div class="hero-mark-tl"></div>
     <div class="container">
-      <div class="hero-eyebrow">Java Annotation Processor</div>
+      <div class="hero-eyebrow">Type-Safe Arity for Java</div>
 
       <h1 class="hero-headline">
         One Template.
@@ -18,10 +18,16 @@ description: "Permuplate is a Java annotation processor that generates type-safe
       </h1>
 
       <p class="hero-sub">
-        Permuplate is a Java annotation processor that generates type-safe arity
-        permutations from a single compilable template. No separate build step.
-        No broken IDE navigation or refactoring. No committed generated files.
-        Just annotate and generate.
+        Scala ships Tuple22, Function22, and the entire functional hierarchy to go with them.
+        Java ships <code style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:#e85d04">BiFunction</code> — then stops.
+        <br><br>
+        The gap isn't just missing tuple types. It's every <code style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:#e85d04">Callable</code>,
+        <code style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:#e85d04">Function</code>, and builder DSL that should exist for each arity, but doesn't.
+        Any API that grows with the number of typed inputs means maintaining N near-identical classes by hand.
+        <br><br>
+        Permuplate closes that gap. One compilable template — your entire arity-varying
+        infrastructure. Tuples, functional types, stateful builder DSLs. Type-safe.
+        IDE-refactorable. Zero committed generated files.
       </p>
 
       <div class="hero-actions">
@@ -148,14 +154,21 @@ description: "Permuplate is a Java annotation processor that generates type-safe
     <div class="container">
       <div class="section-header">
         <div class="section-label">The Problem</div>
-        <h2>The Boilerplate Tax</h2>
+        <h2>Java's Arity Ceiling</h2>
       </div>
+
+      <p style="color:var(--muted);max-width:640px;font-size:0.95rem;line-height:1.7;margin-bottom:var(--space-xl)">
+        Java's <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--orange)">Function</code> goes to 2 arguments.
+        Its <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--orange)">Supplier</code> is unary.
+        Libraries like Vavr (Tuple1–8) and jOOL patch corners of the gap — but any API that
+        <em>varies by arity</em> still forces N hand-maintained classes. That's the ceiling.
+      </p>
 
       <div class="tax-grid">
         <div class="tax-col">
           <span class="tax-col-num">01</span>
-          <h3>You Write</h3>
-          <p>Eight files. Identical except for the number.</p>
+          <h3>The Ceiling</h3>
+          <p>Java's built-in functional types stop at 2. No native tuples. No <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">Callable3</code>, no <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">Tuple5</code>, no typed join builder. Hit arity 3 and you're writing these by hand:</p>
           <ul class="file-list">
             <li>Join3.java</li>
             <li>Join4.java</li>
@@ -214,8 +227,11 @@ description: "Permuplate is a Java annotation processor that generates type-safe
         <p style="color:var(--muted);max-width:500px;font-size:0.9rem">
           The template is a real, compilable Java class. Your IDE can navigate it,
           refactor it, and type-check it. At compile time, <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">javac</code>
-          generates eight complete, correct classes — field renames, parameter
-          expansions, call-site rewrites, all of it.
+          generates eight complete, type-safe classes — field renames, parameter
+          expansions, call-site rewrites, typed tuple collections throughout.
+          <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">DataSource&lt;Tuple3&gt;</code>,
+          <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">DataSource&lt;Tuple10&gt;</code> —
+          never <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">List&lt;Object&gt;</code>.
         </p>
         <div class="example-ratio">
           <span>1</span>
@@ -239,18 +255,21 @@ public class Join2 {
         type = "Callable${i}",
         name = "c${i}") Callable2 c2;
 
-    private List&lt;Object&gt; right;
+    private @PermuteDeclr(
+        type = "DataSource&lt;Tuple${i}&gt;")
+        DataSource&lt;Tuple2&gt; right;
 
     public void join(
         @PermuteParam(varName = "j",
             from = "1", to = "${i-1}",
             type = "Object",
             name = "o${j}") Object o1,
-        List&lt;Object&gt; results) {
+        @PermuteDeclr(type = "List&lt;Tuple${i}&gt;")
+        List&lt;Tuple2&gt; results) {
 
         for (@PermuteDeclr(
-                 type = "Object",
-                 name = "o${i}") Object o2 : right) {
+                 type = "Tuple${i}",
+                 name = "t${i}") Object o2 : right) {
             c2.call(o1, o2);
             results.add(o2);
         }
@@ -274,15 +293,15 @@ public class Join2 {
               <pre><code class="language-java">public class Join3 {
 
     private Callable3 c3;
-    private List&lt;Object&gt; right;
+    private DataSource&lt;Tuple3&gt; right;
 
     public void join(
             Object o1, Object o2,
-            List&lt;Object&gt; results) {
+            List&lt;Tuple3&gt; results) {
 
-        for (Object o3 : right) {
-            c3.call(o1, o2, o3);
-            results.add(o3);
+        for (Tuple3 t3 : right) {
+            c3.call(o1, o2, t3);
+            results.add(t3);
         }
     }
 }</code></pre>
@@ -291,15 +310,15 @@ public class Join2 {
               <pre><code class="language-java">public class Join4 {
 
     private Callable4 c4;
-    private List&lt;Object&gt; right;
+    private DataSource&lt;Tuple4&gt; right;
 
     public void join(
             Object o1, Object o2, Object o3,
-            List&lt;Object&gt; results) {
+            List&lt;Tuple4&gt; results) {
 
-        for (Object o4 : right) {
-            c4.call(o1, o2, o3, o4);
-            results.add(o4);
+        for (Tuple4 t4 : right) {
+            c4.call(o1, o2, o3, t4);
+            results.add(t4);
         }
     }
 }</code></pre>
@@ -308,23 +327,70 @@ public class Join2 {
               <pre><code class="language-java">public class Join10 {
 
     private Callable10 c10;
-    private List&lt;Object&gt; right;
+    private DataSource&lt;Tuple10&gt; right;
 
     public void join(
             Object o1, Object o2, Object o3,
             Object o4, Object o5, Object o6,
             Object o7, Object o8, Object o9,
-            List&lt;Object&gt; results) {
+            List&lt;Tuple10&gt; results) {
 
-        for (Object o10 : right) {
+        for (Tuple10 t10 : right) {
             c10.call(o1, o2, o3, o4, o5,
-                     o6, o7, o8, o9, o10);
-            results.add(o10);
+                     o6, o7, o8, o9, t10);
+            results.add(t10);
         }
     }
 }</code></pre>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       WHAT YOU CAN BUILD
+       ============================================================ -->
+  <section class="section why-section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label">The Scope</div>
+        <h2>One Pattern. Every Arity.</h2>
+      </div>
+
+      <p style="color:var(--muted);max-width:620px;font-size:0.95rem;line-height:1.7;margin-bottom:var(--space-xl)">
+        Permuplate isn't a tuple library — it's the tool that lets you build your own.
+        Any type whose signature grows with the number of inputs is a template waiting to be written.
+      </p>
+
+      <div class="features-grid">
+        <div class="feature-item">
+          <span class="feature-tag">01</span>
+          <h3>Tuple Families</h3>
+          <p>
+            <code>Tuple2&lt;A,B&gt;</code> through <code>TupleN&lt;A,…,N&gt;</code>.
+            Type-safe multi-value containers with full IDE navigation.
+            One record template. The whole family generated at compile time.
+          </p>
+        </div>
+        <div class="feature-item">
+          <span class="feature-tag">02</span>
+          <h3>Functional Infrastructure</h3>
+          <p>
+            <code>Callable1</code> through <code>CallableN</code>.
+            <code>Function</code>, <code>Consumer</code>, <code>Supplier</code> — every
+            variant Java stops short of. All type-checked, all refactorable, all from one template each.
+          </p>
+        </div>
+        <div class="feature-item">
+          <span class="feature-tag">03</span>
+          <h3>Complete DSLs</h3>
+          <p>
+            Stateful builder chains where each step adds a type parameter and the
+            compiler enforces arity. Rule engines. Query builders. Domain APIs.
+            What would take thousands of lines of boilerplate is now one template file.
+          </p>
         </div>
       </div>
     </div>
@@ -407,11 +473,12 @@ mvn install -DskipTests</code></pre>
       </div>
 
       <p style="color:var(--muted);max-width:620px;font-size:0.95rem;line-height:1.7;margin-bottom:var(--space-xl)">
-        Every other solution — Freemarker templates, Python scripts, Groovy generators —
-        uses a template that is <em>not</em> valid Java. Your IDE can't navigate it.
-        Permuplate templates ARE valid, compilable Java. The compiler, the IDE, the
-        refactoring tools — all of them work, because the template is the same Java
-        they already understand.
+        Every other generator — Freemarker templates, Python scripts, Groovy code-gen —
+        uses a template that is <em>not</em> valid Java. Your IDE can't navigate it,
+        refactor it, or type-check it. When you rename a field, the generated classes break silently.
+        Permuplate templates ARE valid, compilable Java. The same tools you already trust —
+        the compiler, the IDE, Find Usages, Rename — all work, because the template is
+        just Java.
       </p>
 
       <table class="comparison-table">

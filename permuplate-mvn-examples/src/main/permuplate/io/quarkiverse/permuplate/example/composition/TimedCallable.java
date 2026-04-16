@@ -18,8 +18,7 @@ public class TimedCallable {
              inline = true, keepTemplate = false)
     public interface Callable1<
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}",
-                              name = "${alpha(k)}") A
-    > {
+                              name = "${alpha(k)}") A> {
         Object result(
                 @PermuteParam(varName = "j", from = "1", to = "${i}",
                               type = "${alpha(j)}", name = "${lower(j)}")
