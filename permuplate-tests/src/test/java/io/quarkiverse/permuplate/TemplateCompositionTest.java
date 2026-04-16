@@ -189,7 +189,11 @@ public class TemplateCompositionTest {
         String output = afterB.toString();
 
         assertThat(output).contains("System.out.println(\"logging\")");
-        assertThat(output.split("Object result\\(").length - 1).isEqualTo(1);
+        // Verify the user-declared method is present and no synthesised duplicate was added.
+        // Count only within LoggedCallable2's class body (output also contains Callable2 interface
+        // which independently contributes one "Object result(" occurrence).
+        String loggedClass = output.substring(output.indexOf("class LoggedCallable2"));
+        assertThat(loggedClass.split("Object result\\(").length - 1).isEqualTo(1);
     }
 
     // =========================================================================

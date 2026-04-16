@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -14,6 +16,7 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteCaseTransformer;
@@ -221,6 +224,9 @@ public class InlineGenerator {
                 io.quarkiverse.permuplate.core.PermuteThrowsTransformer.transform(
                         generated, ctx, null, null);
             }
+
+            // Synthesise @PermuteDelegate method bodies
+            applyPermuteDelegate(generated, parentCu);
 
             // Strip @Permute, @PermuteFilter, @PermuteFilters
             generated.getAnnotations().removeIf(a -> {
@@ -1277,6 +1283,99 @@ public class InlineGenerator {
                 srcTps.forEach(tp -> copied.add(tp.clone()));
                 genTyped.setTypeParameters(copied);
             }
+        }
+    }
+
+    /**
+     * Synthesises delegating method bodies for all fields annotated with @PermuteDelegate.
+     * For each such field:
+     * - Strips @PermuteDelegate annotation from output
+     * - Reads the field's declared type name to find the source class in parentCu
+     * - For each method in that source class NOT already declared in the generated class,
+     * generates a delegating method body (with optional modifier from @PermuteDelegate)
+     * - User-declared methods take precedence — they are never overwritten
+     */
+    private static void applyPermuteDelegate(TypeDeclaration<?> generated,
+            CompilationUnit parentCu) {
+        for (FieldDeclaration field : new ArrayList<>(generated.getFields())) {
+            AnnotationExpr delegateAnn = null;
+            for (AnnotationExpr ann : field.getAnnotations()) {
+                String n = ann.getNameAsString();
+                if ("PermuteDelegate".equals(n) || n.endsWith(".PermuteDelegate")) {
+                    delegateAnn = ann;
+                    break;
+                }
+            }
+            if (delegateAnn == null)
+                continue;
+
+            // Remove @PermuteDelegate from output
+            field.getAnnotations().remove(delegateAnn);
+
+            // Read modifier= attribute (empty = no modifier)
+            String modifier = "";
+            if (delegateAnn instanceof NormalAnnotationExpr normal) {
+                modifier = normal.getPairs().stream()
+                        .filter(p -> "modifier".equals(p.getNameAsString()))
+                        .map(p -> p.getValue().toString().replace("\"", ""))
+                        .findFirst().orElse("");
+            }
+
+            // Get field's type simple name (strip generic type args)
+            String fieldTypeName = field.getCommonType().asString()
+                    .replaceAll("<.*>", "").trim();
+
+            // Get the field variable name (e.g. "delegate")
+            String fieldName = field.getVariables().get(0).getNameAsString();
+
+            // Find that type in parentCu
+            Optional<TypeDeclaration<?>> sourceType = parentCu.findFirst(ClassOrInterfaceDeclaration.class,
+                    c -> c.getNameAsString().equals(fieldTypeName))
+                    .<TypeDeclaration<?>> map(c -> c);
+            if (sourceType.isEmpty())
+                continue;
+
+            // Collect method names already declared in the generated class (user takes precedence)
+            Set<String> declaredMethods = generated.getMethods().stream()
+                    .map(MethodDeclaration::getNameAsString)
+                    .collect(Collectors.toSet());
+
+            // Synthesise delegating methods for each undeclared source method
+            final String mod = modifier;
+            final String fname = fieldName;
+            sourceType.get().getMethods().forEach(srcMethod -> {
+                if (declaredMethods.contains(srcMethod.getNameAsString()))
+                    return;
+
+                // Join param names for the call site (just names, not types)
+                String paramNames = srcMethod.getParameters().stream()
+                        .map(p -> p.getNameAsString())
+                        .collect(Collectors.joining(", "));
+                // Join param declarations for the method signature (type + name)
+                String paramDecls = srcMethod.getParameters().stream()
+                        .map(p -> p.getTypeAsString() + " " + p.getNameAsString())
+                        .collect(Collectors.joining(", "));
+                boolean isVoid = srcMethod.getType().asString().equals("void");
+                String callExpr = fname + "." + srcMethod.getNameAsString() + "(" + paramNames + ")";
+                String body = isVoid ? "{ " + callExpr + "; }" : "{ return " + callExpr + "; }";
+
+                String throws_ = srcMethod.getThrownExceptions().isEmpty() ? ""
+                        : " throws " + srcMethod.getThrownExceptions().stream()
+                                .map(Object::toString).collect(Collectors.joining(", "));
+
+                String methodSrc = (mod.isEmpty() ? "" : mod + " ")
+                        + srcMethod.getTypeAsString() + " " + srcMethod.getNameAsString()
+                        + "(" + paramDecls + ")" + throws_ + " " + body;
+
+                try {
+                    MethodDeclaration synth = StaticJavaParser.parseMethodDeclaration(methodSrc);
+                    synth.addAnnotation("Override");
+                    generated.addMember(synth);
+                } catch (Exception e) {
+                    System.err.println("[Permuplate] @PermuteDelegate: failed to synthesise "
+                            + srcMethod.getNameAsString() + ": " + e.getMessage());
+                }
+            });
         }
     }
 
