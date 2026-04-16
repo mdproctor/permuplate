@@ -45,7 +45,7 @@ Maven is at `/opt/homebrew/bin/mvn`. The standard build command is:
 The IntelliJ plugin uses a separate Gradle build. From `permuplate-intellij-plugin/`:
 
 ```bash
-./gradlew test          # run plugin tests (56 tests)
+./gradlew test          # run plugin tests (83 tests)
 ./gradlew buildPlugin   # produce installable zip in build/distributions/
 ```
 
@@ -175,6 +175,8 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 | @PermuteDelegate synthesised methods need public | Source interface methods are implicitly public. When synthesising delegation, the method must be explicitly declared public or the override weakens access — which is a compile error. |
 | SourceScanner scans RecordDeclaration | Before template composition, SourceScanner only found ClassOrInterfaceDeclaration templates. Records as templates (Tuple2Record.java pattern) needed RecordDeclaration added to the scan. |
 | @PermuteSource stripped from output | @PermuteSource and @PermuteSources annotations are stripped from generated classes (same as @Permute, @PermuteFilter etc.) to prevent "cannot find symbol" compile errors on the generated output. |
+| IntelliJ rename propagation covers @PermuteAnnotation, @PermuteThrows, @PermuteSource | All three are in `AnnotationStringRenameProcessor.ALL_ANNOTATION_FQNS`. Renaming a class updates their `.value` strings atomically. `@PermuteFilter` is excluded — its `.value` is a boolean JEXL expression with no class references. |
+| IntelliJ `PsiAnnotation.getQualifiedName()` simple-name fallback | When annotation imports are unresolved (e.g. in tests), `getQualifiedName()` returns the bare simple name with no dot prefix — `endsWith(".AnnotationName")` is false. All inspections add a third guard: `|| fqn.equals("AnnotationSimpleName")`. Required whenever adding a new `LocalInspectionTool` for a Permuplate annotation. |
 
 ---
 
