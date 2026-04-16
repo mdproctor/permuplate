@@ -478,6 +478,10 @@ public class PermuteProcessor extends AbstractProcessor {
         // 5g. @PermuteStatements — insert accumulated statements into method bodies
         PermuteStatementsTransformer.transform(classDecl, ctx);
 
+        // 5h. @PermuteAnnotation — add Java annotations to generated elements (runs last)
+        io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
+                classDecl, ctx, processingEnv.getMessager(), typeElement);
+
         // TODO: extract PermuteFilter/PermuteFilters predicate to a shared constant — used in 3 places
         // 6. Remove @Permute and @PermuteFilter / @PermuteFilters from the class
         classDecl.getAnnotations().removeIf(a -> {
