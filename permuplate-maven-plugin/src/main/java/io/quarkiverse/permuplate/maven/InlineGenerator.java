@@ -10,13 +10,17 @@ import java.util.stream.Collectors;
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
+import com.github.javaparser.ast.nodeTypes.NodeWithTypeParameters;
+import com.github.javaparser.ast.type.TypeParameter;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteCaseTransformer;
@@ -136,6 +140,9 @@ public class InlineGenerator {
 
             // Infer type parameters from @PermuteSource if present
             applySourceTypeParams(generated, templateClassDecl, parentCu, ctx);
+
+            // Builder synthesis: empty body + record source → complete fluent builder
+            applyBuilderSynthesis(generated, templateClassDecl, parentCu, ctx);
 
             // Apply transformations (null messager — Maven plugin has no Messager)
             PermuteTypeParamTransformer.transform(generated, ctx, null, null);
@@ -1284,6 +1291,81 @@ public class InlineGenerator {
                 genTyped.setTypeParameters(copied);
             }
         }
+    }
+
+    /**
+     * If the template has @PermuteSource referencing a RecordDeclaration AND the
+     * generated class body is empty (no declared members), synthesises a complete
+     * fluent builder:
+     * - Private fields per record component
+     * - Fluent setter per component (returns this, builder type as return type)
+     * - build() method returning new RecordType<>(fields...)
+     *
+     * Type parameters are already set by applySourceTypeParams() before this runs.
+     * Triggers only on empty body — if the user wrote any members, synthesis is skipped.
+     */
+    private static void applyBuilderSynthesis(TypeDeclaration<?> generated,
+            TypeDeclaration<?> templateClass,
+            CompilationUnit parentCu,
+            EvaluationContext ctx) {
+        // Only trigger when template body is empty
+        if (!generated.getMembers().isEmpty())
+            return;
+
+        List<String> patterns = readSourceNamePatterns(templateClass);
+        if (patterns.isEmpty())
+            return;
+        String sourceName = ctx.evaluate(patterns.get(0));
+
+        // Source must be a record
+        Optional<RecordDeclaration> recordOpt = parentCu.findFirst(RecordDeclaration.class,
+                r -> r.getNameAsString().equals(sourceName));
+        if (recordOpt.isEmpty())
+            return;
+
+        RecordDeclaration record = recordOpt.get();
+        String builderName = generated.getNameAsString();
+
+        // Build type param string (e.g. "<A, B, C>") from already-set type params
+        String typeParamStr = "";
+        if (generated instanceof NodeWithTypeParameters<?> nwtp) {
+            @SuppressWarnings("unchecked")
+            NodeList<TypeParameter> tps = ((NodeWithTypeParameters<TypeDeclaration<?>>) nwtp).getTypeParameters();
+            if (!tps.isEmpty()) {
+                typeParamStr = "<" + tps.stream()
+                        .map(TypeParameter::getNameAsString)
+                        .collect(Collectors.joining(", ")) + ">";
+            }
+        }
+        String builderType = builderName + typeParamStr;
+        String recordType = sourceName + typeParamStr;
+
+        // Collect record components
+        List<Parameter> components = record.getParameters();
+
+        // Generate: private fields
+        for (Parameter comp : components) {
+            String fieldSrc = "private " + comp.getType() + " " + comp.getNameAsString() + ";";
+            generated.addMember(StaticJavaParser.parseBodyDeclaration(fieldSrc));
+        }
+
+        // Generate: fluent setters
+        for (Parameter comp : components) {
+            String compName = comp.getNameAsString();
+            String compType = comp.getType().asString();
+            String setterSrc = "public " + builderType + " " + compName
+                    + "(" + compType + " " + compName + ") { this." + compName
+                    + " = " + compName + "; return this; }";
+            generated.addMember(StaticJavaParser.parseBodyDeclaration(setterSrc));
+        }
+
+        // Generate: build() method (use diamond <> for the constructor call)
+        String args = components.stream()
+                .map(Parameter::getNameAsString)
+                .collect(Collectors.joining(", "));
+        String buildSrc = "public " + recordType + " build() { return new "
+                + sourceName + "<>(" + args + "); }";
+        generated.addMember(StaticJavaParser.parseBodyDeclaration(buildSrc));
     }
 
     /**
