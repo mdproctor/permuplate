@@ -13,7 +13,7 @@ import java.lang.annotation.*;
  * <pre>
  * {@code
  * &#64;Permute(varName="i", from="1", to="6", className="Callable${i}", strings={"max=6"})
- * @PermuteAnnotation(when="${i == 1}", value="@FunctionalInterface")
+ * &#64;PermuteAnnotation(when="${i == 1}", value="@FunctionalInterface")
  * &#64;PermuteAnnotation(when="${i == max}", value="@Deprecated(since=\"use higher arity\")")
  * public interface Callable1 { ... }
  * }
