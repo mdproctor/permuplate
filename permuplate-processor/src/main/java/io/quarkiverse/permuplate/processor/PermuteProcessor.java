@@ -482,6 +482,10 @@ public class PermuteProcessor extends AbstractProcessor {
         io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
                 classDecl, ctx, processingEnv.getMessager(), typeElement);
 
+        // 5i. @PermuteThrows — add exception types to method throws clauses
+        io.quarkiverse.permuplate.core.PermuteThrowsTransformer.transform(
+                classDecl, ctx, processingEnv.getMessager(), typeElement);
+
         // TODO: extract PermuteFilter/PermuteFilters predicate to a shared constant — used in 3 places
         // 6. Remove @Permute and @PermuteFilter / @PermuteFilters from the class
         classDecl.getAnnotations().removeIf(a -> {

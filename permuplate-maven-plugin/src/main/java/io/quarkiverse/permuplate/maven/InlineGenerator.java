@@ -167,6 +167,10 @@ public class InlineGenerator {
                 io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
                         generated, ctx, null, null);
 
+                // @PermuteThrows — add exception types to method throws clauses
+                io.quarkiverse.permuplate.core.PermuteThrowsTransformer.transform(
+                        generated, ctx, null, null);
+
                 // @PermuteImport — add evaluated imports to the parent CU
                 for (String importStr : collectInlinePermuteImports(coid, ctx)) {
                     boolean alreadyPresent = outputCu.getImports().stream()
@@ -208,6 +212,10 @@ public class InlineGenerator {
 
                 // @PermuteAnnotation — add Java annotations to generated elements (runs last)
                 io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
+                        generated, ctx, null, null);
+
+                // @PermuteThrows — add exception types to method throws clauses
+                io.quarkiverse.permuplate.core.PermuteThrowsTransformer.transform(
                         generated, ctx, null, null);
             }
 
