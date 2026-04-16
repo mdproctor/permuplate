@@ -221,6 +221,28 @@ public class PermuteProcessor extends AbstractProcessor {
             }
         }
 
+        // @PermuteSource is only valid in Maven plugin mode
+        boolean hasPermuteSource = processingEnv.getElementUtils()
+                .getAllAnnotationMirrors(typeElement).stream()
+                .anyMatch(m -> {
+                    String fqn = ((javax.lang.model.element.TypeElement) m.getAnnotationType().asElement()).getQualifiedName()
+                            .toString();
+                    return "io.quarkiverse.permuplate.PermuteSource".equals(fqn)
+                            || "io.quarkiverse.permuplate.PermuteSources".equals(fqn);
+                });
+        if (hasPermuteSource) {
+            AnnotationMirror sourceMirror = findAnnotationMirror(typeElement,
+                    "io.quarkiverse.permuplate.PermuteSource");
+            if (sourceMirror == null) {
+                sourceMirror = findAnnotationMirror(typeElement,
+                        "io.quarkiverse.permuplate.PermuteSources");
+            }
+            error("@PermuteSource requires the Maven plugin (permuplate-maven-plugin). "
+                    + "Use inline=true with the Maven plugin instead of APT.",
+                    typeElement, sourceMirror, null);
+            return;
+        }
+
         // Check for inline — APT cannot generate inline (requires Maven plugin)
         if (permute.inline()) {
             boolean isNested = typeElement.getEnclosingElement() instanceof TypeElement;

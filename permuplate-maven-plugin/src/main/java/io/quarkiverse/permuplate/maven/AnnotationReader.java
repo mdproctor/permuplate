@@ -2,13 +2,16 @@ package io.quarkiverse.permuplate.maven;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
+import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.ArrayInitializerExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
+import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
@@ -142,6 +145,53 @@ public class AnnotationReader {
             }
         }
         return new PermuteVarConfig[0];
+    }
+
+    /**
+     * Returns all @PermuteSource value strings from a template class.
+     * Returns empty list when no @PermuteSource is present.
+     */
+    public List<String> readPermuteSourceNames(TypeDeclaration<?> typeDecl) {
+        List<String> result = new ArrayList<>();
+        for (AnnotationExpr ann : typeDecl.getAnnotations()) {
+            String name = ann.getNameAsString();
+            if ("PermuteSource".equals(name) || name.endsWith(".PermuteSource")) {
+                extractSingleFilterValue(ann).ifPresent(result::add);
+            } else if ("PermuteSources".equals(name) || name.endsWith(".PermuteSources")) {
+                if (ann instanceof NormalAnnotationExpr normal) {
+                    normal.getPairs().stream()
+                            .filter(p -> "value".equals(p.getNameAsString()))
+                            .findFirst()
+                            .map(p -> p.getValue())
+                            .filter(v -> v instanceof ArrayInitializerExpr)
+                            .map(v -> (ArrayInitializerExpr) v)
+                            .ifPresent(arr -> arr.getValues()
+                                    .forEach(expr -> extractSingleFilterValue(expr).ifPresent(result::add)));
+                }
+            }
+        }
+        return result;
+    }
+
+    private Optional<String> extractSingleFilterValue(Node node) {
+        if (node instanceof SingleMemberAnnotationExpr single) {
+            String raw = single.getMemberValue().toString();
+            if (raw.startsWith("\"") && raw.endsWith("\"")) {
+                return Optional.of(raw.substring(1, raw.length() - 1));
+            }
+        } else if (node instanceof NormalAnnotationExpr normal) {
+            return normal.getPairs().stream()
+                    .filter(p -> "value".equals(p.getNameAsString()))
+                    .findFirst()
+                    .map(p -> {
+                        String raw = p.getValue().toString();
+                        return (raw.startsWith("\"") && raw.endsWith("\""))
+                                ? raw.substring(1, raw.length() - 1)
+                                : null;
+                    })
+                    .filter(s -> s != null);
+        }
+        return Optional.empty();
     }
 
     /** Signals a malformed or missing annotation attribute found during source scanning. */

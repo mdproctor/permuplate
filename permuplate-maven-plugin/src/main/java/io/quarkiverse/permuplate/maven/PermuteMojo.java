@@ -163,7 +163,8 @@ public class PermuteMojo extends AbstractMojo {
 
                 for (java.util.Map.Entry<java.nio.file.Path, java.util.List<SourceScanner.AnnotatedType>> fileGroup : inlineByFile
                         .entrySet()) {
-                    generateInlineGroup(fileGroup.getKey(), fileGroup.getValue());
+                    List<SourceScanner.AnnotatedType> sorted = sortBySourceDependency(fileGroup.getValue());
+                    generateInlineGroup(fileGroup.getKey(), sorted);
                 }
             }
         } catch (MojoExecutionException e) {
@@ -381,6 +382,28 @@ public class PermuteMojo extends AbstractMojo {
                 : packageName + "." + parentClassName;
         writeGeneratedFile(qualifiedName, currentCu.toString());
         getLog().info("Permuplate: generated inline group in " + qualifiedName);
+    }
+
+    /**
+     * Sorts templates so @PermuteSource-dependent templates process after their sources.
+     * Source templates (no @PermuteSource) come first; derived templates come second.
+     * Single-level only — preserves original relative order within each group.
+     */
+    private List<SourceScanner.AnnotatedType> sortBySourceDependency(
+            List<SourceScanner.AnnotatedType> templates) {
+        AnnotationReader reader = new AnnotationReader();
+        List<SourceScanner.AnnotatedType> sources = new java.util.ArrayList<>();
+        List<SourceScanner.AnnotatedType> derived = new java.util.ArrayList<>();
+        for (SourceScanner.AnnotatedType t : templates) {
+            if (reader.readPermuteSourceNames(t.classDecl()).isEmpty()) {
+                sources.add(t);
+            } else {
+                derived.add(t);
+            }
+        }
+        List<SourceScanner.AnnotatedType> sorted = new java.util.ArrayList<>(sources);
+        sorted.addAll(derived);
+        return sorted;
     }
 
     private void processMethod(SourceScanner.AnnotatedMethod entry) throws Exception {
