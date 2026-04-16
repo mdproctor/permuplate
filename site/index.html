@@ -61,7 +61,7 @@ description: "Permuplate is a Java annotation processor that generates type-safe
 
         <!-- ── TEMPLATE PLATE ─────────────────────────────── -->
         <text x="119" y="24" font-family="JetBrains Mono,monospace" font-size="11"
-              fill="#555" text-anchor="middle">Callable2.java</text>
+              fill="#555" text-anchor="middle">Join2.java</text>
 
         <rect x="28" y="32" width="182" height="232" fill="#111" stroke="#e85d04" stroke-width="2.5"/>
 
@@ -121,12 +121,12 @@ description: "Permuplate is a Java annotation processor that generates type-safe
         <!-- card 2 — Join4 -->
         <rect x="469" y="114" width="125" height="162" fill="#191919" stroke="#393939" stroke-width="1"/>
         <text x="531" y="109" font-family="JetBrains Mono,monospace" font-size="9"
-              fill="#3e3e3e" text-anchor="middle">Callable4.java</text>
+              fill="#3e3e3e" text-anchor="middle">Join4.java</text>
 
         <!-- card 1 — Join3 (frontmost) -->
         <rect x="453" y="128" width="125" height="162" fill="#1c1c1c" stroke="#585858" stroke-width="1.5"/>
         <text x="515" y="123" font-family="JetBrains Mono,monospace" font-size="9"
-              fill="#777" text-anchor="middle">Callable3.java</text>
+              fill="#777" text-anchor="middle">Join3.java</text>
 
         <rect x="466" y="145" width="99" height="5" rx="1" fill="#2c2c2c"/>
         <rect x="466" y="157" width="82" height="5" rx="1" fill="#282828"/>
@@ -170,14 +170,14 @@ description: "Permuplate is a Java annotation processor that generates type-safe
           <h3>The Ceiling</h3>
           <p>Java's built-in functional types stop at 2. No native tuples. No <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">Callable3</code>, no <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">Tuple5</code>, no typed join builder. Hit arity 3 and you're writing these by hand:</p>
           <ul class="file-list">
-            <li>Callable3.java</li>
-            <li>Callable4.java</li>
-            <li>Callable5.java</li>
-            <li>Callable6.java</li>
-            <li>Callable7.java</li>
-            <li>Callable8.java</li>
-            <li>Callable9.java</li>
-            <li>Callable10.java</li>
+            <li>Join3.java</li>
+            <li>Join4.java</li>
+            <li>Join5.java</li>
+            <li>Join6.java</li>
+            <li>Join7.java</li>
+            <li>Join8.java</li>
+            <li>Join9.java</li>
+            <li>Join10.java</li>
           </ul>
         </div>
 
@@ -186,11 +186,14 @@ description: "Permuplate is a Java annotation processor that generates type-safe
           <h3>All Identical Except</h3>
           <p>The number. That's it. Every declaration. Every parameter. Every call site.</p>
           <div class="diff-block">
-            <span class="diff-old">- interface Callable2&lt;A, B&gt;</span>
-            <span class="diff-new">+ interface Callable3&lt;A, B, C&gt;</span>
+            <span class="diff-old">- class Join2&lt;A, B&gt;</span>
+            <span class="diff-new">+ class Join3&lt;A, B, C&gt;</span>
             <br>
-            <span class="diff-old">-   void call(A a, B b);</span>
-            <span class="diff-new">+   void call(A a, B b, C c);</span>
+            <span class="diff-old">-   Callable2&lt;A, B&gt; c2</span>
+            <span class="diff-new">+   Callable3&lt;A, B, C&gt; c3</span>
+            <br>
+            <span class="diff-old">-   DataSource&lt;Tuple2&lt;A,B&gt;&gt; right</span>
+            <span class="diff-new">+   DataSource&lt;Tuple3&lt;A,B,C&gt;&gt; right</span>
           </div>
         </div>
 
@@ -198,10 +201,10 @@ description: "Permuplate is a Java annotation processor that generates type-safe
           <span class="tax-col-num">03</span>
           <h3>Every Change</h3>
           <p>
-            Fix a bug in <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Callable3</code>?
-            Fix it in <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Callable4</code>,
-            <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Callable5</code>...
-            <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Callable10</code>.
+            Fix a bug in <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Join3</code>?
+            Fix it in <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Join4</code>,
+            <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Join5</code>...
+            <code style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:#e85d04">Join10</code>.
             Every time. The tax compounds with every arity added.
           </p>
           <p style="margin-top:16px">Permuplate is the fourth option — the one that doesn't hurt.</p>
@@ -224,11 +227,13 @@ description: "Permuplate is a Java annotation processor that generates type-safe
         <p style="color:var(--muted);max-width:500px;font-size:0.9rem">
           The template is a real, compilable Java class. Your IDE can navigate it,
           refactor it, and type-check it. At compile time, <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">javac</code>
-          generates eight complete, type-safe interfaces. Type parameters expand
-          from <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">&lt;A&gt;</code> to
-          <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">&lt;A, B, C&gt;</code> to
+          generates eight complete, type-safe classes. Type parameters grow in lockstep
+          across the class, its <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">Callable</code>,
+          and its <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">DataSource&lt;Tuple&gt;</code>:
+          <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">&lt;A, B&gt;</code> →
+          <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">&lt;A, B, C&gt;</code> →
           <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">&lt;A, B, C, D, E, F, G, H, I, J&gt;</code>.
-          Every parameter is typed. No <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">Object</code> anywhere.
+          No <code style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--orange)">Object</code> anywhere.
         </p>
         <div class="example-ratio">
           <span>1</span>
@@ -242,20 +247,22 @@ description: "Permuplate is a Java annotation processor that generates type-safe
         <div class="split-panel panel-template">
           <div class="split-label">
             <span class="split-label-text">The Template</span>
-            <span class="split-label-file">Callable2.java</span>
+            <span class="split-label-file">Join2.java</span>
           </div>
           <pre><code class="language-java">@Permute(varName = "i", from = "3", to = "10",
-         className = "Callable${i}")
-public interface Callable2&lt;
+         className = "Join${i}")
+public class Join2&lt;A,
         @PermuteTypeParam(varName = "k",
-            from = "1", to = "${i}",
-            name = "${alpha(k)}") A&gt; {
+            from = "2", to = "${i}",
+            name = "${alpha(k)}") B&gt; {
 
-    void call(
-        @PermuteParam(varName = "j",
-            from = "1", to = "${i}",
-            type = "${alpha(j)}",
-            name = "${lower(j)}") A a);
+    private @PermuteDeclr(
+        type = "Callable${i}&lt;${typeArgList(1,i,\"alpha\")}&gt;",
+        name = "c${i}") Callable2&lt;A, B&gt; c2;
+
+    private @PermuteDeclr(
+        type = "DataSource&lt;Tuple${i}&lt;${typeArgList(1,i,\"alpha\")}&gt;&gt;")
+        DataSource&lt;Tuple2&lt;A, B&gt;&gt; right;
 }</code></pre>
         </div>
 
@@ -265,30 +272,32 @@ public interface Callable2&lt;
             <span class="split-label-text">Generates</span>
           </div>
           <div class="gen-tabs">
-            <button class="gen-tab active" data-pane="callable3">Callable3.java</button>
-            <button class="gen-tab" data-pane="callable4">Callable4.java</button>
-            <button class="gen-tab" data-pane="callable10">Callable10.java</button>
+            <button class="gen-tab active" data-pane="join3">Join3.java</button>
+            <button class="gen-tab" data-pane="join4">Join4.java</button>
+            <button class="gen-tab" data-pane="join10">Join10.java</button>
             <span class="gen-more">+5 more</span>
           </div>
           <div class="gen-content">
-            <div class="gen-pane active" id="callable3">
-              <pre><code class="language-java">public interface Callable3&lt;A, B, C&gt; {
+            <div class="gen-pane active" id="join3">
+              <pre><code class="language-java">public class Join3&lt;A, B, C&gt; {
 
-    void call(A a, B b, C c);
+    private Callable3&lt;A, B, C&gt; c3;
+    private DataSource&lt;Tuple3&lt;A, B, C&gt;&gt; right;
 }</code></pre>
             </div>
-            <div class="gen-pane" id="callable4">
-              <pre><code class="language-java">public interface Callable4&lt;A, B, C, D&gt; {
+            <div class="gen-pane" id="join4">
+              <pre><code class="language-java">public class Join4&lt;A, B, C, D&gt; {
 
-    void call(A a, B b, C c, D d);
+    private Callable4&lt;A, B, C, D&gt; c4;
+    private DataSource&lt;Tuple4&lt;A, B, C, D&gt;&gt; right;
 }</code></pre>
             </div>
-            <div class="gen-pane" id="callable10">
-              <pre><code class="language-java">public interface Callable10&lt;A, B, C, D, E,
-                             F, G, H, I, J&gt; {
+            <div class="gen-pane" id="join10">
+              <pre><code class="language-java">public class Join10&lt;A, B, C, D, E, F, G, H, I, J&gt; {
 
-    void call(A a, B b, C c, D d, E e,
-              F f, G g, H h, I i, J j);
+    private Callable10&lt;A, B, C, D, E, F, G, H, I, J&gt; c10;
+    private DataSource&lt;
+        Tuple10&lt;A, B, C, D, E, F, G, H, I, J&gt;&gt; right;
 }</code></pre>
             </div>
           </div>
