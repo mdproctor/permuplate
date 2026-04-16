@@ -150,7 +150,7 @@ The preprocessor strips the block when the condition is false. Trade-off: breaks
 | String-set iteration | Medium | High | **Done** (#27) |
 | `@PermuteFilter` | Low | Medium | **Done** (#28) |
 | `@PermuteAnnotation` | Medium | Medium | Future |
-| Record component expansion | High (two blockers) | Medium | Blocked — needs parser + AST refactor |
+| Record component expansion | High | Medium | **Done** (#29) |
 | `@PermuteThrows` | Low | Low | Future |
 | Template composition | High | High | Long-term |
 | Retrograde mode | High | Medium | Long-term |
