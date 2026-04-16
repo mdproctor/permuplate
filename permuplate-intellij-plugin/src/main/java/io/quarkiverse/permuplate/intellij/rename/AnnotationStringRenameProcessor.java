@@ -50,7 +50,10 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
             "io.quarkiverse.permuplate.PermuteDeclr",
             "io.quarkiverse.permuplate.PermuteParam",
             "io.quarkiverse.permuplate.PermuteTypeParam",
-            "io.quarkiverse.permuplate.PermuteMethod"
+            "io.quarkiverse.permuplate.PermuteMethod",
+            "io.quarkiverse.permuplate.PermuteSource",
+            "io.quarkiverse.permuplate.PermuteAnnotation",
+            "io.quarkiverse.permuplate.PermuteThrows"
     );
 
     /**

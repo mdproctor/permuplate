@@ -26,7 +26,8 @@ public class PermuteAnnotationValueInspection extends LocalInspectionTool {
                 String fqn = annotation.getQualifiedName();
                 if (fqn == null) return;
                 if (!fqn.equals("io.quarkiverse.permuplate.PermuteAnnotation")
-                        && !fqn.endsWith(".PermuteAnnotation")) return;
+                        && !fqn.endsWith(".PermuteAnnotation")
+                        && !fqn.equals("PermuteAnnotation")) return;
 
                 PsiAnnotationMemberValue valueAttr = annotation.findAttributeValue("value");
                 if (!(valueAttr instanceof PsiLiteralExpression lit)) return;
@@ -37,7 +38,7 @@ public class PermuteAnnotationValueInspection extends LocalInspectionTool {
                     StaticJavaParser.parseAnnotation(stubbed);
                 } catch (Exception e) {
                     holder.registerProblem(valueAttr,
-                            "@PermuteAnnotation: value does not parse as a valid Java annotation",
+                            "Permuplate: @PermuteAnnotation value does not parse as a valid Java annotation",
                             ProblemHighlightType.WARNING);
                 }
             }

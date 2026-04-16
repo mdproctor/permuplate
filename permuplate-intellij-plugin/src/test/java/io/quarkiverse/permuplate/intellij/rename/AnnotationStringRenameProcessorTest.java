@@ -565,6 +565,137 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
                 generatedFile.getText().contains("public void join()"));
     }
 
+    // =========================================================================
+    // @PermuteSource rename propagation
+    // =========================================================================
+
+    /**
+     * findAffectedLiterals must pick up the @PermuteSource value attribute because
+     * PermuteSource is now included in ALL_ANNOTATION_FQNS.
+     */
+    public void testFindAffectedLiteralsDetectsPermuteSourceValue() {
+        myFixture.configureByText("TimedCallable2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"2\", to=\"6\", className=\"TimedCallable${i}\")\n" +
+                "@PermuteSource(\"Callable${i}\")\n" +
+                "public class TimedCallable2 {}");
+
+        java.util.List<com.intellij.psi.PsiLiteralExpression> affected =
+                AnnotationStringRenameProcessor.findAffectedLiterals(myFixture.getFile(), "Callable");
+
+        assertFalse("Expected at least one literal containing 'Callable' from @PermuteSource",
+                affected.isEmpty());
+        boolean foundPermuteSource = affected.stream()
+                .anyMatch(lit -> "Callable${i}".equals(lit.getValue()));
+        assertTrue("findAffectedLiterals must find the @PermuteSource value literal",
+                foundPermuteSource);
+    }
+
+    /**
+     * Renaming Callable2 → Task2 must update @PermuteSource("Callable${i}") to
+     * @PermuteSource("Task${i}") in the dependent template.
+     */
+    public void testClassRenameUpdatesPermuteSourceValue() {
+        myFixture.addFileToProject("Callable2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"2\", to=\"6\", className=\"Callable${i}\")\n" +
+                "public interface Callable2 {}");
+
+        PsiFile timedCallableFile = myFixture.addFileToProject("TimedCallable2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"2\", to=\"6\", className=\"TimedCallable${i}\")\n" +
+                "@PermuteSource(\"Callable${i}\")\n" +
+                "public class TimedCallable2 {}");
+
+        com.intellij.psi.PsiClass callable2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Callable2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull("Callable2 must be resolvable", callable2);
+
+        myFixture.renameElement(callable2, "Task2");
+
+        String timedText = timedCallableFile.getText();
+        assertTrue("@PermuteSource value must be updated to Task${i}",
+                timedText.contains("\"Task${i}\""));
+        assertFalse("Old @PermuteSource value must not remain",
+                timedText.contains("\"Callable${i}\""));
+    }
+
+    /**
+     * @PermuteSource is not picked up for a literal that does not contain the old family name.
+     * Verifies that unrelated @PermuteSource values are left untouched.
+     */
+    public void testUnrelatedPermuteSourceValueIsNotAffected() {
+        myFixture.configureByText("TimedCallable2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"2\", to=\"6\", className=\"TimedCallable${i}\")\n" +
+                "@PermuteSource(\"Callable${i}\")\n" +
+                "public class TimedCallable2 {}");
+
+        java.util.List<com.intellij.psi.PsiLiteralExpression> affected =
+                AnnotationStringRenameProcessor.findAffectedLiterals(myFixture.getFile(), "Unrelated");
+
+        boolean foundPermuteSource = affected.stream()
+                .anyMatch(lit -> "Callable${i}".equals(lit.getValue()));
+        assertFalse("@PermuteSource value must not appear in results for an unrelated literal",
+                foundPermuteSource);
+    }
+
+    // =========================================================================
+    // @PermuteThrows and @PermuteAnnotation rename propagation
+    // =========================================================================
+
+    /**
+     * findAffectedLiterals must pick up the @PermuteThrows value attribute because
+     * PermuteThrows is now included in ALL_ANNOTATION_FQNS.
+     */
+    public void testFindAffectedLiteralsDetectsPermuteThrowsValue() {
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteThrows(\"IOException\")\n" +
+                "    public void call() {}\n" +
+                "}");
+
+        java.util.List<com.intellij.psi.PsiLiteralExpression> affected =
+                AnnotationStringRenameProcessor.findAffectedLiterals(myFixture.getFile(), "IOException");
+
+        assertFalse("Expected at least one literal containing 'IOException' from @PermuteThrows",
+                affected.isEmpty());
+        boolean foundPermuteThrows = affected.stream()
+                .anyMatch(lit -> "IOException".equals(lit.getValue()));
+        assertTrue("findAffectedLiterals must find the @PermuteThrows value literal",
+                foundPermuteThrows);
+    }
+
+    /**
+     * findAffectedLiterals must pick up the @PermuteAnnotation value attribute because
+     * PermuteAnnotation is now included in ALL_ANNOTATION_FQNS.
+     */
+    public void testFindAffectedLiteralsDetectsPermuteAnnotationValue() {
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "@PermuteAnnotation(\"@MyAnnotation\")\n" +
+                "public class Join2 {}");
+
+        java.util.List<com.intellij.psi.PsiLiteralExpression> affected =
+                AnnotationStringRenameProcessor.findAffectedLiterals(myFixture.getFile(), "MyAnnotation");
+
+        assertFalse("Expected at least one literal containing 'MyAnnotation' from @PermuteAnnotation",
+                affected.isEmpty());
+        boolean foundPermuteAnnotation = affected.stream()
+                .anyMatch(lit -> "@MyAnnotation".equals(lit.getValue()));
+        assertTrue("findAffectedLiterals must find the @PermuteAnnotation value literal",
+                foundPermuteAnnotation);
+    }
+
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
         com.intellij.openapi.vfs.VirtualFile generatedFile =
                 myFixture.getTempDirFixture().createFile(

@@ -26,7 +26,8 @@ public class PermuteThrowsTypeInspection extends LocalInspectionTool {
                 String fqn = annotation.getQualifiedName();
                 if (fqn == null) return;
                 if (!fqn.equals("io.quarkiverse.permuplate.PermuteThrows")
-                        && !fqn.endsWith(".PermuteThrows")) return;
+                        && !fqn.endsWith(".PermuteThrows")
+                        && !fqn.equals("PermuteThrows")) return;
 
                 PsiAnnotationMemberValue valueAttr = annotation.findAttributeValue("value");
                 if (!(valueAttr instanceof PsiLiteralExpression lit)) return;
@@ -37,7 +38,7 @@ public class PermuteThrowsTypeInspection extends LocalInspectionTool {
                     StaticJavaParser.parseClassOrInterfaceType(stubbed);
                 } catch (Exception e) {
                     holder.registerProblem(valueAttr,
-                            "@PermuteThrows: value does not look like a valid Java type name",
+                            "Permuplate: @PermuteThrows value does not look like a valid Java type name",
                             ProblemHighlightType.WARNING);
                 }
             }
