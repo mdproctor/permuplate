@@ -1616,7 +1616,7 @@ public class InlineGenerator {
      * {@code @PermuteParam}) from a type declaration and all of its members,
      * including field-level and parameter-level annotations.
      */
-    private static void stripPermuteAnnotations(TypeDeclaration<?> classDecl) {
+    static void stripPermuteAnnotations(TypeDeclaration<?> classDecl) {
         Set<String> PERMUPLATE_ANNOTATIONS = Set.of(
                 "Permute", "io.quarkiverse.permuplate.Permute",
                 "PermuteDeclr", "io.quarkiverse.permuplate.PermuteDeclr",

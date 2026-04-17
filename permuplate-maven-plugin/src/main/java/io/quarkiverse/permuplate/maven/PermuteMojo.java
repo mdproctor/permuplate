@@ -207,17 +207,21 @@ public class PermuteMojo extends AbstractMojo {
         java.util.Map<String, Object> baseVars = PermuteConfig.buildBaseVars(config, externalProperties);
         io.quarkiverse.permuplate.core.EvaluationContext valCtx = new io.quarkiverse.permuplate.core.EvaluationContext(
                 baseVars);
-        int fromVal, toVal;
-        try {
-            fromVal = valCtx.evaluateInt(config.from);
-            toVal = valCtx.evaluateInt(config.to);
-        } catch (Exception e) {
-            throw new MojoExecutionException(location +
-                    ": @Permute from/to expression failed to evaluate: " + e.getMessage(), e);
-        }
-        if (fromVal > toVal) {
-            throw new MojoExecutionException(location + ": @Permute has invalid range: from=" +
-                    fromVal + " is greater than to=" + toVal);
+        // String-set mode: values is non-empty — skip from/to range validation.
+        // buildAllCombinations already handles the values path correctly.
+        if (config.values.length == 0) {
+            int fromVal, toVal;
+            try {
+                fromVal = valCtx.evaluateInt(config.from);
+                toVal = valCtx.evaluateInt(config.to);
+            } catch (Exception e) {
+                throw new MojoExecutionException(location +
+                        ": @Permute from/to expression failed to evaluate: " + e.getMessage(), e);
+            }
+            if (fromVal > toVal) {
+                throw new MojoExecutionException(location + ": @Permute has invalid range: from=" +
+                        fromVal + " is greater than to=" + toVal);
+            }
         }
         for (String entry : config.strings) {
             int sep = entry.indexOf('=');
@@ -310,6 +314,31 @@ public class PermuteMojo extends AbstractMojo {
             String qualifiedName = packageName.isEmpty() ? newClassName
                     : packageName + "." + newClassName;
             writeGeneratedFile(qualifiedName, generatedCu.toString());
+        }
+
+        // keepTemplate=true: write the template class itself (annotations stripped) as its own file.
+        // This is required when the template class is referenced directly by other code
+        // (e.g. NegationScope is used by JoinBuilder alongside the generated ExistenceScope).
+        if (config.keepTemplate) {
+            ClassOrInterfaceDeclaration templateDecl = ((ClassOrInterfaceDeclaration) entry.typeDecl()).clone();
+            templateDecl.setStatic(false);
+            if (!templateDecl.isPublic())
+                templateDecl.setModifier(Modifier.Keyword.PUBLIC, true);
+            InlineGenerator.stripPermuteAnnotations(templateDecl);
+
+            CompilationUnit templateCu = new CompilationUnit();
+            entry.cu().getPackageDeclaration().ifPresent(p -> templateCu.setPackageDeclaration(p.clone()));
+            entry.cu().getImports().forEach(imp -> {
+                if (!imp.getNameAsString().startsWith("io.quarkiverse.permuplate"))
+                    templateCu.addImport(imp.clone());
+            });
+            templateCu.addType(templateDecl);
+
+            String packageName = entry.cu().getPackageDeclaration()
+                    .map(p -> p.getNameAsString()).orElse("");
+            String qualifiedTemplateName = packageName.isEmpty() ? templateClassName
+                    : packageName + "." + templateClassName;
+            writeGeneratedFile(qualifiedTemplateName, templateCu.toString());
         }
     }
 
