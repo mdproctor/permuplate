@@ -1,41 +1,44 @@
-# Handover — 2026-04-17
+# Handover — 2026-04-18
 
-**Head commit:** `87ad27e` — docs: CLAUDE.md sync + blog entry 2026-04-17
-**GitHub:** Zero open issues.
+**Head commit:** `7ec605e` — chore: remove src/main/java stubs replaced by permuplate templates
+**GitHub:** No open issues. Epics #48 and #52 closed. Build fully green.
 
 ---
 
 ## What Changed This Session
 
-### Website example — finally correct
-Three iterations to get it right. The example now shows `Join2<A, B>` generating `Join3<A,B,C>` with all three types expanding in lockstep: class type params, `Callable3<A,B,C>` field, and `DataSource<Tuple3<A,B,C>>` right field. No `Object` anywhere. Diff block shows the three-way expansion.
+### Drools DSL sandbox — all planned template work complete
 
-### IntelliJ MCP smoke test — 7/7 pass
-- All rename propagation scenarios verified: template, mid-range generated file, end-range generated file
-- `@PermuteSource.value` updates atomically on class rename ✓
-- Both inspections fire on deliberate mismatch ✓
-- **Key finding:** `ide_diagnostics` MCP tool does NOT run `LocalInspectionTool` plugins — use `get_file_problems`
+Six files moved from `src/main/java/` to `src/main/permuplate/` as inline templates.
+~496 lines of hand-written boilerplate eliminated.
 
-### Generics sweep — 21 example template files
-All `permuplate-tests/src/test/java/.../example/` files now use proper generics. Pattern: `<A, @PermuteTypeParam B>`, typed Callables via `typeArgList`, typed List fields via `@PermuteDeclr`. Five test assertion files updated.
+| Template | Result |
+|---|---|
+| RuleExtendsPoint | `@Permute(inline=true, keepTemplate=true)` + `@PermuteTypeParam` — 88 → 37 lines |
+| BaseTuple | Delegation refactor + full inline template — ~290 lines saved |
+| RuleOOPathBuilder | Path3 template generates Path4..Path6 — 128 → 74 lines |
+| NegationScope + ExistenceScope | `@Permute(values={"Existence"}, inline=false, keepTemplate=true)` — 110 → 55 lines |
+| RuleBuilder + ParametersFirst | Top-level inline template + `@PermuteMethod(j=2..7)` — 216 → 170 lines |
 
-**Known limitation discovered:** Two independent `@PermuteTypeParam` axes in cross-product templates (`@PermuteVar`) produce duplicate type params. `BiCallable1x1`, `Combo1x1`, `DualParam2` left with `Object` until fixed.
+### Four framework gaps closed
 
-### Garden — 4 entries submitted
-- `ide_diagnostics` vs `get_file_problems` gotcha
-- Two-axis `@PermuteTypeParam` limitation
-- Non-first type param pattern (`<A, @PermuteTypeParam B>`)
-- `typeArgList` single-quote technique
+1. **Maven plugin string-set** (#51) — `@Permute(values={...})` now works in PermuteMojo
+2. **`keepTemplate=true` for `inline=false`** (#51) — template class written to generated sources
+3. **`inline=true` on top-level classes** (#56) — `InlineGenerator.generate()` branches on `isNestedType()`
+4. **`@PermuteDeclr` TYPE_USE on qualified names** (#57) — scope annotations now checked
+
+### Other fixes
+
+- `@PermuteDeclr` on `ElementType.METHOD` — method rename + return type (#46, epic #52)
+- JEXL exceptions in transformers now produce compile errors not RuntimeExceptions (#54)
+- Two pre-existing test failures fixed
+- `transformNewExpressions` widened from `TypeDeclaration<?>` to `Node`; now `public static`
 
 ---
 
 ## Immediate Next Step
 
-Two tracked issues to consider:
-1. **Fix dual `@PermuteTypeParam` for cross-product templates** — `BiCallable1x1`, `Combo1x1`, `DualParam2` still use `Object`; requires processor change
-2. **`@PermuteConditional`** — highest-complexity remaining feature; needs design
-
-Otherwise, no tracked work remains. Clean state.
+Read the actual droolsvol2 source at `/Users/mdproctor/dev/droolsoct2025/droolsvol2/` for at least one arity family (Join or Tuple equivalent) before writing the follow-up blog article. The sandbox was built from vol2 *tests*, not source — the savings claims need validation against the real implementation.
 
 ---
 
@@ -44,6 +47,7 @@ Otherwise, no tracked work remains. Clean state.
 | Context | Where |
 |---|---|
 | Previous handover | `git show HEAD~1:HANDOFF.md` |
-| Blog entry | `site/_posts/2026-04-17-mdp01-generics-website-smoketest.md` |
-| Example templates | `permuplate-tests/src/test/java/.../example/` |
-| CLAUDE.md additions | `## Key non-obvious decisions` — 3 new rows |
+| Working notes | `docs/drools-dsl-template-improvements.md` |
+| DSL article | `site/_posts/2026-04-17-mdp02-dsl-that-generated-itself.md` |
+| Session diary | `site/_posts/2026-04-18-mdp01-using-tool-on-itself.md` |
+| Session plan | `docs/superpowers/plans/2026-04-17-method-rename-and-basetuple-template.md` |
