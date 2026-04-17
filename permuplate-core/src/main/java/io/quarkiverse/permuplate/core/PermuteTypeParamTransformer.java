@@ -360,6 +360,10 @@ public class PermuteTypeParamTransformer {
             // @PermuteReturn explicitly handles return type transformation — R1 does not apply.
             if (hasPermuteReturn(method))
                 continue;
+            // @PermuteDeclr on the method declaration explicitly sets the new return type —
+            // R1 does not apply (the return type will be replaced, not expanded in-place).
+            if (hasPermuteDeclrOnMethod(method))
+                continue;
             String returnType = method.getTypeAsString();
             // Implicit inference will handle methods whose return type is from the same
             // generated class family. The template return type (e.g. "Chain2<T1,T2>") has base
@@ -393,6 +397,13 @@ public class PermuteTypeParamTransformer {
         return method.getAnnotations().stream().anyMatch(a -> {
             String n = a.getNameAsString();
             return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn");
+        });
+    }
+
+    private static boolean hasPermuteDeclrOnMethod(MethodDeclaration method) {
+        return method.getAnnotations().stream().anyMatch(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteDeclr") || n.equals("io.quarkiverse.permuplate.PermuteDeclr");
         });
     }
 

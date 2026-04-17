@@ -19,6 +19,9 @@ import java.lang.annotation.Target;
  * <li><b>Method parameter</b> — the method body only; name rename is optional</li>
  * <li><b>Object creation expression (TYPE_USE)</b> — updates the constructor class name
  * in {@code new @PermuteDeclr(type="X${i+1}") X${i}<>(args)} expressions</li>
+ * <li><b>Method</b> — renames the method declaration itself: {@code name} sets the new
+ * method name, {@code type} (optional) sets the new return type. No body propagation —
+ * body identifier renames are driven by the field-level {@code @PermuteDeclr}.</li>
  * </ul>
  *
  * <p>
@@ -63,7 +66,8 @@ import java.lang.annotation.Target;
  * }</pre>
  */
 @Retention(RetentionPolicy.SOURCE)
-@Target({ ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.PARAMETER, ElementType.TYPE_USE })
+@Target({ ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.PARAMETER,
+        ElementType.TYPE_USE, ElementType.METHOD })
 public @interface PermuteDeclr {
     String type();
 

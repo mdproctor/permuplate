@@ -25,6 +25,7 @@ import io.quarkiverse.permuplate.example.CtorDeclr2;
 import io.quarkiverse.permuplate.example.DualForEach2;
 import io.quarkiverse.permuplate.example.FieldDeclr2;
 import io.quarkiverse.permuplate.example.ForEachDeclr2;
+import io.quarkiverse.permuplate.example.GetterRename2;
 import io.quarkiverse.permuplate.example.RichJoin2;
 import io.quarkiverse.permuplate.example.TwoFieldDeclr2;
 import io.quarkiverse.permuplate.processor.PermuteProcessor;
@@ -509,6 +510,46 @@ public class PermuteDeclrTest {
         // i=1, j=2 → Join${1+2}First = Join3First
         assertThat(newExpr.getType().getNameAsString()).isEqualTo("Join3First");
         assertThat(newExpr.getType().getAnnotations()).isEmpty();
+    }
+
+    // -------------------------------------------------------------------------
+    // @PermuteDeclr on method declaration — rename name and return type
+    // -------------------------------------------------------------------------
+
+    /**
+     * @PermuteDeclr on a method declaration renames the method name and return type.
+     *               GetterRename2<A> generates GetterRename3<A,B> and GetterRename4<A,B,C>, each
+     *               adding one named getter and one named setter.
+     */
+    @Test
+    public void testPermuteDeclrOnMethodRenamesNameAndReturnType() {
+        var compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(templateSource(GetterRename2.class));
+        assertThat(compilation).succeeded();
+
+        var src3 = sourceOf(compilation.generatedSourceFile(
+                generatedClassName(GetterRename2.class, 3)).orElseThrow());
+
+        // Type params expanded
+        assertThat(src3).contains("GetterRename3<A, B>");
+
+        // Getter renamed: return type changed + method name changed
+        assertThat(src3).contains("public B getB()");
+        assertThat(src3).contains("return b;");
+
+        // Setter renamed: method name changed, param type+name changed
+        assertThat(src3).contains("public void setB(B b)");
+        assertThat(src3).contains("this.b = b;");
+
+        // No leftover annotation noise
+        assertThat(src3).doesNotContain("@PermuteDeclr");
+
+        var src4 = sourceOf(compilation.generatedSourceFile(
+                generatedClassName(GetterRename2.class, 4)).orElseThrow());
+        assertThat(src4).contains("GetterRename4<A, B, C>");
+        assertThat(src4).contains("public C getC()");
+        assertThat(src4).contains("public void setC(C c)");
     }
 
     /**

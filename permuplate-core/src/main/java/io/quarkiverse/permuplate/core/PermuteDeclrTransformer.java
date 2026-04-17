@@ -19,6 +19,7 @@ import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.IntegerLiteralExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.NameExpr;
@@ -79,6 +80,8 @@ public class PermuteDeclrTransformer {
         transformConstructorParams(classDecl, ctx, messager);
         // For-each variables (narrowest scope — loop body only)
         transformForEachVars(classDecl, ctx, messager);
+        // Method declarations — rename name and/or return type per permutation
+        transformMethods(classDecl, ctx, messager);
         // Method parameters — type always; name+body rename only when name is non-empty
         transformMethodParams(classDecl, ctx, messager);
     }
@@ -122,6 +125,38 @@ public class PermuteDeclrTransformer {
                 // Propagate: rename all usages of oldName in the entire class body
                 renameAllUsages(classDecl, oldName, newName);
             }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Method declarations — rename name and/or return type
+    // -------------------------------------------------------------------------
+
+    private static void transformMethods(TypeDeclaration<?> classDecl,
+            EvaluationContext ctx,
+            Messager messager) {
+        List<MethodDeclaration> annotated = new ArrayList<>();
+        classDecl.getMethods().forEach(m -> {
+            if (hasPermuteDeclr(m.getAnnotations()))
+                annotated.add(m);
+        });
+
+        for (MethodDeclaration method : annotated) {
+            AnnotationExpr ann = getPermuteDeclr(method.getAnnotations());
+            String[] params = extractTwoParams(ann, messager);
+            if (params == null)
+                continue;
+
+            String newType = params[0].isEmpty() ? "" : ctx.evaluate(params[0]);
+            String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]);
+
+            if (!newType.isEmpty()) {
+                method.setType(StaticJavaParser.parseType(newType));
+            }
+            if (!newName.isEmpty()) {
+                method.setName(newName);
+            }
+            method.getAnnotations().remove(ann);
         }
     }
 
@@ -443,6 +478,14 @@ public class PermuteDeclrTransformer {
                 }
                 return super.visit(n, arg);
             }
+
+            @Override
+            public Visitable visit(FieldAccessExpr n, Void arg) {
+                // Rename `this.oldName` → `this.newName`
+                if (n.getNameAsString().equals(oldName))
+                    n.setName(newName);
+                return super.visit(n, arg);
+            }
         }, null);
     }
 
@@ -528,14 +571,24 @@ public class PermuteDeclrTransformer {
                 continue;
             }
             VariableDeclarator declarator = field.getVariable(0);
-            if (!checkAnnotationString("@PermuteDeclr type", params[0], "field type",
-                    declarator.getType().asString(), messager, element, stringConstants))
+            // Pure-variable expressions (e.g. "${alpha(i)}") have no static literal to
+            // anchor against the sentinel — skip R4/R2/R3 as for @PermuteParam.name.
+            AnnotationStringTemplate fieldTypeTemplate = AnnotationStringAlgorithm.expandStringConstants(
+                    AnnotationStringAlgorithm.parse(params[0]), stringConstants);
+            if (!fieldTypeTemplate.hasNoLiteral() &&
+                    !checkAnnotationString("@PermuteDeclr type", params[0], "field type",
+                            declarator.getType().asString(), messager, element, stringConstants))
                 valid[0] = false;
             // Empty name means type-only change — skip name validation
-            if (!params[1].isEmpty() &&
-                    !checkAnnotationString("@PermuteDeclr name", params[1], "field name",
-                            declarator.getNameAsString(), messager, element, stringConstants))
-                valid[0] = false;
+            // Pure-variable name (e.g. "${lower(i)}") also skipped — no literal to anchor
+            if (!params[1].isEmpty()) {
+                AnnotationStringTemplate fieldNameTemplate = AnnotationStringAlgorithm.expandStringConstants(
+                        AnnotationStringAlgorithm.parse(params[1]), stringConstants);
+                if (!fieldNameTemplate.hasNoLiteral() &&
+                        !checkAnnotationString("@PermuteDeclr name", params[1], "field name",
+                                declarator.getNameAsString(), messager, element, stringConstants))
+                    valid[0] = false;
+            }
         }
 
         // Constructor parameters
