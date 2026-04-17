@@ -512,6 +512,48 @@ public class PermuteDeclrTest {
         assertThat(newExpr.getType().getAnnotations()).isEmpty();
     }
 
+    /**
+     * Verifies that @PermuteDeclr TYPE_USE works when the constructor type is a qualified
+     * name (e.g. {@code JoinBuilder.Join1First}). JavaParser places the annotation on the
+     * scope type ({@code JoinBuilder}) rather than the leaf ({@code Join1First}) for qualified
+     * names — transformNewExpressions must check scope annotations as well.
+     *
+     * <p>
+     * This was discovered when implementing extendsRule() via @PermuteMethod in top-level
+     * inline templates. Without this fix, {@code new @PermuteDeclr(type="X.Y") A.B<>()}
+     * leaves the annotation unprocessed.
+     */
+    @Test
+    public void testPermuteDeclrOnNewExpressionWithQualifiedTypeName() {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                class TestClass {
+                    public Object method() {
+                        return new @io.quarkiverse.permuplate.PermuteDeclr(type = "JoinBuilder.Join${j-1}First")
+                                JoinBuilder.Join1First<>();
+                    }
+                }
+                """);
+        ClassOrInterfaceDeclaration classDecl = cu.getClassByName("TestClass").orElseThrow();
+        EvaluationContext ctx = new EvaluationContext(Map.of("j", 3)); // j=3 → j-1=2
+
+        PermuteDeclrTransformer.transform(classDecl, ctx, null);
+
+        com.github.javaparser.ast.expr.ObjectCreationExpr newExpr = classDecl
+                .getMethods().get(0).getBody().orElseThrow()
+                .findFirst(com.github.javaparser.ast.expr.ObjectCreationExpr.class)
+                .orElseThrow();
+
+        // Type updated from JoinBuilder.Join1First → JoinBuilder.Join2First
+        assertThat(newExpr.getType().getNameAsString()).isEqualTo("Join2First");
+        assertThat(newExpr.getType().getScope().map(s -> s.getNameAsString()).orElse(""))
+                .isEqualTo("JoinBuilder");
+
+        // @PermuteDeclr removed from both type and scope
+        assertThat(newExpr.getType().getAnnotations()).isEmpty();
+        assertThat(newExpr.getType().getScope()
+                .map(s -> s.getAnnotations().isEmpty()).orElse(true)).isTrue();
+    }
+
     // -------------------------------------------------------------------------
     // @PermuteDeclr on method declaration — rename name and return type
     // -------------------------------------------------------------------------

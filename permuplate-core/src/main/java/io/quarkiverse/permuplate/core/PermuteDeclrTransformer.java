@@ -237,10 +237,23 @@ public class PermuteDeclrTransformer {
             EvaluationContext ctx) {
         scope.walk(com.github.javaparser.ast.expr.ObjectCreationExpr.class, newExpr -> {
             com.github.javaparser.ast.type.ClassOrInterfaceType type = newExpr.getType();
-            if (!hasPermuteDeclr(type.getAnnotations()))
-                return;
 
-            AnnotationExpr ann = getPermuteDeclr(type.getAnnotations());
+            AnnotationExpr ann;
+            if (hasPermuteDeclr(type.getAnnotations())) {
+                // Simple name: annotation is on the type itself (e.g. @PermuteDeclr Join3First)
+                ann = getPermuteDeclr(type.getAnnotations());
+            } else if (type.getScope().filter(s -> hasPermuteDeclr(s.getAnnotations())).isPresent()) {
+                // Qualified name: JavaParser places the annotation on the scope type
+                // (e.g. `new @PermuteDeclr(type="X.Y") A.B<>()` puts @PermuteDeclr on A).
+                // Remove it from the scope so the replaced type node is clean.
+                com.github.javaparser.ast.type.ClassOrInterfaceType scopeType = type.getScope().get();
+                ann = getPermuteDeclr(scopeType.getAnnotations());
+                scopeType.getAnnotations().remove(ann);
+                // Fall through: newExpr.setType(newType) will replace the whole type node
+            } else {
+                return;
+            }
+
             String[] params = extractTwoParams(ann, null);
             if (params == null)
                 return;
