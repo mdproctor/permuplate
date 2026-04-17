@@ -259,11 +259,17 @@ public class PermuteProcessor extends AbstractProcessor {
             return;
         }
 
-        // Warn if keepTemplate is set but inline is false
-        if (permute.keepTemplate()) {
+        // In APT mode, keepTemplate=true has no effect when inline=false — the template
+        // class is already in src/main/java/ and compiled normally. In Maven plugin mode
+        // (src/main/permuplate/), keepTemplate=true causes the template class to be written
+        // to the generated sources directory so it is compiled alongside the generated classes.
+        if (permute.keepTemplate() && !permute.inline()) {
             processingEnv.getMessager().printMessage(
                     Diagnostic.Kind.WARNING,
-                    "@Permute keepTemplate = true has no effect when inline = false",
+                    "@Permute keepTemplate = true has no effect in APT mode when inline = false"
+                            + " — the template class is already compiled from its source location."
+                            + " To use keepTemplate = true with inline = false, use the Maven plugin"
+                            + " (place the template in src/main/permuplate/).",
                     typeElement, permuteMirror, findAnnotationValue(permuteMirror, "keepTemplate"));
         }
 
