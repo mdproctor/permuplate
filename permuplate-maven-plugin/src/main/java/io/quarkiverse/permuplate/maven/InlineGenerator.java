@@ -12,6 +12,7 @@ import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
@@ -1669,6 +1670,18 @@ public class InlineGenerator {
                         }
                     });
         });
+
+        // Strip from constructor annotations and constructor parameters
+        classDecl.findAll(ConstructorDeclaration.class).forEach(ctor -> {
+            ctor.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
+            ctor.getParameters().forEach(
+                    param -> param.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+        });
+
+        // Strip from local variable annotations inside method and constructor bodies
+        classDecl.findAll(com.github.javaparser.ast.expr.VariableDeclarationExpr.class)
+                .forEach(vde -> vde.getAnnotations()
+                        .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
 
         // Strip TYPE_USE annotations from ObjectCreationExpr types (e.g. new @PermuteDeclr(...) Join3First<>())
         classDecl.findAll(com.github.javaparser.ast.expr.ObjectCreationExpr.class)

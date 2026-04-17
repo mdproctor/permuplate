@@ -140,9 +140,20 @@ public class PermuteStatementsTransformer {
     }
 
     private static List<Statement> parseStatements(String bodyStr) {
+        // First try parseBlock (handles ordinary statements and multi-statement bodies).
+        // Falls back to parseStatement for constructs that parseBlock doesn't support,
+        // such as explicit constructor invocations (super(...), this(...)).
         try {
             BlockStmt block = StaticJavaParser.parseBlock("{" + bodyStr + "}");
             return new ArrayList<>(block.getStatements());
+        } catch (Exception e) {
+            // ignored — try single-statement parse
+        }
+        try {
+            Statement stmt = StaticJavaParser.parseStatement(bodyStr);
+            List<Statement> result = new ArrayList<>();
+            result.add(stmt);
+            return result;
         } catch (Exception e) {
             return List.of();
         }
