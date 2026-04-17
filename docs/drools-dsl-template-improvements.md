@@ -38,66 +38,47 @@ See "Vol2 question" section at the bottom.
 
 ---
 
-## Planned (sandbox, not yet started)
+## Done (continued)
 
-### NegationScope + ExistenceScope
-- **Current:** 57 + 53 = 110 lines, structurally identical classes
-- **Only difference:** class name and field name (`notRd` vs `existsRd`)
-- **Approach:** `@Permute(values={"Negation","Existence"}, className="${T}Scope")`
-  string-set permutation, single template generating both classes
-- **Estimate:** ~60 lines → saves ~50 lines (45%)
-- **Complexity:** low — no new features needed
+### NegationScope + ExistenceScope ✅
+- **Before:** 57 + 53 = 110 lines hand-written
+- **After:** 55-line template, `@Permute(values={"Existence"}, className="${T}Scope", inline=false, keepTemplate=true)` on NegationScope
+- **Savings:** ~55 lines (50%)
+- **New features required:** Maven plugin string-set support (#51), `keepTemplate=true` for `inline=false` (#51)
 
-### RuleOOPathBuilder (Path2..Path6)
-- **Current:** 128 lines, 5 inner classes (Path2..Path6), each ~22 lines
-- **Pattern:** same 4 fields, same 5-line constructor, same 8-line body;
-  only type parameter count and return type differ per class
-- **Approach:** `@Permute(inline=true, keepTemplate=true)` on Path2, `@PermuteExtends`
-  for return type chain (Path3 returns Path2, Path4 returns Path3, etc.),
-  `@PermuteTypeParam` for expanding type params
-- **Estimate:** ~35 lines → saves ~93 lines (73%)
-- **Complexity:** medium — same pattern as BaseTuple but simpler (no new features needed)
-- **Note:** path2()..path6() methods in JoinBuilder template reference
-  `RuleOOPathBuilder.Path${k}` — those JEXL strings would remain unchanged since
-  the generated PathN classes keep the same names
+### RuleOOPathBuilder ✅
+- **Before:** 128 lines, 5 hand-written inner classes
+- **After:** 74-line template, Path3 generates Path4..Path6 via `@Permute(inline=true, keepTemplate=true)`
+- **Savings:** 54 lines (42%)
 
-### extendsRule() overloads — ParametersFirst + RuleBuilder
-- **Current:** 6 overloads × ~6 lines each in two classes = ~76 lines
-- **Pattern:** each overload takes `RuleExtendsPoint${n+1}` and returns `Join${n}First`,
-  body is always the same 4 lines
-- **Blocker:** `ep.baseRd()` — the parameter is typed as Object in the template,
-  can't call baseRd() without a common interface
-- **Required change:** add `interface ExtendsPoint<DS> { RuleDefinition<DS> baseRd(); }`
-  and have all RuleExtendsPointN implement it — small but a real API change
-- **Approach after interface added:** `@PermuteMethod(j=2..7)` on a single
-  `extendsRule()` template method, `@PermuteReturn` for the JoinNFirst return type
-- **Estimate:** ~25 lines (two classes combined) → saves ~51 lines (67%)
-- **Complexity:** medium — ExtendsPoint interface needed; @PermuteMethod already works
+### extendsRule() overloads — ParametersFirst + RuleBuilder ✅
+- **Before:** 94 + 122 = 216 lines hand-written (6 overloads each)
+- **After:** 80 + 90 = 170-line top-level inline templates using `@PermuteMethod(j=2..7)`
+- **Savings:** templates generate 300 lines from 170 source lines
+- **New features required:** `inline=true` on top-level classes (#56), `@PermuteDeclr` TYPE_USE on qualified names (#57)
+- **Body uses reflection** — `ep.getClass().getSimpleName()` derives arity. TYPE_USE `@PermuteDeclr` on qualified names works after #57 but reflection is cleaner for the `JoinBuilder.JoinNFirst` pattern.
 
-### @PermuteSource Capability A — potential extension
-- The extendsRule() type parameters (A, B, C...) are currently specified as JEXL
-  string expressions (`typeArgList(1, j-1, 'alpha')`)
-- If @PermuteSource were extended to work at **method level** inside @PermuteMethod,
-  type params could be inferred from `RuleExtendsPoint${j}` automatically
-- Not currently implemented — would make the template cleaner but is not blocking
-- Worth noting for the article as "where @PermuteSource could evolve"
+### @PermuteSource Capability A — future extension
+- The extendsRule() type parameters (A, B, C...) use JEXL `typeArgList(1, j-1, 'alpha')`
+- Method-level @PermuteSource type inference would eliminate these expressions
+- Not yet implemented — good future article topic
 
 ---
 
-## Total savings (sandbox)
+## Total savings (sandbox) — all done
 
-| Work | Status | Lines saved |
-|---|---|---|
-| RuleExtendsPoint | Done | ~51 |
-| BaseTuple (step 1: delegation refactor) | Done | ~90 |
-| BaseTuple (step 2: template) | Done | ~200 |
-| NegationScope + ExistenceScope | Planned | ~50 |
-| RuleOOPathBuilder | Planned | ~93 |
-| extendsRule() overloads (×2 classes) | Planned | ~51 |
-| **Total** | | **~535** |
+| Work | Lines saved |
+|---|---|
+| RuleExtendsPoint | ~51 |
+| BaseTuple (delegation refactor) | ~90 |
+| BaseTuple (template) | ~200 |
+| NegationScope + ExistenceScope | ~55 |
+| RuleOOPathBuilder | ~54 |
+| RuleBuilder + ParametersFirst (extendsRule) | ~46 |
+| **Total** | **~496** |
 
-Current hand-written infrastructure: ~1,500 lines. After all planned work: ~965 lines.
-Template source (654 lines) drives 2,755 generated lines — 4.2× expansion.
+Hand-written infrastructure reduced from ~1,500 to ~1,004 lines.
+Templates (now ~804 lines) drive ~3,055 generated lines — ~3.8× expansion.
 
 ---
 
