@@ -246,19 +246,28 @@ public class ExampleTest {
                 var src = sourceOf(compilation.generatedSourceFile(name)
                         .orElseThrow(() -> new AssertionError(name + " not generated")));
 
-                // Generated as interface, not class
-                assertThat(src).contains("public interface BiCallable" + i + "x" + k);
+                // Generated as interface with correct type parameters
+                var typeDecl = new StringBuilder("BiCallable").append(i).append("x").append(k).append("<");
+                for (int j = 1; j <= i; j++) {
+                    if (j > 1)
+                        typeDecl.append(", ");
+                    typeDecl.append("T").append(j);
+                }
+                for (int m = 1; m <= k; m++) {
+                    typeDecl.append(", U").append(m);
+                }
+                assertThat(src).contains("public interface " + typeDecl.append(">"));
                 assertThat(src).doesNotContain("public class");
 
-                // Correct signature: i left params then k right params
+                // Correct signature: i typed left params then k typed right params
                 var params = new StringBuilder("void call(");
                 for (int j = 1; j <= i; j++) {
                     if (j > 1)
                         params.append(", ");
-                    params.append("Object left").append(j);
+                    params.append("T").append(j).append(" left").append(j);
                 }
                 for (int m = 1; m <= k; m++) {
-                    params.append(", Object right").append(m);
+                    params.append(", U").append(m).append(" right").append(m);
                 }
                 assertThat(src).contains(params.append(")").toString());
 

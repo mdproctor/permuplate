@@ -279,7 +279,8 @@ public class PermuteTest {
 
         // Combo2x2: i=2 → left1,left2  k=2 → right1,right2
         var src22 = sourceOf(compilation.generatedSourceFile(pkg + ".Combo2x2").orElseThrow());
-        assertThat(src22).contains("void combine(Object left1, Object left2, Object right1, Object right2)");
+        assertThat(src22).contains("Combo2x2<L1, L2, R1, R2>");
+        assertThat(src22).contains("void combine(L1 left1, L2 left2, R1 right1, R2 right2)");
         assertThat(src22).contains("Collections.addAll(results, left1, left2, right1, right2)");
         assertThat(src22).doesNotContain("@PermuteParam");
         var inst22 = newInstance(loader, pkg + ".Combo2x2");
@@ -288,24 +289,25 @@ public class PermuteTest {
 
         // Combo2x3: i=2 → left1,left2  k=3 → right1,right2,right3
         var src23 = sourceOf(compilation.generatedSourceFile(pkg + ".Combo2x3").orElseThrow());
-        assertThat(src23).contains(
-                "void combine(Object left1, Object left2, Object right1, Object right2, Object right3)");
+        assertThat(src23).contains("Combo2x3<L1, L2, R1, R2, R3>");
+        assertThat(src23).contains("void combine(L1 left1, L2 left2, R1 right1, R2 right2, R3 right3)");
         var inst23 = newInstance(loader, pkg + ".Combo2x3");
         invokeMethod(inst23, "combine", "L1", "L2", "R1", "R2", "R3");
         assertThat(readResultsField(inst23)).containsExactly("L1", "L2", "R1", "R2", "R3").inOrder();
 
         // Combo3x2: i=3 → left1,left2,left3  k=2 → right1,right2
         var src32 = sourceOf(compilation.generatedSourceFile(pkg + ".Combo3x2").orElseThrow());
-        assertThat(src32).contains(
-                "void combine(Object left1, Object left2, Object left3, Object right1, Object right2)");
+        assertThat(src32).contains("Combo3x2<L1, L2, L3, R1, R2>");
+        assertThat(src32).contains("void combine(L1 left1, L2 left2, L3 left3, R1 right1, R2 right2)");
         var inst32 = newInstance(loader, pkg + ".Combo3x2");
         invokeMethod(inst32, "combine", "L1", "L2", "L3", "R1", "R2");
         assertThat(readResultsField(inst32)).containsExactly("L1", "L2", "L3", "R1", "R2").inOrder();
 
         // Combo3x3: i=3 → left1,left2,left3  k=3 → right1,right2,right3
         var src33 = sourceOf(compilation.generatedSourceFile(pkg + ".Combo3x3").orElseThrow());
+        assertThat(src33).contains("Combo3x3<L1, L2, L3, R1, R2, R3>");
         assertThat(src33).contains(
-                "void combine(Object left1, Object left2, Object left3, Object right1, Object right2, Object right3)");
+                "void combine(L1 left1, L2 left2, L3 left3, R1 right1, R2 right2, R3 right3)");
         var inst33 = newInstance(loader, pkg + ".Combo3x3");
         invokeMethod(inst33, "combine", "L1", "L2", "L3", "R1", "R2", "R3");
         assertThat(readResultsField(inst33)).containsExactly("L1", "L2", "L3", "R1", "R2", "R3").inOrder();

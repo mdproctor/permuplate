@@ -158,8 +158,9 @@ public class PermuteParamTest {
         // --- DualParam3: each sentinel expands to 2 params (from="1", to=i-1=2) ---
         var src3 = sourceOf(compilation.generatedSourceFile(generatedClassName(DualParam2.class, 3)).orElseThrow());
 
-        // Both sentinels expanded in declaration order
-        assertThat(src3).contains("void merge(Object left1, Object left2, Object right1, Object right2)");
+        // Both sentinels expanded in declaration order, type params generated
+        assertThat(src3).contains("DualParam3<L1, L2, R1, R2>");
+        assertThat(src3).contains("void merge(L1 left1, L2 left2, R1 right1, R2 right2)");
 
         // Both anchors expanded at the shared Collections.addAll call site
         assertThat(src3).contains("Collections.addAll(merged, left1, left2, right1, right2)");
@@ -172,8 +173,9 @@ public class PermuteParamTest {
 
         // --- DualParam4: each sentinel expands to 3 params (from="1", to=i-1=3) ---
         var src4 = sourceOf(compilation.generatedSourceFile(generatedClassName(DualParam2.class, 4)).orElseThrow());
+        assertThat(src4).contains("DualParam4<L1, L2, L3, R1, R2, R3>");
         assertThat(src4).contains(
-                "void merge(Object left1, Object left2, Object left3, Object right1, Object right2, Object right3)");
+                "void merge(L1 left1, L2 left2, L3 left3, R1 right1, R2 right2, R3 right3)");
         assertThat(src4).contains("Collections.addAll(merged, left1, left2, left3, right1, right2, right3)");
 
         // Behavioural
