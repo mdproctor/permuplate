@@ -154,8 +154,10 @@ public class OrphanVariableTest {
                         """.formatted(PKG, PERMUTE_FQN, PERMUTE_DECLR_FQN));
 
         assertThat(compilation).failed();
-        // R4: no anchor error — the message says "no static literal"
-        assertThat(compilation).hadErrorContaining("no static literal");
+        // The pure-variable name "${v1}${v2}" passes the hasNoLiteral() R4 guard (no literal anchor
+        // to compare against the sentinel field name "c2") but fails at evaluation time because
+        // v1 and v2 are not defined in the permutation context. The error is an evaluation failure.
+        assertThat(compilation).hadErrorContaining("v1");
     }
 
     @Test

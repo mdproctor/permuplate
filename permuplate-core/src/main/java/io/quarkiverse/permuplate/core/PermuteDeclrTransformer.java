@@ -107,8 +107,13 @@ public class PermuteDeclrTransformer {
             if (params == null)
                 continue;
 
-            String newType = ctx.evaluate(params[0]);
-            String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]); // "" = keep original name
+            String newType = evaluateSafely(ctx, params[0], "@PermuteDeclr type", messager, null);
+            if (newType == null)
+                continue;
+            String newName = params[1].isEmpty() ? ""
+                    : evaluateSafely(ctx, params[1], "@PermuteDeclr name", messager, null);
+            if (newName == null)
+                continue;
 
             // There should be exactly one declarator on an annotated field
             VariableDeclarator declarator = field.getVariable(0);
@@ -147,8 +152,14 @@ public class PermuteDeclrTransformer {
             if (params == null)
                 continue;
 
-            String newType = params[0].isEmpty() ? "" : ctx.evaluate(params[0]);
-            String newName = params[1].isEmpty() ? "" : ctx.evaluate(params[1]);
+            String newType = params[0].isEmpty() ? ""
+                    : evaluateSafely(ctx, params[0], "@PermuteDeclr type", messager, null);
+            if (newType == null)
+                continue;
+            String newName = params[1].isEmpty() ? ""
+                    : evaluateSafely(ctx, params[1], "@PermuteDeclr name", messager, null);
+            if (newName == null)
+                continue;
 
             if (!newType.isEmpty()) {
                 method.setType(StaticJavaParser.parseType(newType));
@@ -464,6 +475,33 @@ public class PermuteDeclrTransformer {
     // -------------------------------------------------------------------------
     // Shared utilities
     // -------------------------------------------------------------------------
+
+    /**
+     * Evaluates a JEXL template expression, converting any evaluation failure into a
+     * compile-time error via {@code messager}. Returns the evaluated string on success,
+     * or {@code null} on failure (caller should skip the annotated element).
+     *
+     * <p>
+     * Without this guard, JEXL exceptions (undefined variables, unknown function
+     * arguments like an invalid typeArgList style) propagate as uncaught RuntimeExceptions,
+     * crashing the annotation processing round instead of producing a compile error.
+     */
+    private static String evaluateSafely(EvaluationContext ctx, String expr,
+            String location, Messager messager, Element element) {
+        try {
+            return ctx.evaluate(expr);
+        } catch (Exception e) {
+            if (messager != null) {
+                Throwable root = e;
+                while (root.getCause() != null)
+                    root = root.getCause();
+                messager.printMessage(Diagnostic.Kind.ERROR,
+                        location + " expression failed to evaluate: " + root.getMessage(),
+                        element);
+            }
+            return null;
+        }
+    }
 
     /**
      * Renames every {@link NameExpr} matching {@code oldName} within {@code scope}.
