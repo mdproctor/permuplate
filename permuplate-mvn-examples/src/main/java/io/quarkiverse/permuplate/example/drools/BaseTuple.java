@@ -150,25 +150,19 @@ public abstract class BaseTuple {
         @Override
         @SuppressWarnings("unchecked")
         public <T> T get(int index) {
-            if (index == 0)
-                return (T) a;
             if (index == 1)
                 return (T) b;
-            throw new IndexOutOfBoundsException(index);
+            return super.get(index);
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public <T> void set(int index, T t) {
-            if (index == 0) {
-                a = (A) t;
-                return;
-            }
             if (index == 1) {
                 b = (B) t;
                 return;
             }
-            throw new IndexOutOfBoundsException(index);
+            super.set(index, t);
         }
     }
 
@@ -197,31 +191,19 @@ public abstract class BaseTuple {
         @Override
         @SuppressWarnings("unchecked")
         public <T> T get(int index) {
-            if (index == 0)
-                return (T) a;
-            if (index == 1)
-                return (T) b;
             if (index == 2)
                 return (T) c;
-            throw new IndexOutOfBoundsException(index);
+            return super.get(index);
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public <T> void set(int index, T t) {
-            if (index == 0) {
-                a = (A) t;
-                return;
-            }
-            if (index == 1) {
-                b = (B) t;
-                return;
-            }
             if (index == 2) {
                 c = (C) t;
                 return;
             }
-            throw new IndexOutOfBoundsException(index);
+            super.set(index, t);
         }
     }
 
@@ -250,37 +232,19 @@ public abstract class BaseTuple {
         @Override
         @SuppressWarnings("unchecked")
         public <T> T get(int index) {
-            if (index == 0)
-                return (T) a;
-            if (index == 1)
-                return (T) b;
-            if (index == 2)
-                return (T) c;
             if (index == 3)
                 return (T) d;
-            throw new IndexOutOfBoundsException(index);
+            return super.get(index);
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public <T> void set(int index, T t) {
-            if (index == 0) {
-                a = (A) t;
-                return;
-            }
-            if (index == 1) {
-                b = (B) t;
-                return;
-            }
-            if (index == 2) {
-                c = (C) t;
-                return;
-            }
             if (index == 3) {
                 d = (D) t;
                 return;
             }
-            throw new IndexOutOfBoundsException(index);
+            super.set(index, t);
         }
     }
 
@@ -309,43 +273,19 @@ public abstract class BaseTuple {
         @Override
         @SuppressWarnings("unchecked")
         public <T> T get(int index) {
-            if (index == 0)
-                return (T) a;
-            if (index == 1)
-                return (T) b;
-            if (index == 2)
-                return (T) c;
-            if (index == 3)
-                return (T) d;
             if (index == 4)
                 return (T) e;
-            throw new IndexOutOfBoundsException(index);
+            return super.get(index);
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public <T> void set(int index, T t) {
-            if (index == 0) {
-                a = (A) t;
-                return;
-            }
-            if (index == 1) {
-                b = (B) t;
-                return;
-            }
-            if (index == 2) {
-                c = (C) t;
-                return;
-            }
-            if (index == 3) {
-                d = (D) t;
-                return;
-            }
             if (index == 4) {
                 e = (E) t;
                 return;
             }
-            throw new IndexOutOfBoundsException(index);
+            super.set(index, t);
         }
     }
 
@@ -374,49 +314,19 @@ public abstract class BaseTuple {
         @Override
         @SuppressWarnings("unchecked")
         public <T> T get(int index) {
-            if (index == 0)
-                return (T) a;
-            if (index == 1)
-                return (T) b;
-            if (index == 2)
-                return (T) c;
-            if (index == 3)
-                return (T) d;
-            if (index == 4)
-                return (T) e;
             if (index == 5)
                 return (T) f;
-            throw new IndexOutOfBoundsException(index);
+            return super.get(index);
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public <T> void set(int index, T t) {
-            if (index == 0) {
-                a = (A) t;
-                return;
-            }
-            if (index == 1) {
-                b = (B) t;
-                return;
-            }
-            if (index == 2) {
-                c = (C) t;
-                return;
-            }
-            if (index == 3) {
-                d = (D) t;
-                return;
-            }
-            if (index == 4) {
-                e = (E) t;
-                return;
-            }
             if (index == 5) {
                 f = (F) t;
                 return;
             }
-            throw new IndexOutOfBoundsException(index);
+            super.set(index, t);
         }
     }
 }
