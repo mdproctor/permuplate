@@ -121,6 +121,78 @@ public class StringSetIterationTest {
     }
 
     /**
+     * String-set with inline=false, keepTemplate=true via APT: both generated classes
+     * are produced and the template class remains compilable in its original source file.
+     * The template class does NOT appear in generated source files — it stays in the source.
+     *
+     * <p>
+     * This is the APT equivalent of the scenario that was broken in the Maven plugin:
+     * when values is set alongside keepTemplate=true, the plugin previously threw
+     * "Expression did not evaluate to a number" because validateConfig tried to evaluate
+     * the empty from/to strings. The Maven plugin fix (checking values.length == 0 before
+     * from/to evaluation) is integration-tested via the mvn-examples build. This test
+     * covers the shared buildAllCombinations path used by both APT and Maven plugin.
+     */
+    @Test
+    public void testStringSetNonInlineKeepTemplateGeneratesValueClassesOnly() {
+        // Template class name is NegationScope (not in values set); keepTemplate=true.
+        // APT generates ExistenceScope only; NegationScope stays in its source file.
+        Compilation compilation = compile("io.example.NegationScope",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteDeclr;\n" +
+                        "@Permute(varName=\"T\", values={\"Existence\"}, className=\"${T}Scope\",\n" +
+                        "         inline=false, keepTemplate=true)\n" +
+                        "public class NegationScope<OUTER> {\n" +
+                        "    private final OUTER outer;\n" +
+                        "    public NegationScope(OUTER outer) { this.outer = outer; }\n" +
+                        "    @PermuteDeclr(type=\"${T}Scope<OUTER>\")\n" +
+                        "    public NegationScope<OUTER> next() { return this; }\n" +
+                        "    public OUTER end() { return outer; }\n" +
+                        "}");
+
+        assertThat(compilation).succeeded();
+
+        // ExistenceScope generated
+        String existSrc = ProcessorTestSupport.sourceOf(
+                compilation.generatedSourceFile("io.example.ExistenceScope").orElseThrow());
+        assertThat(existSrc).contains("class ExistenceScope");
+        assertThat(existSrc).contains("ExistenceScope<OUTER> next()");
+        assertThat(existSrc).doesNotContain("@PermuteDeclr");
+
+        // NegationScope itself not in generated output (stays in source)
+        assertThat(compilation.generatedSourceFile("io.example.NegationScope").isPresent()).isFalse();
+    }
+
+    /**
+     * PermuteConfig.buildAllCombinations with string-set values produces one combination
+     * per value, binding varName to the string — no from/to evaluation needed.
+     * This is the shared code path that both APT and Maven plugin use, and the Maven plugin's
+     * validateConfig formerly called evaluateInt(from) before reaching buildAllCombinations,
+     * throwing when from was empty because values was set.
+     */
+    @Test
+    public void testBuildAllCombinationsWithStringSetValues() {
+        io.quarkiverse.permuplate.core.PermuteConfig config = new io.quarkiverse.permuplate.core.PermuteConfig(
+                "T", // varName
+                "", // from (empty — values mode)
+                "", // to   (empty — values mode)
+                new String[] { "Negation", "Existence" },
+                "${T}Scope", // className
+                new String[0],
+                new io.quarkiverse.permuplate.core.PermuteVarConfig[0],
+                false, // inline
+                true); // keepTemplate
+
+        java.util.List<java.util.Map<String, Object>> combos = io.quarkiverse.permuplate.core.PermuteConfig
+                .buildAllCombinations(config);
+
+        assertThat(combos).hasSize(2);
+        assertThat(combos.get(0).get("T")).isEqualTo("Negation");
+        assertThat(combos.get(1).get("T")).isEqualTo("Existence");
+    }
+
+    /**
      * @PermuteVar cannot have both values and from/to — compile error.
      */
     @Test
