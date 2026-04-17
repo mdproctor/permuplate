@@ -233,9 +233,9 @@ public class PermuteDeclrTransformer {
      * // Generated for i=3: new Join4First<>(end(), rule)
      * }</pre>
      */
-    private static void transformNewExpressions(TypeDeclaration<?> classDecl,
+    public static void transformNewExpressions(Node scope,
             EvaluationContext ctx) {
-        classDecl.walk(com.github.javaparser.ast.expr.ObjectCreationExpr.class, newExpr -> {
+        scope.walk(com.github.javaparser.ast.expr.ObjectCreationExpr.class, newExpr -> {
             com.github.javaparser.ast.type.ClassOrInterfaceType type = newExpr.getType();
             if (!hasPermuteDeclr(type.getAnnotations()))
                 return;

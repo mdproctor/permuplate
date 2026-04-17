@@ -149,11 +149,6 @@ public class PermuteMojo extends AbstractMojo {
                     } catch (AnnotationReader.MojoAnnotationException e) {
                         throw new MojoExecutionException(entry.sourceFile() + ": " + e.getMessage(), e);
                     }
-                    boolean isNested = entry.typeDecl().isNestedType();
-                    if (config.inline && !isNested) {
-                        throw new MojoExecutionException(entry.sourceFile() +
-                                ": @Permute inline=true is only valid on nested static classes");
-                    }
                     validateConfig(config, entry.sourceFile().toString());
                     if (config.inline) {
                         inlineByFile.computeIfAbsent(entry.sourceFile(),

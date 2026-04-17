@@ -84,21 +84,33 @@ public class InlineGenerator {
 
         // Clone the entire parent CU as the starting point for the output
         CompilationUnit outputCu = parentCu.clone();
-        ClassOrInterfaceDeclaration outputParent = outputCu.findFirst(
-                ClassOrInterfaceDeclaration.class,
-                c -> !c.isNestedType())
-                .orElseThrow(() -> new IllegalStateException("Cannot find top-level class in parent CU"));
 
-        // Remove the template nested type from the output (class, interface, or record)
+        // Top-level templates (inline=true on a non-nested class): the template IS the
+        // top-level type. Generated classes are added directly to the CU, not as members
+        // of an enclosing outer class. Nested templates follow the original path.
+        boolean isTopLevel = !templateClassDecl.isNestedType();
+        ClassOrInterfaceDeclaration outputParent = isTopLevel ? null
+                : outputCu.findFirst(ClassOrInterfaceDeclaration.class, c -> !c.isNestedType())
+                        .orElseThrow(() -> new IllegalStateException("Cannot find top-level class in parent CU"));
+
+        // Remove the template from the output (class, interface, or record)
         String templateClassName = templateClassDecl.getNameAsString();
-        outputParent.getMembers().removeIf(member -> member instanceof TypeDeclaration<?> td &&
-                td.getNameAsString().equals(templateClassName));
+        if (isTopLevel) {
+            outputCu.getTypes().removeIf(t -> t.getNameAsString().equals(templateClassName));
+        } else {
+            outputParent.getMembers().removeIf(member -> member instanceof TypeDeclaration<?> td &&
+                    td.getNameAsString().equals(templateClassName));
+        }
 
         // Re-add the template type if keepTemplate = true (strip all permuplate annotations)
         if (config.keepTemplate) {
             TypeDeclaration<?> templateCopy = templateClassDecl.clone();
             stripPermuteAnnotations(templateCopy);
-            outputParent.addMember(templateCopy);
+            if (isTopLevel) {
+                outputCu.addType(templateCopy);
+            } else {
+                outputParent.addMember(templateCopy);
+            }
         }
 
         boolean isRecord = templateClassDecl instanceof RecordDeclaration;
@@ -254,7 +266,11 @@ public class InlineGenerator {
                         || n.equals("PermuteSources") || n.equals("io.quarkiverse.permuplate.PermuteSources");
             });
 
-            outputParent.addMember(generated);
+            if (isTopLevel) {
+                outputCu.addType(generated);
+            } else {
+                outputParent.addMember(generated);
+            }
         }
 
         // Strip permuplate imports from the output
@@ -406,6 +422,14 @@ public class InlineGenerator {
                 if (!tmpParam.getMethods().isEmpty()) {
                     clone = tmpParam.getMethods().get(0);
                 }
+
+                // Process @PermuteDeclr TYPE_USE in the method body with innerCtx.
+                // Must run AFTER @PermuteParam so we operate on the final clone node
+                // (PermuteParamTransformer may replace the method node in tmpParam).
+                // Handles `new @PermuteDeclr(type="Join${j-1}First") Join1First<>(...)`
+                // where j is only defined in the inner (i,j) context.
+                io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                        .transformNewExpressions(clone, innerCtx);
 
                 // Apply name template if set
                 if (pmCfg.hasName()) {

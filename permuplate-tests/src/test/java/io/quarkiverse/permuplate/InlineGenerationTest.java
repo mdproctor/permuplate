@@ -423,6 +423,55 @@ public class InlineGenerationTest {
         assertThat(output).doesNotContain("@Permute(varName");
     }
 
+    // -------------------------------------------------------------------------
+    // Top-level class inline templates (inline=true on a non-nested class)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies that inline=true works on a top-level class template.
+     * RuleBuilderTemplate (top-level) with @Permute(className="RuleBuilder",from="1",to="1",
+     * inline=true, keepTemplate=false) should produce a CU containing only public class RuleBuilder.
+     *
+     * <p>
+     * This was blocked by a guard in PermuteMojo and a structural assumption in
+     * InlineGenerator.generate() that the template is always a nested class. Both are
+     * now relaxed to support top-level templates.
+     */
+    @Test
+    public void testTopLevelInlineTemplateRenamesClassAndDropsTemplate() {
+        CompilationUnit cu = StaticJavaParser.parse("""
+                package com.example;
+                import io.quarkiverse.permuplate.Permute;
+                import io.quarkiverse.permuplate.PermuteDeclr;
+                @Permute(varName = "i", from = "1", to = "1",
+                         className = "RuleBuilder", inline = true, keepTemplate = false)
+                public class RuleBuilderTemplate<DS> {
+                    @PermuteDeclr(type = "${alpha(i)}", name = "${lower(i)}")
+                    private Object a;
+                }
+                """);
+
+        ClassOrInterfaceDeclaration template = cu.getClassByName("RuleBuilderTemplate").orElseThrow();
+        PermuteConfig config = new PermuteConfig("i", "1", "1", "RuleBuilder",
+                new String[0], new PermuteVarConfig[0], true, false);
+        List<Map<String, Object>> combos = List.of(Map.of("i", 1));
+
+        CompilationUnit output = InlineGenerator.generate(cu, template, config, combos);
+        String src = output.toString();
+
+        // Generated class exists at top level with correct name
+        assertThat(output.getClassByName("RuleBuilder").isPresent()).isTrue();
+        assertThat(src).contains("public class RuleBuilder");
+
+        // Template class gone (keepTemplate=false)
+        assertThat(output.getClassByName("RuleBuilderTemplate").isEmpty()).isTrue();
+        assertThat(src).doesNotContain("RuleBuilderTemplate");
+
+        // Transformation applied: @PermuteDeclr renamed field
+        assertThat(src).contains("A a"); // alpha(1)=A, lower(1)=a
+        assertThat(src).doesNotContain("@PermuteDeclr");
+    }
+
     private static TypeDeclaration<?> findNestedType(
             ClassOrInterfaceDeclaration parent, String name) {
         return parent.getMembers().stream()
