@@ -23,14 +23,16 @@ public class RuleExtendsPoint {
     @Permute(varName = "i", from = "3", to = "7", className = "RuleExtendsPoint${i}",
              inline = true, keepTemplate = true)
     public static class RuleExtendsPoint2<DS,
-            @PermuteTypeParam(varName = "k", from = "1", to = "${i-1}", name = "${alpha(k)}") A> {
+            @PermuteTypeParam(varName = "k", from = "1", to = "${i-1}", name = "${alpha(k)}") A>
+            implements ExtendsPoint<DS> {
         private final RuleDefinition<DS> baseRd;
 
         public RuleExtendsPoint2(RuleDefinition<DS> baseRd) {
             this.baseRd = baseRd;
         }
 
-        RuleDefinition<DS> baseRd() {
+        @Override
+        public RuleDefinition<DS> baseRd() {
             return baseRd;
         }
     }

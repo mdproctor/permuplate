@@ -15,6 +15,17 @@ import java.util.function.Function;
 public class ParametersFirst<DS> {
     private final String name;
 
+    @SuppressWarnings("unchecked")
+    private static <T> T cast(Object o) {
+        return (T) o;
+    }
+
+    private RuleDefinition<DS> childFrom(ExtendsPoint<DS> ep) {
+        RuleDefinition<DS> child = new RuleDefinition<>(name);
+        ep.baseRd().copyInto(child);
+        return child;
+    }
+
     public ParametersFirst(String name) {
         this.name = name;
     }
@@ -79,44 +90,33 @@ public class ParametersFirst<DS> {
         return new RuleResult<>(rd);
     }
 
-    // extendsRule() — all 6 overloads, one per base arity (RuleExtendsPoint2..7)
+    // extendsRule() — 6 typed overloads (one per RuleExtendsPoint arity).
+    // Each calls childFrom(ep) which uses the ExtendsPoint<DS> interface to access baseRd().
 
     public <A> JoinBuilder.Join1First<Void, DS, A> extendsRule(RuleExtendsPoint.RuleExtendsPoint2<DS, A> ep) {
-        RuleDefinition<DS> child = new RuleDefinition<>(name);
-        ep.baseRd().copyInto(child);
-        return new JoinBuilder.Join1First<>(null, child);
+        return new JoinBuilder.Join1First<>(null, childFrom(ep));
     }
 
     public <A, B> JoinBuilder.Join2First<Void, DS, A, B> extendsRule(RuleExtendsPoint.RuleExtendsPoint3<DS, A, B> ep) {
-        RuleDefinition<DS> child = new RuleDefinition<>(name);
-        ep.baseRd().copyInto(child);
-        return new JoinBuilder.Join2First<>(null, child);
+        return cast(new JoinBuilder.Join2First<>(null, childFrom(ep)));
     }
 
     public <A, B, C> JoinBuilder.Join3First<Void, DS, A, B, C> extendsRule(RuleExtendsPoint.RuleExtendsPoint4<DS, A, B, C> ep) {
-        RuleDefinition<DS> child = new RuleDefinition<>(name);
-        ep.baseRd().copyInto(child);
-        return new JoinBuilder.Join3First<>(null, child);
+        return cast(new JoinBuilder.Join3First<>(null, childFrom(ep)));
     }
 
     public <A, B, C, D> JoinBuilder.Join4First<Void, DS, A, B, C, D> extendsRule(
             RuleExtendsPoint.RuleExtendsPoint5<DS, A, B, C, D> ep) {
-        RuleDefinition<DS> child = new RuleDefinition<>(name);
-        ep.baseRd().copyInto(child);
-        return new JoinBuilder.Join4First<>(null, child);
+        return cast(new JoinBuilder.Join4First<>(null, childFrom(ep)));
     }
 
     public <A, B, C, D, E> JoinBuilder.Join5First<Void, DS, A, B, C, D, E> extendsRule(
             RuleExtendsPoint.RuleExtendsPoint6<DS, A, B, C, D, E> ep) {
-        RuleDefinition<DS> child = new RuleDefinition<>(name);
-        ep.baseRd().copyInto(child);
-        return new JoinBuilder.Join5First<>(null, child);
+        return cast(new JoinBuilder.Join5First<>(null, childFrom(ep)));
     }
 
     public <A, B, C, D, E, F> JoinBuilder.Join6First<Void, DS, A, B, C, D, E, F> extendsRule(
             RuleExtendsPoint.RuleExtendsPoint7<DS, A, B, C, D, E, F> ep) {
-        RuleDefinition<DS> child = new RuleDefinition<>(name);
-        ep.baseRd().copyInto(child);
-        return new JoinBuilder.Join6First<>(null, child);
+        return cast(new JoinBuilder.Join6First<>(null, childFrom(ep)));
     }
 }
