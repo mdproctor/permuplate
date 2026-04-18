@@ -21,6 +21,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
@@ -270,28 +271,28 @@ public class PermuteMojo extends AbstractMojo {
                     "\" — the className expression must reference the template class name");
         }
 
-        if (!(entry.typeDecl() instanceof ClassOrInterfaceDeclaration)) {
+        if (entry.typeDecl() instanceof com.github.javaparser.ast.body.RecordDeclaration) {
             throw new MojoExecutionException(entry.sourceFile() +
-                    ": top-level (non-inline) @Permute templates must be classes or interfaces;" +
-                    " records require inline=true");
+                    ": record templates require inline=true");
         }
 
         for (Map<String, Object> vars : allCombinations) {
             EvaluationContext ctx = new EvaluationContext(vars);
-            ClassOrInterfaceDeclaration classDecl = ((ClassOrInterfaceDeclaration) entry.typeDecl()).clone();
-            classDecl.setStatic(false);
-            if (!classDecl.isPublic())
-                classDecl.setModifier(Modifier.Keyword.PUBLIC, true);
+            TypeDeclaration<?> typeDecl = entry.typeDecl().clone();
+            if (typeDecl instanceof ClassOrInterfaceDeclaration coid)
+                coid.setStatic(false);
+            if (!typeDecl.isPublic())
+                typeDecl.setModifier(Modifier.Keyword.PUBLIC, true);
 
             String newClassName = ctx.evaluate(config.className);
-            classDecl.setName(newClassName);
-            classDecl.getConstructors().forEach(ctor -> ctor.setName(newClassName));
+            typeDecl.setName(newClassName);
+            typeDecl.getConstructors().forEach(ctor -> ctor.setName(newClassName));
 
-            PermuteTypeParamTransformer.transform(classDecl, ctx, null, null);
-            PermuteDeclrTransformer.transform(classDecl, ctx, null);
-            PermuteParamTransformer.transform(classDecl, ctx, null);
+            PermuteTypeParamTransformer.transform(typeDecl, ctx, null, null);
+            PermuteDeclrTransformer.transform(typeDecl, ctx, null);
+            PermuteParamTransformer.transform(typeDecl, ctx, null);
 
-            classDecl.getAnnotations().removeIf(a -> {
+            typeDecl.getAnnotations().removeIf(a -> {
                 String n = a.getNameAsString();
                 return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute");
             });
@@ -302,7 +303,7 @@ public class PermuteMojo extends AbstractMojo {
                 if (!imp.getNameAsString().startsWith("io.quarkiverse.permuplate"))
                     generatedCu.addImport(imp.clone());
             });
-            generatedCu.addType(classDecl);
+            generatedCu.addType(typeDecl);
 
             String packageName = entry.cu().getPackageDeclaration()
                     .map(p -> p.getNameAsString()).orElse("");
@@ -315,8 +316,9 @@ public class PermuteMojo extends AbstractMojo {
         // This is required when the template class is referenced directly by other code
         // (e.g. NegationScope is used by JoinBuilder alongside the generated ExistenceScope).
         if (config.keepTemplate) {
-            ClassOrInterfaceDeclaration templateDecl = ((ClassOrInterfaceDeclaration) entry.typeDecl()).clone();
-            templateDecl.setStatic(false);
+            TypeDeclaration<?> templateDecl = entry.typeDecl().clone();
+            if (templateDecl instanceof ClassOrInterfaceDeclaration coid)
+                coid.setStatic(false);
             if (!templateDecl.isPublic())
                 templateDecl.setModifier(Modifier.Keyword.PUBLIC, true);
             InlineGenerator.stripPermuteAnnotations(templateDecl);
@@ -386,6 +388,8 @@ public class PermuteMojo extends AbstractMojo {
                     .<TypeDeclaration<?>> map(c -> c)
                     .or(() -> searchCu.findFirst(RecordDeclaration.class,
                             r -> r.getNameAsString().equals(tName)))
+                    .or(() -> searchCu.findFirst(EnumDeclaration.class,
+                            e -> e.getNameAsString().equals(tName)))
                     .orElseThrow(() -> new MojoExecutionException(sourceFile +
                             ": cannot find template '" + tName + "' in current CU"));
 

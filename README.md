@@ -481,6 +481,24 @@ public class Handlers {
 
 With `keepTemplate = true`, the output `Handlers.java` contains `Handler1` through `Handler5` all nested inside `Handlers`. Users write `Handlers.Handler3 h = (a1, a2, a3) -> ...` with no top-level file clutter.
 
+#### Sealed class `permits` expansion
+
+When a sealed interface or class uses the template class name as its `permits` placeholder, the Maven plugin automatically expands it to list all generated class names:
+
+```java
+// Parent (src/main/java):
+public sealed interface Expr permits ExprTemplate {}
+
+// Template (src/main/permuplate):
+@Permute(varName="i", from="1", to="3", className="Expr${i}", inline=true)
+static final class ExprTemplate implements Expr { ... }
+
+// Generated (target/generated-sources/permuplate/):
+// sealed interface Expr permits Expr1, Expr2, Expr3 {}
+```
+
+The template class name (`ExprTemplate`) is replaced in-place with the full list of generated names (`Expr1, Expr2, Expr3`). Multiple entries in the `permits` clause are supported — only the template placeholder entry is expanded; other entries are preserved unchanged.
+
 ### `@PermuteDeclr`
 
 Renames a declaration and propagates the rename to all usages within the declaration's scope.
@@ -605,6 +623,25 @@ public Tuple1(A a) {
 
 ---
 
+### `@PermuteBody`
+
+Replaces the entire annotated method or constructor body with a JEXL-evaluated template per permutation. The `body` attribute must include surrounding braces.
+
+| Parameter | Meaning |
+|---|---|
+| `body` | JEXL template for the complete method body including `{ }` |
+
+```java
+@PermuteBody(body = "{ return ${i}; }")
+public int arity() {
+    return 1; // template placeholder — replaced entirely in generated classes
+}
+```
+
+Use `@PermuteBody` when you need to replace the full body. Use `@PermuteStatements` when you want to keep existing statements and insert around them.
+
+---
+
 ### `@PermuteCase`
 
 Expands a `switch` statement in the annotated method by inserting new cases per inner-loop value — fully inlined, no inheritance delegation.
@@ -619,7 +656,6 @@ Expands a `switch` statement in the annotated method by inserting new cases per 
 
 The seed case and `default` case in the template are preserved unchanged. New cases are inserted immediately before `default`.
 
-> **`body` string literals:** avoid Java string literals (`"..."`) inside the `body` expression — the body is parsed by JavaParser after JEXL substitution, and the parse fails silently if it contains characters that conflict with the surrounding template string. Use method calls like `String.valueOf(${k})` or primitive expressions instead.
 
 ```java
 @PermuteCase(varName = "k", from = "1", to = "${i-1}",
@@ -633,6 +669,40 @@ public <T> T get(int index) {
     }
 }
 // Tuple3 (i=3): switch with cases 0, 1, 2 — all inlined, no super() calls
+```
+
+---
+
+### `@PermuteEnumConst`
+
+Expands a sentinel enum constant into a sequence of constants per permutation. The sentinel is removed and replaced by constants generated from the inner loop.
+
+| Parameter | Meaning |
+|---|---|
+| `varName` | Inner loop variable name |
+| `from` | Inner loop lower bound (JEXL expression) |
+| `to` | Inner loop upper bound; empty range (from &gt; to) removes sentinel with no replacement |
+| `name` | JEXL template for the generated constant name |
+| `args` | JEXL template for constructor arguments (optional; comma-separated, without parens) |
+
+```java
+@Permute(varName = "i", from = "2", to = "3", className = "Priority${i}")
+public enum Priority1 {
+    LOW,
+    MED,
+    @PermuteEnumConst(varName = "k", from = "3", to = "${i}", name = "LEVEL${k}")
+    HIGH_PLACEHOLDER;
+}
+// Priority2: LOW, MED  (from=3 > to=2 → empty range, sentinel removed)
+// Priority3: LOW, MED, LEVEL3
+```
+
+`@Permute` on `enum` types works the same as on classes — the enum is renamed per permutation value. The `args` attribute expands to constructor arguments, enabling enums with fields:
+
+```java
+@PermuteEnumConst(varName = "k", from = "2", to = "${i}", name = "ITEM${k}", args = "${k}")
+PLACEHOLDER(99);
+// In Status2: ITEM2(2)  — the sentinel PLACEHOLDER(99) is replaced
 ```
 
 ---
@@ -866,7 +936,7 @@ public class AnnotatedCallable2 {
 // Generated execute() declares: throws IOException  (import added by @PermuteImport)
 ```
 
-See `permuplate-apt-examples/.../AnnotatedCallable2.java` for a working example combining all four of `@PermuteAnnotation`, `@PermuteThrows`, `@PermuteCase`, and `@PermuteImport`. The `@PermuteCase` example there uses `body = "return ${k};"` — a body with no string literals inside the Java statement, which is the safe form.
+See `permuplate-apt-examples/.../AnnotatedCallable2.java` for a working example combining all four of `@PermuteAnnotation`, `@PermuteThrows`, `@PermuteCase`, and `@PermuteImport`.
 
 ---
 

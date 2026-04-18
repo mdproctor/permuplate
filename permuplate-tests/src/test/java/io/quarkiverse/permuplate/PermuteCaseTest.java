@@ -3,6 +3,7 @@ package io.quarkiverse.permuplate;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.testing.compile.CompilationSubject.assertThat;
 import static io.quarkiverse.permuplate.ProcessorTestSupport.sourceOf;
+import static io.quarkiverse.permuplate.testing.PermuplateAssertions.assertGenerated;
 
 import org.junit.Test;
 
@@ -45,22 +46,52 @@ public class PermuteCaseTest {
 
         assertThat(compilation).succeeded();
 
-        String src2 = sourceOf(compilation
-                .generatedSourceFile("io.permuplate.example.Dispatch2").orElseThrow());
-        assertThat(src2).contains("case 0:");
-        assertThat(src2).contains("case 1:");
-        assertThat(src2).contains("return data[1]");
-        assertThat(src2).doesNotContain("@PermuteCase");
-        assertThat(src2).doesNotContain("super.get");
+        assertGenerated(compilation, "io.permuplate.example.Dispatch2")
+                .hasCase(0)
+                .hasCase(1)
+                .contains("return data[1]")
+                .doesNotContain("@PermuteCase")
+                .doesNotContain("super.get");
 
-        String src3 = sourceOf(compilation
-                .generatedSourceFile("io.permuplate.example.Dispatch3").orElseThrow());
-        assertThat(src3).contains("case 0:");
-        assertThat(src3).contains("case 1:");
-        assertThat(src3).contains("case 2:");
-        assertThat(src3).contains("return data[1]");
-        assertThat(src3).contains("return data[2]");
-        assertThat(src3).doesNotContain("@PermuteCase");
+        assertGenerated(compilation, "io.permuplate.example.Dispatch3")
+                .hasCase(0)
+                .hasCase(1)
+                .hasCase(2)
+                .contains("return data[1]")
+                .contains("return data[2]")
+                .doesNotContain("@PermuteCase");
+    }
+
+    @Test
+    public void testBodyWithStringLiteral() {
+        // Regression: body containing a Java string literal was silently dropped
+        // because stripQuotes(toString()) left raw escape sequences (\"hello\")
+        // which StaticJavaParser.parseBlock rejected as invalid source.
+        var source = JavaFileObjects.forSourceString(
+                "io.permuplate.example.StringCase1",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteCase;
+                        @Permute(varName="i", from="2", to="2", className="StringCase${i}")
+                        public class StringCase1 {
+                            @PermuteCase(varName="k", from="1", to="1", index="${k}", body="return \\"hello\\";")
+                            public String get(int index) {
+                                switch (index) {
+                                    case 0: return "zero";
+                                    default: throw new IndexOutOfBoundsException(index);
+                                }
+                            }
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.StringCase2").orElseThrow());
+        assertThat(src).contains("case 1:");
+        assertThat(src).contains("return \"hello\"");
     }
 
     @Test

@@ -500,6 +500,29 @@ public class DegenerateInputTest {
         assertThat(compilation).hadErrorContaining("className");
     }
 
+    // -------------------------------------------------------------------------
+    // @PermuteImport — bad JEXL expression must be a compile error
+    // -------------------------------------------------------------------------
+
+    /**
+     * A {@code @PermuteImport} expression that fails to evaluate (e.g., referencing
+     * an undefined variable) must surface as a compiler error, not be silently ignored.
+     */
+    @Test
+    public void testBadPermuteImportExpressionIsError() {
+        var compilation = compile(Callable2.class, "ImportFail2",
+                """
+                        package %s;
+                        import %s;
+                        import io.quarkiverse.permuplate.PermuteImport;
+                        @Permute(varName = "i", from = "2", to = "2", className = "ImportFail${i}")
+                        @PermuteImport("${undefinedVar}.SomeClass")
+                        public class ImportFail2 {}
+                        """.formatted(PKG, PERMUTE_FQN));
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("PermuteImport");
+    }
+
     /**
      * When all declared variables appear in {@code className}, no R1b error.
      */

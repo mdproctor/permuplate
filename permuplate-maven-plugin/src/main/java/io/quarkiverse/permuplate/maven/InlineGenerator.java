@@ -13,6 +13,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
@@ -24,9 +25,11 @@ import com.github.javaparser.ast.nodeTypes.NodeWithTypeParameters;
 import com.github.javaparser.ast.type.TypeParameter;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
+import io.quarkiverse.permuplate.core.PermuteBodyTransformer;
 import io.quarkiverse.permuplate.core.PermuteCaseTransformer;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
+import io.quarkiverse.permuplate.core.PermuteEnumConstTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
 import io.quarkiverse.permuplate.core.PermuteStatementsTransformer;
 import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
@@ -139,6 +142,9 @@ public class InlineGenerator {
             }).collect(java.util.stream.Collectors.toList());
         }
 
+        // Collect all generated class names in order — used for sealed permits expansion
+        List<String> generatedNames = new ArrayList<>();
+
         // Generate and append each permuted nested type
         for (Map<String, Object> vars : filteredCombinations) {
             EvaluationContext ctx = new EvaluationContext(vars);
@@ -147,6 +153,7 @@ public class InlineGenerator {
 
             // Rename the generated nested type
             String newClassName = ctx.evaluate(config.className);
+            generatedNames.add(newClassName);
             generated.setName(newClassName);
             // Rename constructors (only applies to class/record, not interface)
             generated.getConstructors().forEach(ctor -> ctor.setName(newClassName));
@@ -168,9 +175,7 @@ public class InlineGenerator {
             // (runs after applySourceTypeParams so type param names are already set)
             applyBuilderSynthesis(generated, templateClassDecl, parentCu, ctx);
 
-            if (!isRecord) {
-                ClassOrInterfaceDeclaration coid = (ClassOrInterfaceDeclaration) generated;
-
+            if (generated instanceof ClassOrInterfaceDeclaration coid) {
                 // Capture post-G1 type parameter names for extends expansion
                 List<String> postG1TypeParams = new ArrayList<>();
                 coid.getTypeParameters().forEach(tp -> postG1TypeParams.add(tp.getNameAsString()));
@@ -196,6 +201,9 @@ public class InlineGenerator {
 
                 // @PermuteStatements — insert accumulated statements into method bodies
                 PermuteStatementsTransformer.transform(generated, ctx);
+
+                // @PermuteBody — replace entire method or constructor body per permutation
+                PermuteBodyTransformer.transform(generated, ctx);
 
                 // @PermuteAnnotation — add Java annotations to generated elements (runs last)
                 io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
@@ -233,6 +241,33 @@ public class InlineGenerator {
                                 postG1TypeParams);
                     }
                 }
+            } else if (generated instanceof EnumDeclaration) {
+                // Enum path: apply value + declr transforms; expand @PermuteEnumConst sentinels.
+                // @PermuteMethod, @PermuteReturn, and extends expansion are COID-only — skipped.
+                PermuteDeclrTransformer.transform(generated, ctx, null);
+                PermuteParamTransformer.transform(generated, ctx, null);
+
+                // @PermuteCase — expand switch statement cases per permutation (enums can have methods)
+                PermuteCaseTransformer.transform(generated, ctx);
+
+                PermuteValueTransformer.transform(generated, ctx);
+
+                // @PermuteStatements — insert accumulated statements into method bodies
+                PermuteStatementsTransformer.transform(generated, ctx);
+
+                // @PermuteBody — replace entire method or constructor body per permutation
+                PermuteBodyTransformer.transform(generated, ctx);
+
+                // @PermuteEnumConst — expand sentinel enum constants
+                PermuteEnumConstTransformer.transform(generated, ctx);
+
+                // @PermuteAnnotation — add Java annotations to generated elements (runs last)
+                io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
+                        generated, ctx, null, null);
+
+                // @PermuteThrows — add exception types to method throws clauses (enums can have methods)
+                io.quarkiverse.permuplate.core.PermuteThrowsTransformer.transform(
+                        generated, ctx, null, null);
             } else {
                 // Record path: apply param + declr transforms (no extends, no methods/return/case)
                 PermuteDeclrTransformer.transform(generated, ctx, null);
@@ -240,6 +275,8 @@ public class InlineGenerator {
                 // PermuteStatementsTransformer is not applied to records — records cannot have
                 // arbitrary constructor bodies via template syntax; @PermuteStatements support
                 // for compact record constructors is deferred.
+                // PermuteBodyTransformer is also not applied to records — record compact constructors
+                // cannot have arbitrary bodies replaced via @PermuteBody; deferred with @PermuteStatements.
                 // PermuteCaseTransformer is also omitted — switch cases in record methods are not
                 // a supported pattern.
                 PermuteValueTransformer.transform(generated, ctx);
@@ -276,7 +313,51 @@ public class InlineGenerator {
         // Strip permuplate imports from the output
         outputCu.getImports().removeIf(imp -> imp.getNameAsString().startsWith("io.quarkiverse.permuplate"));
 
+        // Expand any sealed permits clause that references the template class name
+        expandSealedPermits(outputCu, templateClassName, generatedNames, config.keepTemplate);
+
         return outputCu;
+    }
+
+    /**
+     * Replaces any {@code permits TemplateName} entry in sealed classes/interfaces within
+     * {@code cu} with one entry per generated class name. Called after all classes are generated.
+     * <p>
+     * When {@code keepTemplate} is {@code true}, the template class is retained in the output as a
+     * real member, so it must remain listed in the {@code permits} clause. In that case the template
+     * name is appended to the end of the expanded list after the generated names, preserving a valid
+     * sealed-type declaration.
+     */
+    private static void expandSealedPermits(
+            CompilationUnit cu, String templateName, List<String> generatedNames, boolean keepTemplate) {
+        if (generatedNames.isEmpty())
+            return;
+
+        cu.findAll(ClassOrInterfaceDeclaration.class).forEach(decl -> {
+            NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> permitted = decl.getPermittedTypes();
+            if (permitted.isEmpty())
+                return;
+
+            int placeholderIdx = -1;
+            for (int i = 0; i < permitted.size(); i++) {
+                if (templateName.equals(permitted.get(i).getNameAsString())) {
+                    placeholderIdx = i;
+                    break;
+                }
+            }
+            if (placeholderIdx < 0)
+                return;
+
+            permitted.remove(placeholderIdx);
+            for (int j = generatedNames.size() - 1; j >= 0; j--) {
+                permitted.add(placeholderIdx,
+                        new com.github.javaparser.ast.type.ClassOrInterfaceType(generatedNames.get(j)));
+            }
+            // If the template class is kept in the output it must still appear in the permits clause.
+            if (keepTemplate) {
+                permitted.add(new com.github.javaparser.ast.type.ClassOrInterfaceType(templateName));
+            }
+        });
     }
 
     /**
@@ -1653,6 +1734,8 @@ public class InlineGenerator {
                 "PermuteCase", "io.quarkiverse.permuplate.PermuteCase",
                 "PermuteValue", "io.quarkiverse.permuplate.PermuteValue",
                 "PermuteStatements", "io.quarkiverse.permuplate.PermuteStatements",
+                "PermuteBody", "io.quarkiverse.permuplate.PermuteBody",
+                "PermuteEnumConst", "io.quarkiverse.permuplate.PermuteEnumConst",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
                 "PermuteImports", "io.quarkiverse.permuplate.PermuteImports");
 
@@ -1673,6 +1756,10 @@ public class InlineGenerator {
                     .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
             // Also strip from record components (analogous to constructor parameters)
             rd.getParameters().forEach(param -> param.getAnnotations()
+                    .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+        } else if (classDecl instanceof EnumDeclaration ed) {
+            // Strip annotations from enum constant declarations (e.g. @PermuteEnumConst sentinels)
+            ed.getEntries().forEach(ec -> ec.getAnnotations()
                     .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
         }
 
