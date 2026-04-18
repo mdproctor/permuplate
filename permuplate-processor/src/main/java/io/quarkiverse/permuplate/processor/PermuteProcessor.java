@@ -536,7 +536,9 @@ public class PermuteProcessor extends AbstractProcessor {
         collectPermuteImports(classDecl).forEach(importStr -> {
             try {
                 generatedCu.addImport(ctx.evaluate(importStr));
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                error("@PermuteImport expression failed to evaluate: " + e.getMessage(),
+                        typeElement, null, null);
             }
         });
         // Strip @PermuteImport / @PermuteImports annotations from the generated class

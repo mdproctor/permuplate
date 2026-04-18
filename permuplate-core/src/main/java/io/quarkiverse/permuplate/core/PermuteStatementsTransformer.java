@@ -79,7 +79,7 @@ public class PermuteStatementsTransformer {
     private static List<Statement> buildInsertList(NormalAnnotationExpr normal, EvaluationContext ctx) {
         String varName = null, from = null, to = null, body = null;
         for (MemberValuePair pair : normal.getPairs()) {
-            String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+            String val = pair.getValue().asStringLiteralExpr().asString();
             switch (pair.getNameAsString()) {
                 case "varName" -> varName = val;
                 case "from" -> from = val;
@@ -133,7 +133,7 @@ public class PermuteStatementsTransformer {
     private static String extractAttr(NormalAnnotationExpr normal, String attrName) {
         for (MemberValuePair pair : normal.getPairs()) {
             if (pair.getNameAsString().equals(attrName)) {
-                return PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+                return pair.getValue().asStringLiteralExpr().asString();
             }
         }
         return null;

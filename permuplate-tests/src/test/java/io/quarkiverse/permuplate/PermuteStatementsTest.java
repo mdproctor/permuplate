@@ -70,4 +70,31 @@ public class PermuteStatementsTest {
         assertThat(src).contains("this.x = 3");
         assertThat(src).doesNotContain("@PermuteStatements");
     }
+
+    @Test
+    public void testBodyWithStringLiteral() {
+        // Regression: body with a Java string literal was silently dropped
+        // because stripQuotes(toString()) left raw escape sequences.
+        var source = JavaFileObjects.forSourceString(
+                "io.permuplate.example.Greeter1",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteStatements;
+                        @Permute(varName="i", from="2", to="2", className="Greeter${i}")
+                        public class Greeter1 {
+                            private String greeting;
+                            @PermuteStatements(position="first", body="this.greeting = \\"hello\\";")
+                            public void init() {
+                            }
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Greeter2").orElseThrow());
+        assertThat(src).contains("this.greeting = \"hello\"");
+    }
 }
