@@ -26,6 +26,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
@@ -474,9 +475,9 @@ public class PermuteProcessor extends AbstractProcessor {
         if (classDecl instanceof ClassOrInterfaceDeclaration coid) {
             applyPermuteMethodApt(coid, ctx, permute, typeElement);
         } else {
-            // For records: @PermuteMethod is not processed, but the annotation must be stripped
-            // from the generated output — the permuplate import is removed from the CU, so any
-            // surviving @PermuteMethod reference would fail to compile.
+            // For records and enums: @PermuteMethod is not processed, but the annotation must be
+            // stripped from the generated output — the permuplate import is removed from the CU,
+            // so any surviving @PermuteMethod reference would fail to compile.
             classDecl.getMethods().forEach(m -> m.getAnnotations().removeIf(a -> {
                 String n = a.getNameAsString();
                 return n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod");
@@ -508,6 +509,9 @@ public class PermuteProcessor extends AbstractProcessor {
 
         // 5g2. @PermuteBody — replace entire method or constructor body per permutation
         io.quarkiverse.permuplate.core.PermuteBodyTransformer.transform(classDecl, ctx);
+
+        // 5g3. @PermuteEnumConst — expand sentinel enum constants (no-op for non-enum types)
+        io.quarkiverse.permuplate.core.PermuteEnumConstTransformer.transform(classDecl, ctx);
 
         // 5h. @PermuteAnnotation — add Java annotations to generated elements (runs last)
         io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
@@ -1875,8 +1879,8 @@ public class PermuteProcessor extends AbstractProcessor {
     // =========================================================================
 
     /**
-     * Finds a class, interface, or record by simple name in the given compilation unit.
-     * Tries ClassOrInterfaceDeclaration first, then RecordDeclaration.
+     * Finds a class, interface, record, or enum by simple name in the given compilation unit.
+     * Tries ClassOrInterfaceDeclaration first, then RecordDeclaration, then EnumDeclaration.
      */
     private static Optional<TypeDeclaration<?>> findTemplateType(
             CompilationUnit cu, String simpleName) {
@@ -1884,7 +1888,9 @@ public class PermuteProcessor extends AbstractProcessor {
                 c -> c.getNameAsString().equals(simpleName))
                 .<TypeDeclaration<?>> map(c -> c)
                 .or(() -> cu.findFirst(RecordDeclaration.class,
-                        r -> r.getNameAsString().equals(simpleName)));
+                        r -> r.getNameAsString().equals(simpleName)))
+                .or(() -> cu.findFirst(EnumDeclaration.class,
+                        e -> e.getNameAsString().equals(simpleName)));
     }
 
     private void writeGeneratedClass(TypeElement typeElement, String newClassName, String source) {

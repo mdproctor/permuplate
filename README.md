@@ -673,6 +673,40 @@ public <T> T get(int index) {
 
 ---
 
+### `@PermuteEnumConst`
+
+Expands a sentinel enum constant into a sequence of constants per permutation. The sentinel is removed and replaced by constants generated from the inner loop.
+
+| Parameter | Meaning |
+|---|---|
+| `varName` | Inner loop variable name |
+| `from` | Inner loop lower bound (JEXL expression) |
+| `to` | Inner loop upper bound; empty range (from &gt; to) removes sentinel with no replacement |
+| `name` | JEXL template for the generated constant name |
+| `args` | JEXL template for constructor arguments (optional; comma-separated, without parens) |
+
+```java
+@Permute(varName = "i", from = "2", to = "3", className = "Priority${i}")
+public enum Priority1 {
+    LOW,
+    MED,
+    @PermuteEnumConst(varName = "k", from = "3", to = "${i}", name = "LEVEL${k}")
+    HIGH_PLACEHOLDER;
+}
+// Priority2: LOW, MED  (from=3 > to=2 → empty range, sentinel removed)
+// Priority3: LOW, MED, LEVEL3
+```
+
+`@Permute` on `enum` types works the same as on classes — the enum is renamed per permutation value. The `args` attribute expands to constructor arguments, enabling enums with fields:
+
+```java
+@PermuteEnumConst(varName = "k", from = "2", to = "${i}", name = "ITEM${k}", args = "${k}")
+PLACEHOLDER(99);
+// In Status2: ITEM2(2)  — the sentinel PLACEHOLDER(99) is replaced
+```
+
+---
+
 ### `@PermuteImport`
 
 Adds a JEXL-evaluated import statement to each generated class. Placed on the template class. Repeatable (`@PermuteImport` / `@PermuteImports`).

@@ -12,6 +12,7 @@ import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
@@ -27,10 +28,10 @@ public class SourceScanner {
     }
 
     /**
-     * Holds a class, interface, or record annotated with {@code @Permute}.
+     * Holds a class, interface, record, or enum annotated with {@code @Permute}.
      * Use {@code typeDecl} for the general TypeDeclaration API.
-     * Cast to {@code ClassOrInterfaceDeclaration} or {@code RecordDeclaration}
-     * when type-specific operations are needed.
+     * Cast to {@code ClassOrInterfaceDeclaration}, {@code RecordDeclaration}, or
+     * {@code EnumDeclaration} when type-specific operations are needed.
      */
     public record AnnotatedType(CompilationUnit cu, TypeDeclaration<?> typeDecl,
             AnnotationExpr permuteAnn, Path sourceFile) {
@@ -45,7 +46,7 @@ public class SourceScanner {
 
     /**
      * Scans {@code directory} recursively for {@code .java} files and returns all
-     * classes, interfaces, records, and methods annotated with {@code @Permute}.
+     * classes, interfaces, records, enums, and methods annotated with {@code @Permute}.
      */
     public static ScanResult scan(File directory) throws IOException {
         List<AnnotatedType> types = new ArrayList<>();
@@ -68,6 +69,10 @@ public class SourceScanner {
                         cu.findAll(RecordDeclaration.class)
                                 .forEach(recordDecl -> findPermuteAnnotation(recordDecl.getAnnotations())
                                         .ifPresent(ann -> types.add(new AnnotatedType(cu, recordDecl, ann, path))));
+                        // Scan enums (e.g. template enums generating renamed enum families)
+                        cu.findAll(EnumDeclaration.class)
+                                .forEach(enumDecl -> findPermuteAnnotation(enumDecl.getAnnotations())
+                                        .ifPresent(ann -> types.add(new AnnotatedType(cu, enumDecl, ann, path))));
                         cu.findAll(MethodDeclaration.class).forEach(method -> findPermuteAnnotation(method.getAnnotations())
                                 .ifPresent(ann -> methods.add(new AnnotatedMethod(cu, method, ann, path))));
                     } catch (Exception e) {
