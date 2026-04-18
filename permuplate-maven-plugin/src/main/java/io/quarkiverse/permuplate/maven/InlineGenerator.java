@@ -24,6 +24,7 @@ import com.github.javaparser.ast.nodeTypes.NodeWithTypeParameters;
 import com.github.javaparser.ast.type.TypeParameter;
 
 import io.quarkiverse.permuplate.core.EvaluationContext;
+import io.quarkiverse.permuplate.core.PermuteBodyTransformer;
 import io.quarkiverse.permuplate.core.PermuteCaseTransformer;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
@@ -197,6 +198,9 @@ public class InlineGenerator {
                 // @PermuteStatements — insert accumulated statements into method bodies
                 PermuteStatementsTransformer.transform(generated, ctx);
 
+                // @PermuteBody — replace entire method or constructor body per permutation
+                PermuteBodyTransformer.transform(generated, ctx);
+
                 // @PermuteAnnotation — add Java annotations to generated elements (runs last)
                 io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
                         generated, ctx, null, null);
@@ -240,6 +244,8 @@ public class InlineGenerator {
                 // PermuteStatementsTransformer is not applied to records — records cannot have
                 // arbitrary constructor bodies via template syntax; @PermuteStatements support
                 // for compact record constructors is deferred.
+                // PermuteBodyTransformer is also not applied to records — record compact constructors
+                // cannot have arbitrary bodies replaced via @PermuteBody; deferred with @PermuteStatements.
                 // PermuteCaseTransformer is also omitted — switch cases in record methods are not
                 // a supported pattern.
                 PermuteValueTransformer.transform(generated, ctx);
@@ -1653,6 +1659,7 @@ public class InlineGenerator {
                 "PermuteCase", "io.quarkiverse.permuplate.PermuteCase",
                 "PermuteValue", "io.quarkiverse.permuplate.PermuteValue",
                 "PermuteStatements", "io.quarkiverse.permuplate.PermuteStatements",
+                "PermuteBody", "io.quarkiverse.permuplate.PermuteBody",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
                 "PermuteImports", "io.quarkiverse.permuplate.PermuteImports");
 

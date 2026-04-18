@@ -605,6 +605,25 @@ public Tuple1(A a) {
 
 ---
 
+### `@PermuteBody`
+
+Replaces the entire annotated method or constructor body with a JEXL-evaluated template per permutation. The `body` attribute must include surrounding braces.
+
+| Parameter | Meaning |
+|---|---|
+| `body` | JEXL template for the complete method body including `{ }` |
+
+```java
+@PermuteBody(body = "{ return ${i}; }")
+public int arity() {
+    return 1; // template placeholder — replaced entirely in generated classes
+}
+```
+
+Use `@PermuteBody` when you need to replace the full body. Use `@PermuteStatements` when you want to keep existing statements and insert around them.
+
+---
+
 ### `@PermuteCase`
 
 Expands a `switch` statement in the annotated method by inserting new cases per inner-loop value — fully inlined, no inheritance delegation.
@@ -619,7 +638,6 @@ Expands a `switch` statement in the annotated method by inserting new cases per 
 
 The seed case and `default` case in the template are preserved unchanged. New cases are inserted immediately before `default`.
 
-> **`body` string literals:** avoid Java string literals (`"..."`) inside the `body` expression — the body is parsed by JavaParser after JEXL substitution, and the parse fails silently if it contains characters that conflict with the surrounding template string. Use method calls like `String.valueOf(${k})` or primitive expressions instead.
 
 ```java
 @PermuteCase(varName = "k", from = "1", to = "${i-1}",
@@ -866,7 +884,7 @@ public class AnnotatedCallable2 {
 // Generated execute() declares: throws IOException  (import added by @PermuteImport)
 ```
 
-See `permuplate-apt-examples/.../AnnotatedCallable2.java` for a working example combining all four of `@PermuteAnnotation`, `@PermuteThrows`, `@PermuteCase`, and `@PermuteImport`. The `@PermuteCase` example there uses `body = "return ${k};"` — a body with no string literals inside the Java statement, which is the safe form.
+See `permuplate-apt-examples/.../AnnotatedCallable2.java` for a working example combining all four of `@PermuteAnnotation`, `@PermuteThrows`, `@PermuteCase`, and `@PermuteImport`.
 
 ---
 

@@ -506,6 +506,9 @@ public class PermuteProcessor extends AbstractProcessor {
         // 5g. @PermuteStatements — insert accumulated statements into method bodies
         PermuteStatementsTransformer.transform(classDecl, ctx);
 
+        // 5g2. @PermuteBody — replace entire method or constructor body per permutation
+        io.quarkiverse.permuplate.core.PermuteBodyTransformer.transform(classDecl, ctx);
+
         // 5h. @PermuteAnnotation — add Java annotations to generated elements (runs last)
         io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
                 classDecl, ctx, processingEnv.getMessager(), typeElement);
