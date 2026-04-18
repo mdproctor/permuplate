@@ -723,5 +723,4 @@ GitHub epics: main `apache/incubator-kie-drools#6639` → DSL sub-epic #6638 (ch
 | [ADR-0004](../docs/adr/0004-negationscope-as-separate-class.md) | `NegationScope` as separate builder class, not `JoinNSecond` subtype |
 | [ADR-0005](../docs/adr/0005-sandbox-scope-boundary.md) | Sandbox scope boundary: DSL API design only; Rete engine out of scope |
 
-**Blog series:** `docs/blog/` — entries 001–008 cover the Permuplate implementation journey
-including typed joins, First/Second split, not()/exists(), and OOPath traversal.
+**Blog series:** `site/_posts/` — entries from 2026-04-04 through 2026-04-18 cover the Permuplate implementation journey including typed joins, First/Second split, not()/exists(), OOPath traversal, and the sandbox template consolidation.

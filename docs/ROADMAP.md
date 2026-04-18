@@ -1,6 +1,20 @@
 # Permuplate Roadmap
 
-Prioritised list of improvements beyond the current feature set. Updated 2026-04-10.
+Prioritised list of improvements beyond the current feature set. Updated 2026-04-18.
+
+---
+
+## Completed (shipped)
+
+| What | Notes |
+|---|---|
+| IntelliJ plugin | Rename propagation, generated-file detection, safe delete, inspections. Phase 3, Apr 8–9. |
+| String-set iteration (`values=`) | `@Permute(values={"Foo","Bar",...})` — loops over named strings, not integers. |
+| `@PermuteFilter` | Skip specific permutations via JEXL boolean. Replaced the planned `@PermuteIf`. |
+| Record templates | `@Permute` on `record` types — `Tuple2Record.java` is the canonical example. |
+| `@PermuteAnnotation` | Adds annotations to generated classes/methods/fields with optional JEXL guard. |
+| `@PermuteThrows` | Adds throws clauses to generated methods with optional JEXL guard. |
+| `@PermuteSource` + `@PermuteDelegate` | Template composition — derive a class family from another generated family. |
 
 ---
 
@@ -11,11 +25,8 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 | 1 | Maven Central release | Unblocks everything else. Change group ID to `io.github.mdproctor` for instant namespace approval, or apply to Quarkiverse for `io.quarkiverse` approval. |
 | 2 | Gradle plugin | ~60% of the Java ecosystem uses Gradle. Inline generation mode is entirely unavailable to Gradle projects today. |
 | 3 | Quarkus extension | The `io.quarkiverse` group ID implies a promise not yet fulfilled. A real extension adds dev mode hot reload (templates reprocess on save), a Dev UI panel showing template→generated mappings, and native image compatibility via Quarkus build-time steps. |
-| 4 | Named type sets | Loops over *types* instead of *integers* — e.g. generate `StringColumn`, `IntegerColumn`, `LongColumn` from one template. Unlocks a completely different class of use cases: DAOs, codecs, serializers, column types. |
-| 5 | `@PermuteIf` | Conditionally include/exclude a method or field for a specific permutation value. Currently the only mechanism is `from`/`to` range — you cannot skip one value in the middle. |
-| 6 | Record generation | `@Permute` on a `record` type. Records are immutable so no constructor body accumulation is needed — much simpler than class templates. Increasingly idiomatic Java. |
-| 7 | `@PermuteAnnotation` | Vary annotations *on* the generated class per permutation, e.g. add `@FunctionalInterface` only at arity 1, or `@Deprecated` above a threshold. |
-| 8 | Kotlin / KSP | Kotlin Symbol Processing is the KSP equivalent of APT. A Permuplate KSP plugin would serve the Kotlin ecosystem with the same template model. Higher effort; different audience. |
+| 4 | VS Code extension | Algorithm (`permuplate-ide-support`) and porting guide are ready. Parked as issue #4. |
+| 5 | Kotlin / KSP | Kotlin Symbol Processing is the KSP equivalent of APT. A Permuplate KSP plugin would serve the Kotlin ecosystem with the same template model. Higher effort; different audience. |
 
 ---
 

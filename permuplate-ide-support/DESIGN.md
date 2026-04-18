@@ -268,7 +268,9 @@ Generated files regenerate into the correct new package automatically. The real 
 
 ---
 
-## VS Code Extension — Porting Guide
+## VS Code Extension — Porting Guide (Parked — issue #4)
+
+The VS Code extension is parked pending bandwidth. The algorithm port and index strategy are fully designed below. When work resumes, start at the P1 rename provider and work down the priority table.
 
 ### Algorithm Port (TypeScript)
 

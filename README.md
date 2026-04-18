@@ -432,7 +432,7 @@ Drives the outer loop. Supported in two positions:
 | `className` | `String` | Output type/class name. For type permutation: a template evaluated per-i (e.g. `"Join${i}"`). For method permutation: a fixed class name (e.g. `"MultiJoin"`) containing all overloads. |
 | `strings` | `String[]` | Named string constants available in all `${...}` expressions alongside `varName`. Each entry is `"key=value"`. Example: `strings = {"prefix=Buffered"}` makes `${prefix}` expand to `"Buffered"` in `className`, `@PermuteDeclr`, and `@PermuteParam`. See [Expression syntax — String variables](#string-variables). |
 | `extraVars` | `@PermuteVar[]` | Additional integer loop variables for cross-product generation. Each `@PermuteVar(varName="k", from="2", to="4")` adds one axis; one output type is generated per combination. Primary variable is the outermost loop; `extraVars` are inner loops in declaration order. Variable names must not conflict with `varName` or `strings` keys. See [Expression syntax — Multiple permutation variables](#multiple-permutation-variables). |
-| `inline` | `boolean` | Default `false`. When `true`, generates permuted classes as nested siblings inside the parent class rather than separate top-level files. Only valid on nested static classes. Requires `permuplate-maven-plugin`; the APT annotation processor reports a compile error if set. Template must be in `src/main/permuplate/`. |
+| `inline` | `boolean` | Default `false`. When `true`, generates permuted classes as nested siblings inside the parent class rather than separate top-level files. Supported on both nested static classes and top-level classes. Requires `permuplate-maven-plugin`; the APT annotation processor reports a compile error if set. Template must be in `src/main/permuplate/`. |
 | `keepTemplate` | `boolean` | Default `false`. When `true` and `inline = true`, retains the template class itself in the output alongside the permuted classes. When `false`, the template class is removed. Has no effect when `inline = false`. |
 
 ### `values` — string-set iteration (alternative to `from`/`to`)
@@ -619,6 +619,8 @@ Expands a `switch` statement in the annotated method by inserting new cases per 
 
 The seed case and `default` case in the template are preserved unchanged. New cases are inserted immediately before `default`.
 
+> **`body` string literals:** avoid Java string literals (`"..."`) inside the `body` expression — the body is parsed by JavaParser after JEXL substitution, and the parse fails silently if it contains characters that conflict with the surrounding template string. Use method calls like `String.valueOf(${k})` or primitive expressions instead.
+
 ```java
 @PermuteCase(varName = "k", from = "1", to = "${i-1}",
              index = "${k}", body = "return (T) ${lower(k+1)};")
@@ -713,7 +715,7 @@ Controls the **return type** of a method per permutation. Enables stateful build
 
 **Builder chain — inline mode (zero annotations):**
 ```java
-@Permute(varName="i", from=1, to=4, className="Step${i}", inline=true, keepTemplate=true)
+@Permute(varName="i", from="1", to="4", className="Step${i}", inline=true, keepTemplate=true)
 public class Step1<T1> {
     // Return type and parameter type inferred automatically
     public Step2<T1, T2> join(Source<T2> src) { ... }
@@ -828,6 +830,46 @@ Works with `@PermuteVar` cross-products — each combination (i, j, ...) is eval
 
 ---
 
+### `@PermuteAnnotation`
+
+Adds a Java annotation to the generated class (or method or field) per permutation. Placed on the same element as `@Permute`. The `value` is a JEXL-evaluated annotation literal; `when` is an optional boolean guard. Repeatable.
+
+Runs **last** in the transform pipeline, so `when` expressions see the final permutation state (field names renamed, type params expanded, etc.).
+
+```java
+@Permute(varName = "i", from = "3", to = "5", className = "AnnotatedCallable${i}")
+@PermuteAnnotation("@SuppressWarnings(\"unchecked\")")
+@PermuteAnnotation(value = "@Deprecated", when = "${i} == 5")  // only on arity 5
+public class AnnotatedCallable2 { ... }
+// AnnotatedCallable3: @SuppressWarnings("unchecked")
+// AnnotatedCallable5: @SuppressWarnings("unchecked") + @Deprecated
+```
+
+---
+
+### `@PermuteThrows`
+
+Adds an exception type to a method's `throws` clause per permutation. Add-only; existing throws are preserved. The `value` is a JEXL-evaluated class name; `when` is an optional boolean guard. Repeatable.
+
+Works naturally with `@PermuteImport` when the exception type needs an import that isn't in the template:
+
+```java
+@Permute(varName = "i", from = "3", to = "5", className = "AnnotatedCallable${i}")
+@PermuteImport("java.io.IOException")
+public class AnnotatedCallable2 {
+
+    @PermuteThrows("java.io.IOException")
+    public void execute(
+            @PermuteParam(varName = "j", from = "1", to = "${i}", type = "Object", name = "arg${j}")
+            Object arg1) { }
+}
+// Generated execute() declares: throws IOException  (import added by @PermuteImport)
+```
+
+See `permuplate-apt-examples/.../AnnotatedCallable2.java` for a working example combining all four of `@PermuteAnnotation`, `@PermuteThrows`, `@PermuteCase`, and `@PermuteImport`. The `@PermuteCase` example there uses `body = "return ${k};"` — a body with no string literals inside the Java statement, which is the safe form.
+
+---
+
 ### Records as templates
 
 Java records work as `@Permute` templates with full annotation parity. The canonical use case is generating immutable typed tuples:
@@ -856,6 +898,8 @@ public record Tuple2<
 - `@PermuteFilter` — skips specific permutation values
 - `@PermuteVar` — cross-product generation
 - `@PermuteImport` — adds per-permutation imports
+- `@PermuteAnnotation` — adds annotations to generated record types
+- `@PermuteThrows` — adds throws declarations to compact constructor methods
 
 **Not applicable to records** (silently skipped):
 - `@PermuteMethod` — records cannot have overloaded method families in the same way
@@ -1114,8 +1158,8 @@ For a detailed explanation of the architecture, transformation pipeline, design 
 - [`OVERVIEW.md`](OVERVIEW.md) — Deep-dive into the annotation processor architecture
 - [`permuplate-mvn-examples/DROOLS-DSL.md`](permuplate-mvn-examples/DROOLS-DSL.md) — Drools DSL sandbox: six phases of type-safe API generation
 - [`docs/design-snapshots/`](docs/design-snapshots/) — Frozen architecture state records (2026-04-06 is current)
-- [`docs/adr/`](docs/adr/) — Formal architectural decisions (ADR-0001 through ADR-0004)
-- [`docs/blog/`](docs/blog/) — Development diary: 11 entries covering the full Permuplate journey
+- [`docs/adr/`](docs/adr/) — Formal architectural decisions (ADR-0001 through ADR-0005)
+- [`site/_posts/`](site/_posts/) — Development diary: blog entries covering the full Permuplate journey
 
 ---
 

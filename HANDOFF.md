@@ -1,44 +1,46 @@
-# Handover — 2026-04-18
+# Handover — 2026-04-18 (session 2)
 
-**Head commit:** `7ec605e` — chore: remove src/main/java stubs replaced by permuplate templates
-**GitHub:** No open issues. Epics #48 and #52 closed. Build fully green.
+**Head commit:** `82e10f2` — docs: session handover 2026-04-18 (previous session)
+**Status:** All changes uncommitted — see below.
 
 ---
 
 ## What Changed This Session
 
-### Drools DSL sandbox — all planned template work complete
+### Documentation audit — all MD files reviewed and corrected
 
-Six files moved from `src/main/java/` to `src/main/permuplate/` as inline templates.
-~496 lines of hand-written boilerplate eliminated.
+Six MD files updated for drift:
 
-| Template | Result |
+| File | What changed |
 |---|---|
-| RuleExtendsPoint | `@Permute(inline=true, keepTemplate=true)` + `@PermuteTypeParam` — 88 → 37 lines |
-| BaseTuple | Delegation refactor + full inline template — ~290 lines saved |
-| RuleOOPathBuilder | Path3 template generates Path4..Path6 — 128 → 74 lines |
-| NegationScope + ExistenceScope | `@Permute(values={"Existence"}, inline=false, keepTemplate=true)` — 110 → 55 lines |
-| RuleBuilder + ParametersFirst | Top-level inline template + `@PermuteMethod(j=2..7)` — 216 → 170 lines |
+| `CLAUDE.md` | Trimmed 313→255 lines; removed 40 stale entries from key decisions table |
+| `OVERVIEW.md` | Roadmap: IntelliJ plugin marked done (was listed as future work); module structure: 5 missing annotations added; dead `docs/design-snapshots/` and `docs/blog/` references fixed |
+| `README.md` | Added `@PermuteAnnotation` and `@PermuteThrows` sections (both absent); fixed `inline` description (top-level classes now supported); fixed `from=1, to=4` int literals → strings; fixed blog footer |
+| `docs/ROADMAP.md` | 4 shipped items (string-set, @PermuteFilter, records, @PermuteAnnotation) moved to completed section |
+| `permuplate-ide-support/DESIGN.md` | VS Code extension marked parked (issue #4) |
+| `permuplate-mvn-examples/DROOLS-DSL.md` | Blog reference fixed: `docs/blog/` → `site/_posts/` |
 
-### Four framework gaps closed
+### New example file
 
-1. **Maven plugin string-set** (#51) — `@Permute(values={...})` now works in PermuteMojo
-2. **`keepTemplate=true` for `inline=false`** (#51) — template class written to generated sources
-3. **`inline=true` on top-level classes** (#56) — `InlineGenerator.generate()` branches on `isNestedType()`
-4. **`@PermuteDeclr` TYPE_USE on qualified names** (#57) — scope annotations now checked
+`permuplate-apt-examples/.../AnnotatedCallable2.java` — covers the 4 annotations that had no runnable example: `@PermuteAnnotation`, `@PermuteThrows`, `@PermuteCase`, `@PermuteImport`. Generates `AnnotatedCallable3..5`. Build verified green.
 
-### Other fixes
+### Bug discovered: @PermuteCase body string literals silently dropped
 
-- `@PermuteDeclr` on `ElementType.METHOD` — method rename + return type (#46, epic #52)
-- JEXL exceptions in transformers now produce compile errors not RuntimeExceptions (#54)
-- Two pre-existing test failures fixed
-- `transformNewExpressions` widened from `TypeDeclaration<?>` to `Node`; now `public static`
+`PermuteCaseTransformer.buildSwitchEntry()` wraps the evaluated body in `{...}` and calls `StaticJavaParser.parseBlock()`. If the body contains Java string literals, the parser throws; the catch block returns `new BlockStmt()` silently. Cases appear in the generated switch but have no statements.
+
+**Workaround documented:** avoid string literals in `body` — use primitives (`return ${k};`) or method calls (`return String.valueOf(${k});`). Documented in README, submitted to garden as `GE-20260418-90907d`.
 
 ---
 
 ## Immediate Next Step
 
-Read the actual droolsvol2 source at `/Users/mdproctor/dev/droolsoct2025/droolsvol2/` for at least one arity family (Join or Tuple equivalent) before writing the follow-up blog article. The sandbox was built from vol2 *tests*, not source — the savings claims need validation against the real implementation.
+Commit all staged changes:
+```
+git add -A
+git commit -m "docs: audit and update all MD files; add AnnotatedCallable2 example"
+```
+
+Then: read actual droolsvol2 source at `/Users/mdproctor/dev/droolsoct2025/droolsvol2/` (at least one arity family) before writing any vol2 comparison article — the sandbox was built from tests, not source.
 
 ---
 
@@ -46,8 +48,7 @@ Read the actual droolsvol2 source at `/Users/mdproctor/dev/droolsoct2025/droolsv
 
 | Context | Where |
 |---|---|
-| Previous handover | `git show HEAD~1:HANDOFF.md` |
-| Working notes | `docs/drools-dsl-template-improvements.md` |
-| DSL article | `site/_posts/2026-04-17-mdp02-dsl-that-generated-itself.md` |
-| Session diary | `site/_posts/2026-04-18-mdp01-using-tool-on-itself.md` |
-| Session plan | `docs/superpowers/plans/2026-04-17-method-rename-and-basetuple-template.md` |
+| Previous handover | `git show HEAD:HANDOFF.md` |
+| Garden entry (PermuteCase bug) | `~/.hortora/garden/permuplate/GE-20260418-90907d.md` |
+| New blog entry | `site/_posts/2026-04-18-mdp02-bug-found-writing-example.md` |
+| Vol2 source | `/Users/mdproctor/dev/droolsoct2025/droolsvol2/src/main/java/org/drools/core/` |

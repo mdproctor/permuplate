@@ -452,7 +452,12 @@ permuplate-parent/
 │   ├── PermuteTypeParam.java  — class/method type parameter expansion
 │   ├── PermuteReturn.java     — return type control + boundary omission
 │   ├── PermuteMethod.java     — multiple method overloads per class
-│   └── PermuteExtends.java    — explicit extends/implements clause override (inline mode only)
+│   ├── PermuteExtends.java    — explicit extends/implements clause override (inline mode only)
+│   ├── PermuteFilter.java     — skip permutations via JEXL boolean expression (repeatable)
+│   ├── PermuteAnnotation.java — add Java annotations to generated elements (repeatable, conditional)
+│   ├── PermuteThrows.java     — add exception types to method throws clauses (repeatable, conditional)
+│   ├── PermuteSource.java     — declare dependency on another generated class family (Maven plugin only; repeatable)
+│   └── PermuteDelegate.java   — synthesise delegating method bodies from a source interface
 ├── permuplate-core/
 │   ├── EvaluationContext.java          — JEXL3 wrapper; Map<String,Object> for int + string vars; built-in functions
 │   ├── PermuteDeclrTransformer.java    — fields, constructor params, for-each vars, method params; @PermuteConst
@@ -537,13 +542,16 @@ The closest prior art is jOOQ's internal code generator for `Row1`–`Row22` and
 
 ## Possible Roadmap
 
-### Medium-term
+### Done (Phase 3)
 
-**IntelliJ / IDE plugin**
-The algorithm foundation (`permuplate-ide-support`) is complete — it provides annotation string parsing, validation, and rename calculation with no IDE dependencies. The remaining work is the IntelliJ plugin implementation (virtual navigation from template to generated variants and vice versa) and a VS Code extension.
+**IntelliJ plugin** — shipped. `permuplate-intellij-plugin/` provides annotation string rename propagation, generated-file detection, safe-delete delegation, template navigation, and validation inspections. Built on `permuplate-ide-support`. See `permuplate-ide-support/DESIGN.md` for architecture details.
+
+### Medium-term
 
 **Gradle plugin support**
 Currently only Maven is supported (via `annotationProcessorPaths`). A Gradle setup using `annotationProcessor` configuration would reach a wider audience.
+
+**VS Code extension** — parked (tracked as issue #4). The `permuplate-ide-support` algorithm is ready; a TypeScript port is needed. See `permuplate-ide-support/DESIGN.md § VS Code Extension` for the porting guide.
 
 ### Longer-term
 
@@ -556,6 +564,5 @@ The annotations and processor jars could be published independently. The annotat
 
 The annotation processor architecture is stable and covered in this document. For the evolving DSL sandbox architecture:
 
-- **Current state:** [`docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md`](../docs/design-snapshots/2026-04-06-drools-dsl-sandbox.md)
-- **Key decisions:** [`docs/adr/`](../docs/adr/) — ADR-0001 through ADR-0004
-- **Development narrative:** [`docs/blog/`](../docs/blog/) — 11 diary entries
+- **Key decisions:** [`docs/adr/`](../docs/adr/) — ADR-0001 through ADR-0005
+- **Development narrative:** [`site/_posts/`](../site/_posts/) — blog entries covering the full Permuplate journey
