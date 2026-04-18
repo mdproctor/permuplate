@@ -42,7 +42,9 @@ public class PermuteCaseTransformer {
 
             String varName = null, from = null, to = null, indexExpr = null, bodyExpr = null;
             for (MemberValuePair pair : normal.getPairs()) {
-                String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+                // asStringLiteralExpr().asString() unescapes Java sequences (e.g. \" → ")
+                // so the body can be reparsed as valid Java source by StaticJavaParser.
+                String val = pair.getValue().asStringLiteralExpr().asString();
                 switch (pair.getNameAsString()) {
                     case "varName" -> varName = val;
                     case "from" -> from = val;
@@ -112,12 +114,7 @@ public class PermuteCaseTransformer {
 
     private static SwitchEntry buildSwitchEntry(int label, String bodyStr) {
         // Wrap in block to parse multiple statements (e.g. "this.b = t; break;")
-        BlockStmt block;
-        try {
-            block = StaticJavaParser.parseBlock("{" + bodyStr + "}");
-        } catch (Exception e) {
-            block = new BlockStmt();
-        }
+        BlockStmt block = StaticJavaParser.parseBlock("{" + bodyStr + "}");
 
         SwitchEntry entry = new SwitchEntry();
         entry.setType(SwitchEntry.Type.STATEMENT_GROUP);
