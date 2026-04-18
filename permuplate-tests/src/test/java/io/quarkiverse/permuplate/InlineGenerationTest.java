@@ -512,4 +512,103 @@ public class InlineGenerationTest {
         assertThat(config.inline).isTrue();
         assertThat(config.keepTemplate).isTrue();
     }
+
+    // -------------------------------------------------------------------------
+    // Sealed class permits expansion
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testSealedPermitsExpandedForTemplate() throws Exception {
+        // Parent CU has: sealed interface Expr permits ExprTemplate {}
+        // Template generates Expr1..Expr3.
+        // After generation, permits should be: Expr1, Expr2, Expr3 (not ExprTemplate).
+        StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_17);
+        CompilationUnit parentCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                public class Shape {
+                    public sealed interface Expr permits ExprTemplate {}
+                }
+                """);
+
+        CompilationUnit templateCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                import io.quarkiverse.permuplate.Permute;
+                public class Shape {
+                    @Permute(varName="i", from="1", to="3", className="Expr${i}", inline=true)
+                    static final class ExprTemplate implements Expr {
+                        public int rank() { return 1; }
+                    }
+                }
+                """);
+
+        ClassOrInterfaceDeclaration templateClass = templateCu
+                .findFirst(ClassOrInterfaceDeclaration.class,
+                        c -> "ExprTemplate".equals(c.getNameAsString()))
+                .orElseThrow();
+
+        var ann = templateClass.getAnnotationByName("Permute").orElseThrow();
+        PermuteConfig config = AnnotationReader.readPermute(ann);
+        List<Map<String, Object>> combinations = PermuteConfig.buildAllCombinations(config);
+
+        CompilationUnit result = InlineGenerator.generate(parentCu, templateClass, config, combinations);
+        String src = result.toString();
+
+        assertThat(src).contains("permits Expr1, Expr2, Expr3");
+        assertThat(src).doesNotContain("ExprTemplate");
+        assertThat(src).contains("class Expr1");
+        assertThat(src).contains("class Expr2");
+        assertThat(src).contains("class Expr3");
+    }
+
+    @Test
+    public void testSealedPermitsExpandsAtCorrectPosition() throws Exception {
+        // Verifies that when permits has multiple entries, the placeholder is replaced
+        // at its exact position (not appended), preserving surrounding entries.
+        StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_17);
+        CompilationUnit parentCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                public class Multi {
+                    public sealed interface Node permits Leaf, NodeTemplate, Branch {}
+                }
+                """);
+
+        CompilationUnit templateCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                import io.quarkiverse.permuplate.Permute;
+                public class Multi {
+                    @Permute(varName="i", from="1", to="2", className="Node${i}", inline=true)
+                    static final class NodeTemplate implements Node {
+                        public int id() { return 1; }
+                    }
+                }
+                """);
+
+        ClassOrInterfaceDeclaration templateClass = templateCu
+                .findFirst(ClassOrInterfaceDeclaration.class,
+                        c -> "NodeTemplate".equals(c.getNameAsString()))
+                .orElseThrow();
+
+        var ann = templateClass.getAnnotationByName("Permute").orElseThrow();
+        PermuteConfig config = AnnotationReader.readPermute(ann);
+        List<Map<String, Object>> combinations = PermuteConfig.buildAllCombinations(config);
+
+        CompilationUnit result = InlineGenerator.generate(parentCu, templateClass, config, combinations);
+        String src = result.toString();
+
+        // NodeTemplate (at index 1) should be replaced by Node1, Node2 — Leaf and Branch preserved
+        assertThat(src).contains("Leaf");
+        assertThat(src).contains("Node1");
+        assertThat(src).contains("Node2");
+        assertThat(src).contains("Branch");
+        assertThat(src).doesNotContain("NodeTemplate");
+
+        // Position: Leaf before Node1/Node2, Branch after
+        int leafIdx = src.indexOf("Leaf");
+        int node1Idx = src.indexOf("Node1");
+        int branchIdx = src.indexOf("Branch");
+        assertThat(leafIdx).isLessThan(node1Idx);
+        assertThat(node1Idx).isLessThan(branchIdx);
+    }
 }

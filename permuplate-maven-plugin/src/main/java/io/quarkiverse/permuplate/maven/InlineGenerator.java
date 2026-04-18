@@ -140,6 +140,9 @@ public class InlineGenerator {
             }).collect(java.util.stream.Collectors.toList());
         }
 
+        // Collect all generated class names in order — used for sealed permits expansion
+        List<String> generatedNames = new ArrayList<>();
+
         // Generate and append each permuted nested type
         for (Map<String, Object> vars : filteredCombinations) {
             EvaluationContext ctx = new EvaluationContext(vars);
@@ -148,6 +151,7 @@ public class InlineGenerator {
 
             // Rename the generated nested type
             String newClassName = ctx.evaluate(config.className);
+            generatedNames.add(newClassName);
             generated.setName(newClassName);
             // Rename constructors (only applies to class/record, not interface)
             generated.getConstructors().forEach(ctor -> ctor.setName(newClassName));
@@ -282,7 +286,51 @@ public class InlineGenerator {
         // Strip permuplate imports from the output
         outputCu.getImports().removeIf(imp -> imp.getNameAsString().startsWith("io.quarkiverse.permuplate"));
 
+        // Expand any sealed permits clause that references the template class name
+        expandSealedPermits(outputCu, templateClassName, generatedNames, config.keepTemplate);
+
         return outputCu;
+    }
+
+    /**
+     * Replaces any {@code permits TemplateName} entry in sealed classes/interfaces within
+     * {@code cu} with one entry per generated class name. Called after all classes are generated.
+     * <p>
+     * When {@code keepTemplate} is {@code true}, the template class is retained in the output as a
+     * real member, so it must remain listed in the {@code permits} clause. In that case the template
+     * name is appended to the end of the expanded list after the generated names, preserving a valid
+     * sealed-type declaration.
+     */
+    private static void expandSealedPermits(
+            CompilationUnit cu, String templateName, List<String> generatedNames, boolean keepTemplate) {
+        if (generatedNames.isEmpty())
+            return;
+
+        cu.findAll(ClassOrInterfaceDeclaration.class).forEach(decl -> {
+            NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> permitted = decl.getPermittedTypes();
+            if (permitted.isEmpty())
+                return;
+
+            int placeholderIdx = -1;
+            for (int i = 0; i < permitted.size(); i++) {
+                if (templateName.equals(permitted.get(i).getNameAsString())) {
+                    placeholderIdx = i;
+                    break;
+                }
+            }
+            if (placeholderIdx < 0)
+                return;
+
+            permitted.remove(placeholderIdx);
+            for (int j = generatedNames.size() - 1; j >= 0; j--) {
+                permitted.add(placeholderIdx,
+                        new com.github.javaparser.ast.type.ClassOrInterfaceType(generatedNames.get(j)));
+            }
+            // If the template class is kept in the output it must still appear in the permits clause.
+            if (keepTemplate) {
+                permitted.add(new com.github.javaparser.ast.type.ClassOrInterfaceType(templateName));
+            }
+        });
     }
 
     /**

@@ -481,6 +481,24 @@ public class Handlers {
 
 With `keepTemplate = true`, the output `Handlers.java` contains `Handler1` through `Handler5` all nested inside `Handlers`. Users write `Handlers.Handler3 h = (a1, a2, a3) -> ...` with no top-level file clutter.
 
+#### Sealed class `permits` expansion
+
+When a sealed interface or class uses the template class name as its `permits` placeholder, the Maven plugin automatically expands it to list all generated class names:
+
+```java
+// Parent (src/main/java):
+public sealed interface Expr permits ExprTemplate {}
+
+// Template (src/main/permuplate):
+@Permute(varName="i", from="1", to="3", className="Expr${i}", inline=true)
+static final class ExprTemplate implements Expr { ... }
+
+// Generated (target/generated-sources/permuplate/):
+// sealed interface Expr permits Expr1, Expr2, Expr3 {}
+```
+
+The template class name (`ExprTemplate`) is replaced in-place with the full list of generated names (`Expr1, Expr2, Expr3`). Multiple entries in the `permits` clause are supported — only the template placeholder entry is expanded; other entries are preserved unchanged.
+
 ### `@PermuteDeclr`
 
 Renames a declaration and propagates the rename to all usages within the declaration's scope.
