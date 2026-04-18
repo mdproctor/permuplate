@@ -611,4 +611,52 @@ public class InlineGenerationTest {
         assertThat(leafIdx).isLessThan(node1Idx);
         assertThat(node1Idx).isLessThan(branchIdx);
     }
+
+    // -------------------------------------------------------------------------
+    // Enum inline templates: @PermuteImport
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testEnumInlineTemplateHonorsPermuteImport() throws Exception {
+        // Regression: @PermuteImport was silently skipped for enum templates because
+        // collectInlinePermuteImports() only accepted ClassOrInterfaceDeclaration.
+        StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_17);
+
+        CompilationUnit parentCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                public class Container {
+                }
+                """);
+
+        CompilationUnit templateCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                import io.quarkiverse.permuplate.Permute;
+                import io.quarkiverse.permuplate.PermuteImport;
+                public class Container {
+                    @Permute(varName="i", from="1", to="2", className="Level${i}", inline=true)
+                    @PermuteImport("java.util.function.Supplier")
+                    static enum LevelTemplate {
+                        ONE;
+                    }
+                }
+                """);
+
+        com.github.javaparser.ast.body.EnumDeclaration templateEnum = templateCu
+                .findFirst(com.github.javaparser.ast.body.EnumDeclaration.class,
+                        e -> "LevelTemplate".equals(e.getNameAsString()))
+                .orElseThrow();
+
+        var ann = templateEnum.getAnnotationByName("Permute").orElseThrow();
+        PermuteConfig config = AnnotationReader.readPermute(ann);
+        List<Map<String, Object>> combinations = PermuteConfig.buildAllCombinations(config);
+
+        CompilationUnit result = InlineGenerator.generate(parentCu, templateEnum, config, combinations);
+        String src = result.toString();
+
+        assertThat(src).contains("import java.util.function.Supplier;");
+        assertThat(src).contains("enum Level1");
+        assertThat(src).contains("enum Level2");
+        assertThat(src).doesNotContain("@PermuteImport");
+    }
 }

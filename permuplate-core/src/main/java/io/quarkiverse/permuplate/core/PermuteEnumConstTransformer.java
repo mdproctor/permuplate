@@ -56,8 +56,10 @@ public class PermuteEnumConstTransformer {
                     case "args" -> argsTemplate = val;
                 }
             }
-            if (varName == null || from == null || to == null || nameTemplate == null)
+            if (varName == null || from == null || to == null || nameTemplate == null) {
+                enumDecl.getEntries().remove(sentinel);
                 continue;
+            }
 
             int sentinelIdx = enumDecl.getEntries().indexOf(sentinel);
 

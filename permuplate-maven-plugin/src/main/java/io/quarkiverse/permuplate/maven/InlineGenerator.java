@@ -268,6 +268,20 @@ public class InlineGenerator {
                 // @PermuteThrows — add exception types to method throws clauses (enums can have methods)
                 io.quarkiverse.permuplate.core.PermuteThrowsTransformer.transform(
                         generated, ctx, null, null);
+
+                // @PermuteImport — add evaluated imports to the parent CU
+                for (String importStr : collectInlinePermuteImports(generated, ctx)) {
+                    boolean alreadyPresent = outputCu.getImports().stream()
+                            .anyMatch(imp -> imp.getNameAsString().equals(importStr));
+                    if (!alreadyPresent) {
+                        outputCu.addImport(importStr);
+                    }
+                }
+                generated.getAnnotations().removeIf(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteImport") || n.equals("io.quarkiverse.permuplate.PermuteImport")
+                            || n.equals("PermuteImports") || n.equals("io.quarkiverse.permuplate.PermuteImports");
+                });
             } else {
                 // Record path: apply param + declr transforms (no extends, no methods/return/case)
                 PermuteDeclrTransformer.transform(generated, ctx, null);
@@ -1225,7 +1239,7 @@ public class InlineGenerator {
     }
 
     private static java.util.List<String> collectInlinePermuteImports(
-            ClassOrInterfaceDeclaration classDecl, EvaluationContext ctx) {
+            TypeDeclaration<?> classDecl, EvaluationContext ctx) {
         java.util.List<String> result = new java.util.ArrayList<>();
         classDecl.getAnnotations().forEach(ann -> {
             String name = ann.getNameAsString();
