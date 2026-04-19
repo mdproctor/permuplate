@@ -1050,6 +1050,16 @@ public class PermuteProcessor extends AbstractProcessor {
                 io.quarkiverse.permuplate.core.PermuteDeclrTransformer
                         .processMethodParamDeclr(clone, innerCtx);
 
+                // Apply @PermuteBody with innerCtx so body templates can reference
+                // the @PermuteMethod inner variable.
+                {
+                    com.github.javaparser.ast.body.ClassOrInterfaceDeclaration tmpBody = new com.github.javaparser.ast.body.ClassOrInterfaceDeclaration();
+                    tmpBody.addMember(clone);
+                    io.quarkiverse.permuplate.core.PermuteBodyTransformer.transform(tmpBody, innerCtx);
+                    if (!tmpBody.getMethods().isEmpty())
+                        clone = tmpBody.getMethods().get(0);
+                }
+
                 // Apply name template if set
                 if (nameTempl != null && !nameTempl.isEmpty()) {
                     try {

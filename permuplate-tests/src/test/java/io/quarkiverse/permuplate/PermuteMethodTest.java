@@ -445,4 +445,35 @@ public class PermuteMethodTest {
         // j=3: tip expanded by 2 → JConn4<T1, T2, T3, T4>, param JS3<T2, T3, T4>
         assertThat(src).contains("JConn4<T1, T2, T3, T4> connect(JS3<T2, T3, T4> src)");
     }
+
+    @Test
+    public void testPermuteBodyAccessesInnerMethodVariable() {
+        // @PermuteBody on a @PermuteMethod template must evaluate the body with the
+        // inner method variable (n) available, not just the outer permutation variable (i).
+        var source = JavaFileObjects.forSourceString(
+                "io.permuplate.example.Counter2",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteMethod;
+                        import io.quarkiverse.permuplate.PermuteBody;
+                        @Permute(varName="i", from="1", to="1", className="Counter${i}")
+                        public class Counter2 {
+                            @PermuteMethod(varName="n", from="2", to="3", name="count${n}")
+                            @PermuteBody(body="{ return ${n}; }")
+                            public int countTemplate() { return 0; }
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Counter1").orElseThrow());
+        assertThat(src).contains("int count2()");
+        assertThat(src).contains("return 2");
+        assertThat(src).contains("int count3()");
+        assertThat(src).contains("return 3");
+        assertThat(src).doesNotContain("return 0");
+    }
 }

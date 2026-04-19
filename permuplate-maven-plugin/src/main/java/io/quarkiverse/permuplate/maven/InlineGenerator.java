@@ -526,6 +526,17 @@ public class InlineGenerator {
                 io.quarkiverse.permuplate.core.PermuteDeclrTransformer
                         .transformNewExpressions(clone, innerCtx);
 
+                // Apply @PermuteBody with innerCtx so body templates can reference
+                // the @PermuteMethod inner variable (e.g. ${n}).
+                // Uses the same temp-class wrapper pattern as PermuteParamTransformer.
+                {
+                    ClassOrInterfaceDeclaration tmpBody = new ClassOrInterfaceDeclaration();
+                    tmpBody.addMember(clone);
+                    PermuteBodyTransformer.transform(tmpBody, innerCtx);
+                    if (!tmpBody.getMethods().isEmpty())
+                        clone = tmpBody.getMethods().get(0);
+                }
+
                 // Apply name template if set
                 if (pmCfg.hasName()) {
                     try {

@@ -659,4 +659,48 @@ public class InlineGenerationTest {
         assertThat(src).contains("enum Level2");
         assertThat(src).doesNotContain("@PermuteImport");
     }
+
+    @Test
+    public void testPermuteBodyInPermuteMethodUsesInnerVariable() throws Exception {
+        // InlineGenerator path: @PermuteBody on a @PermuteMethod clone must see the
+        // inner variable (n), not just the outer (i).
+        CompilationUnit parentCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                public class Host {
+                }
+                """);
+
+        CompilationUnit templateCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                import io.quarkiverse.permuplate.Permute;
+                import io.quarkiverse.permuplate.PermuteMethod;
+                import io.quarkiverse.permuplate.PermuteBody;
+                public class Host {
+                    @Permute(varName="i", from="1", to="1", className="Gauge${i}", inline=true)
+                    static class GaugeTemplate {
+                        @PermuteMethod(varName="n", from="2", to="3", name="level${n}")
+                        @PermuteBody(body="{ return ${n}; }")
+                        public int levelTemplate() { return 0; }
+                    }
+                }
+                """);
+
+        ClassOrInterfaceDeclaration templateClass = templateCu
+                .findFirst(ClassOrInterfaceDeclaration.class,
+                        c -> "GaugeTemplate".equals(c.getNameAsString()))
+                .orElseThrow();
+
+        var ann = templateClass.getAnnotationByName("Permute").orElseThrow();
+        PermuteConfig config = AnnotationReader.readPermute(ann);
+        List<Map<String, Object>> combinations = PermuteConfig.buildAllCombinations(config);
+
+        CompilationUnit result = InlineGenerator.generate(parentCu, templateClass, config, combinations);
+        String src = result.toString();
+
+        assertThat(src).contains("int level2()");
+        assertThat(src).contains("return 2");
+        assertThat(src).contains("int level3()");
+        assertThat(src).contains("return 3");
+        assertThat(src).doesNotContain("return 0");
+    }
 }
