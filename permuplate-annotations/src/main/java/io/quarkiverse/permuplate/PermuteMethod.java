@@ -65,4 +65,21 @@ public @interface PermuteMethod {
      * sentinel method's name — the standard pattern for {@code join()} overloads.
      */
     String name() default "";
+
+    /**
+     * String values to iterate over instead of an integer range.
+     * Mutually exclusive with {@link #from()} and {@link #to()}.
+     * When non-empty, each value is bound as a String to {@link #varName()},
+     * and one method overload is generated per value.
+     *
+     * <p>
+     * Example:
+     *
+     * <pre>{@code
+     * &#64;PermuteMethod(varName="T", values={"Sync","Async"}, name="${capitalize(T)}Execute")
+     * public Object executeTemplate() { ... }
+     * // Generates: SyncExecute() and AsyncExecute()
+     * }</pre>
+     */
+    String[] values() default {};
 }

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.github.javaparser.StaticJavaParser;
@@ -446,118 +447,163 @@ public class InlineGenerator {
             if (pmCfg == null)
                 return;
 
-            // Evaluate from
-            int fromVal;
-            try {
-                fromVal = ctx.evaluateInt(pmCfg.from().isEmpty() ? "1" : pmCfg.from());
-            } catch (Exception ignored) {
-                fromVal = 1;
-            }
-
-            // Evaluate to: infer as @Permute.to - currentI when not explicit
-            int toVal;
-            if (!pmCfg.hasExplicitTo()) {
-                int currentI = ((Number) vars.get(config.varName)).intValue();
-                int outerTo = ctx.evaluateInt(config.to);
-                toVal = outerTo - currentI;
-            } else {
-                try {
-                    toVal = ctx.evaluateInt(pmCfg.to());
-                } catch (Exception ignored) {
-                    return;
-                }
-            }
-
             toRemove.add(method);
 
             // Collect declared class type parameter names for undeclared-var detection
             Set<String> declaredTypeParams = new java.util.LinkedHashSet<>();
             classDecl.getTypeParameters().forEach(tp -> declaredTypeParams.add(tp.getNameAsString()));
 
-            for (int j = fromVal; j <= toVal; j++) {
-                EvaluationContext innerCtx = ctx.withVariable(pmCfg.varName(), j);
-                MethodDeclaration clone = method.clone();
-
-                // Strip @PermuteMethod from clone
-                clone.getAnnotations()
-                        .removeIf(a -> a.getNameAsString().equals(PM_SIMPLE) || a.getNameAsString().equals(PM_FQ));
-
-                // Expand method-level @PermuteTypeParam with the (i,k) inner context
-                io.quarkiverse.permuplate.core.PermuteTypeParamTransformer
-                        .transformMethod(clone, innerCtx, null, null);
-
-                // Handle explicit @PermuteReturn first; fall through to implicit expansion otherwise.
-                // Use a temporary wrapper class so applyPermuteReturn can operate on it.
-                ClassOrInterfaceDeclaration tmpClass = new ClassOrInterfaceDeclaration();
-                tmpClass.setName("_Tmp");
-                classDecl.getTypeParameters().forEach(tp -> tmpClass.addTypeParameter(tp.clone()));
-                tmpClass.addMember(clone);
-
-                Set<String> explicitMethods = collectExplicitReturnMethodNames(tmpClass);
-                applyPermuteReturn(tmpClass, innerCtx, allGeneratedNames);
-
-                // If boundary omission removed the method, skip this j value
-                if (tmpClass.getMethods().isEmpty()) {
-                    continue;
+            if (pmCfg.hasValues()) {
+                // String-set axis: one clone per string value.
+                // fromVal/toVal are not evaluated here — the outer @Permute may be in
+                // string-set mode, making vars.get(config.varName) a String, not a Number.
+                for (String value : pmCfg.values()) {
+                    EvaluationContext innerCtx = ctx.withVariable(pmCfg.varName(), value);
+                    applyPermuteMethodClone(method, clone -> toAdd.add(clone),
+                            innerCtx, classDecl, declaredTypeParams, pmCfg, allGeneratedNames,
+                            /* j for implicit expansion */ -1);
+                }
+            } else {
+                // Integer range axis: evaluate from/to then iterate.
+                // Safe to cast vars.get(config.varName) to Number here — outer @Permute
+                // is in integer range mode (otherwise pmCfg.hasValues() would be true
+                // and we'd have taken the branch above).
+                int fromVal;
+                try {
+                    fromVal = ctx.evaluateInt(pmCfg.from().isEmpty() ? "1" : pmCfg.from());
+                } catch (Exception ignored) {
+                    fromVal = 1;
                 }
 
-                // Retrieve the (possibly @PermuteReturn-updated) clone
-                clone = tmpClass.getMethods().get(0);
-
-                // Implicit j-based expansion: expand undeclared T+number vars and embedded
-                // class-name numbers by (j-1), so that j=1 is a no-op and j>1 expands the tip.
-                // This fires only on types NOT already handled by @PermuteReturn.
-                String methodKey = clone.getNameAsString() + clone.getParameters().toString();
-                if (!explicitMethods.contains(methodKey)) {
-                    expandMethodTypesForJ(clone, declaredTypeParams, j);
-                }
-
-                // Process @PermuteDeclr on parameters with innerCtx
-                io.quarkiverse.permuplate.core.PermuteDeclrTransformer
-                        .processMethodParamDeclr(clone, innerCtx);
-
-                // Process @PermuteParam with innerCtx
-                ClassOrInterfaceDeclaration tmpParam = new ClassOrInterfaceDeclaration();
-                tmpParam.setName("_TmpParam");
-                tmpParam.addMember(clone);
-                PermuteParamTransformer.transform(tmpParam, innerCtx, null);
-                if (!tmpParam.getMethods().isEmpty()) {
-                    clone = tmpParam.getMethods().get(0);
-                }
-
-                // Process @PermuteDeclr TYPE_USE in the method body with innerCtx.
-                // Must run AFTER @PermuteParam so we operate on the final clone node
-                // (PermuteParamTransformer may replace the method node in tmpParam).
-                // Handles `new @PermuteDeclr(type="Join${j-1}First") Join1First<>(...)`
-                // where j is only defined in the inner (i,j) context.
-                io.quarkiverse.permuplate.core.PermuteDeclrTransformer
-                        .transformNewExpressions(clone, innerCtx);
-
-                // Apply @PermuteBody with innerCtx so body templates can reference
-                // the @PermuteMethod inner variable (e.g. ${n}).
-                // Uses the same temp-class wrapper pattern as PermuteParamTransformer.
-                {
-                    ClassOrInterfaceDeclaration tmpBody = new ClassOrInterfaceDeclaration();
-                    tmpBody.addMember(clone);
-                    PermuteBodyTransformer.transform(tmpBody, innerCtx);
-                    if (!tmpBody.getMethods().isEmpty())
-                        clone = tmpBody.getMethods().get(0);
-                }
-
-                // Apply name template if set
-                if (pmCfg.hasName()) {
+                // Evaluate to: infer as @Permute.to - currentI when not explicit
+                int toVal;
+                if (!pmCfg.hasExplicitTo()) {
+                    int currentI = ((Number) vars.get(config.varName)).intValue();
+                    int outerTo = ctx.evaluateInt(config.to);
+                    toVal = outerTo - currentI;
+                } else {
                     try {
-                        clone.setName(innerCtx.evaluate(pmCfg.name()));
+                        toVal = ctx.evaluateInt(pmCfg.to());
                     } catch (Exception ignored) {
+                        return;
                     }
                 }
 
-                toAdd.add(clone);
+                for (int j = fromVal; j <= toVal; j++) {
+                    EvaluationContext innerCtx = ctx.withVariable(pmCfg.varName(), j);
+                    applyPermuteMethodClone(method, clone -> toAdd.add(clone),
+                            innerCtx, classDecl, declaredTypeParams, pmCfg, allGeneratedNames, j);
+                }
             }
         });
 
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
         toAdd.forEach(classDecl::addMember);
+    }
+
+    /**
+     * Processes a single {@code @PermuteMethod} clone for one inner-loop value.
+     *
+     * <p>
+     * Shared by both the integer-range path and the string-set path of
+     * {@link #applyPermuteMethod}. The only difference between the two paths is how
+     * {@code innerCtx} is created — integer: {@code ctx.withVariable(name, j)};
+     * string: {@code ctx.withVariable(name, value)}.
+     *
+     * <p>
+     * When {@code j} is negative (string-set path), j-based implicit type expansion is
+     * skipped — there is no numeric inner variable to drive it.
+     *
+     * @param method the sentinel method to clone
+     * @param addClone consumer that appends the finished clone to the output list
+     * @param innerCtx evaluation context with the inner variable bound
+     * @param classDecl the class being generated (source of type parameters)
+     * @param declaredTypeParams type parameter names declared on the class
+     * @param pmCfg the parsed {@code @PermuteMethod} config
+     * @param allGeneratedNames names of all classes to be generated in this run
+     * @param j inner integer value (for implicit expansion); {@code -1} for string-set
+     */
+    private static void applyPermuteMethodClone(MethodDeclaration method,
+            Consumer<MethodDeclaration> addClone,
+            EvaluationContext innerCtx,
+            ClassOrInterfaceDeclaration classDecl,
+            Set<String> declaredTypeParams,
+            AnnotationReader.PermuteMethodConfig pmCfg,
+            Set<String> allGeneratedNames,
+            int j) {
+
+        MethodDeclaration clone = method.clone();
+
+        // Strip @PermuteMethod from clone
+        clone.getAnnotations()
+                .removeIf(a -> a.getNameAsString().equals(PM_SIMPLE) || a.getNameAsString().equals(PM_FQ));
+
+        // Expand method-level @PermuteTypeParam with the inner context
+        io.quarkiverse.permuplate.core.PermuteTypeParamTransformer
+                .transformMethod(clone, innerCtx, null, null);
+
+        // Handle explicit @PermuteReturn first; fall through to implicit expansion otherwise.
+        // Use a temporary wrapper class so applyPermuteReturn can operate on it.
+        ClassOrInterfaceDeclaration tmpClass = new ClassOrInterfaceDeclaration();
+        tmpClass.setName("_Tmp");
+        classDecl.getTypeParameters().forEach(tp -> tmpClass.addTypeParameter(tp.clone()));
+        tmpClass.addMember(clone);
+
+        Set<String> explicitMethods = collectExplicitReturnMethodNames(tmpClass);
+        applyPermuteReturn(tmpClass, innerCtx, allGeneratedNames);
+
+        // If boundary omission removed the method, skip this value
+        if (tmpClass.getMethods().isEmpty()) {
+            return;
+        }
+
+        // Retrieve the (possibly @PermuteReturn-updated) clone
+        clone = tmpClass.getMethods().get(0);
+
+        // Implicit j-based expansion: only when j >= 1 (integer path).
+        // String-set path passes j=-1 to skip this entirely.
+        String methodKey = clone.getNameAsString() + clone.getParameters().toString();
+        if (j >= 1 && !explicitMethods.contains(methodKey)) {
+            expandMethodTypesForJ(clone, declaredTypeParams, j);
+        }
+
+        // Process @PermuteDeclr on parameters with innerCtx
+        io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                .processMethodParamDeclr(clone, innerCtx);
+
+        // Process @PermuteParam with innerCtx
+        ClassOrInterfaceDeclaration tmpParam = new ClassOrInterfaceDeclaration();
+        tmpParam.setName("_TmpParam");
+        tmpParam.addMember(clone);
+        PermuteParamTransformer.transform(tmpParam, innerCtx, null);
+        if (!tmpParam.getMethods().isEmpty()) {
+            clone = tmpParam.getMethods().get(0);
+        }
+
+        // Process @PermuteDeclr TYPE_USE in the method body with innerCtx.
+        // Must run AFTER @PermuteParam so we operate on the final clone node.
+        io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                .transformNewExpressions(clone, innerCtx);
+
+        // Apply @PermuteBody with innerCtx so body templates can reference
+        // the @PermuteMethod inner variable (e.g. ${n} or ${T}).
+        {
+            ClassOrInterfaceDeclaration tmpBody = new ClassOrInterfaceDeclaration();
+            tmpBody.addMember(clone);
+            PermuteBodyTransformer.transform(tmpBody, innerCtx);
+            if (!tmpBody.getMethods().isEmpty())
+                clone = tmpBody.getMethods().get(0);
+        }
+
+        // Apply name template if set
+        if (pmCfg.hasName()) {
+            try {
+                clone.setName(innerCtx.evaluate(pmCfg.name()));
+            } catch (Exception ignored) {
+            }
+        }
+
+        addClone.accept(clone);
     }
 
     /**

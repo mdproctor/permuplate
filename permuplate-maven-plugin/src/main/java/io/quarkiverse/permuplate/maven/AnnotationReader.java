@@ -259,13 +259,17 @@ public class AnnotationReader {
     }
 
     /** Parsed @PermuteMethod configuration. */
-    public record PermuteMethodConfig(String varName, String from, String to, String name) {
+    public record PermuteMethodConfig(String varName, String from, String to, String name, String[] values) {
         public boolean hasExplicitTo() {
             return to != null && !to.isEmpty();
         }
 
         public boolean hasName() {
             return name != null && !name.isEmpty();
+        }
+
+        public boolean hasValues() {
+            return values != null && values.length > 0;
         }
     }
 
@@ -278,16 +282,21 @@ public class AnnotationReader {
             return null;
         NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
         String varName = null, from = "1", to = "", name = "";
+        String[] values = new String[0];
         for (MemberValuePair pair : normal.getPairs()) {
-            String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
-            switch (pair.getNameAsString()) {
-                case "varName" -> varName = val;
-                case "from" -> from = val;
-                case "to" -> to = val;
-                case "name" -> name = val;
+            if (pair.getNameAsString().equals("values")) {
+                values = readStringArray(normal, "values");
+            } else {
+                String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+                switch (pair.getNameAsString()) {
+                    case "varName" -> varName = val;
+                    case "from" -> from = val;
+                    case "to" -> to = val;
+                    case "name" -> name = val;
+                }
             }
         }
-        return varName == null ? null : new PermuteMethodConfig(varName, from, to, name);
+        return varName == null ? null : new PermuteMethodConfig(varName, from, to, name, values);
     }
 
     /** Parsed {@code @PermuteExtends} configuration. */

@@ -866,8 +866,20 @@ Generates **multiple method overloads** per class using an inner loop variable. 
 | `from` | Inner lower bound (default `"1"`) |
 | `to` | Inner upper bound. When omitted, **inferred as `@Permute.to - i`**. |
 | `name` | Optional method name template. When set (e.g. `"path${k}"`), each overload gets a distinct name. When omitted, all overloads share the sentinel method's name. |
+| `values` | String values to iterate over instead of an integer range. **Mutually exclusive with `from`/`to`.** |
 
 > **The leaf class:** when `from > to` (e.g. when `i = max`), **no overloads are generated** — the method disappears from that class entirely. This is the multi-join equivalent of G2's boundary omission.
+
+**String-set overloads:** Use `values` instead of `from`/`to` to generate one overload per named string:
+
+```java
+@PermuteMethod(varName="T", values={"sync","async"}, name="${T}Execute")
+@PermuteBody(body="{ return \"${T}-${i}\"; }")
+public String executeTemplate() { return ""; }
+// Generates: syncExecute() and asyncExecute()
+```
+
+String variables bind as `String` in JEXL — `capitalize(T)`, `decapitalize(T)`, and `${T}` all work. `values` and `from`/`to` are mutually exclusive.
 
 **Join chain with multiple overloads — inline mode (zero annotations):**
 ```java

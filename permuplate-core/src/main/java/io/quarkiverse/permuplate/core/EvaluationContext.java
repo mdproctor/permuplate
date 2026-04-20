@@ -225,6 +225,16 @@ public class EvaluationContext {
     }
 
     /**
+     * Creates a child context with an additional string variable binding.
+     * Used by {@code @PermuteMethod(values=...)} to bind a string value per overload.
+     */
+    public EvaluationContext withVariable(String name, String value) {
+        Map<String, Object> child = new HashMap<>(variables);
+        child.put(name, value);
+        return new EvaluationContext(child);
+    }
+
+    /**
      * Builds a JEXL MapContext from the current variables plus the built-in functions
      * ({@code alpha}, {@code lower}, {@code typeArgList}) pre-loaded as JEXL lambdas,
      * and the {@code __throwHelper} used by those lambdas to raise

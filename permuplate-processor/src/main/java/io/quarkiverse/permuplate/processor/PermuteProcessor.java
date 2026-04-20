@@ -1108,30 +1108,18 @@ public class PermuteProcessor extends AbstractProcessor {
             if (varName == null || varName.isEmpty())
                 return;
 
-            // Evaluate from
-            int fromVal;
-            try {
-                fromVal = ctx.evaluateInt(fromStr == null || fromStr.isEmpty() ? "1" : fromStr);
-            } catch (Exception ignored) {
-                fromVal = 1;
-            }
-
-            // Evaluate to: infer as @Permute.to - currentI when not explicit
-            int toVal;
-            if (toStr == null || toStr.isEmpty()) {
-                // Infer: @Permute.to - current value of primary variable
-                try {
-                    int currentI = ctx.evaluateInt(permute.varName());
-                    int outerTo = ctx.evaluateInt(permute.to());
-                    toVal = outerTo - currentI;
-                } catch (Exception ignored) {
-                    toVal = fromVal - 1;
-                }
-            } else {
-                try {
-                    toVal = ctx.evaluateInt(toStr);
-                } catch (Exception ignored) {
-                    return;
+            // Read values array from the annotation (string-set axis)
+            java.util.List<String> valuesList = new java.util.ArrayList<>();
+            for (com.github.javaparser.ast.expr.MemberValuePair pair : pmAnn.getPairs()) {
+                if (pair.getNameAsString().equals("values")) {
+                    com.github.javaparser.ast.expr.Expression val = pair.getValue();
+                    if (val instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr) {
+                        for (com.github.javaparser.ast.expr.Expression elem : arr.getValues()) {
+                            valuesList.add(elem.asStringLiteralExpr().asString());
+                        }
+                    } else if (val instanceof com.github.javaparser.ast.expr.StringLiteralExpr sle) {
+                        valuesList.add(sle.asString());
+                    }
                 }
             }
 
@@ -1150,59 +1138,119 @@ public class PermuteProcessor extends AbstractProcessor {
             java.util.Set<String> declaredTypeParams = new java.util.LinkedHashSet<>();
             classDecl.getTypeParameters().forEach(tp -> declaredTypeParams.add(tp.getNameAsString()));
 
-            for (int j = fromVal; j <= toVal; j++) {
-                EvaluationContext innerCtx = ctx.withVariable(varName, j);
-                MethodDeclaration clone = method.clone();
-
-                // Strip @PermuteMethod from clone
-                clone.getAnnotations().removeIf(a -> {
-                    String n = a.getNameAsString();
-                    return n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod");
-                });
-
-                // Expand method-level @PermuteTypeParam with the (i,k) inner context
-                io.quarkiverse.permuplate.core.PermuteTypeParamTransformer
-                        .transformMethod(clone, innerCtx, processingEnv.getMessager(), element);
-
-                // Apply @PermuteReturn: evaluate return type (no boundary omission)
-                applyPermuteReturnSimple(clone, innerCtx, element);
-
-                // J-based implicit type expansion: expand T+number growing tips by (j-1).
-                // Fires only when the original method had no explicit @PermuteReturn
-                // (explicit return types are already fully resolved by applyPermuteReturnSimple).
-                // j=1 is always a no-op (offset=0).
-                if (!originalHasExplicitReturn) {
-                    expandMethodTypesForJ(clone, declaredTypeParams, j);
+            if (!valuesList.isEmpty()) {
+                // String-set path: one clone per string value.
+                for (String value : valuesList) {
+                    EvaluationContext innerCtx = ctx.withVariable(varName, value);
+                    applyPermuteMethodAptClone(method, toAdd, innerCtx, classDecl,
+                            originalHasExplicitReturn, declaredTypeParams, nameTempl,
+                            element, /* j */ -1);
+                }
+            } else {
+                // Integer range path.
+                int fromVal;
+                try {
+                    fromVal = ctx.evaluateInt(fromStr == null || fromStr.isEmpty() ? "1" : fromStr);
+                } catch (Exception ignored) {
+                    fromVal = 1;
                 }
 
-                // Apply @PermuteDeclr on parameters with innerCtx
-                io.quarkiverse.permuplate.core.PermuteDeclrTransformer
-                        .processMethodParamDeclr(clone, innerCtx);
-
-                // Apply @PermuteBody with innerCtx so body templates can reference
-                // the @PermuteMethod inner variable.
-                {
-                    com.github.javaparser.ast.body.ClassOrInterfaceDeclaration tmpBody = new com.github.javaparser.ast.body.ClassOrInterfaceDeclaration();
-                    tmpBody.addMember(clone);
-                    io.quarkiverse.permuplate.core.PermuteBodyTransformer.transform(tmpBody, innerCtx);
-                    if (!tmpBody.getMethods().isEmpty())
-                        clone = tmpBody.getMethods().get(0);
+                // Evaluate to: infer as @Permute.to - currentI when not explicit
+                int toVal;
+                if (toStr == null || toStr.isEmpty()) {
+                    // Infer: @Permute.to - current value of primary variable
+                    try {
+                        int currentI = ctx.evaluateInt(permute.varName());
+                        int outerTo = ctx.evaluateInt(permute.to());
+                        toVal = outerTo - currentI;
+                    } catch (Exception ignored) {
+                        toVal = fromVal - 1;
+                    }
+                } else {
+                    try {
+                        toVal = ctx.evaluateInt(toStr);
+                    } catch (Exception ignored) {
+                        return;
+                    }
                 }
 
-                // Apply name template if set
-                if (nameTempl != null && !nameTempl.isEmpty()) {
-                    String evaluatedName = evaluateOrError(innerCtx, nameTempl,
-                            "PermuteMethod", "name", element);
-                    if (evaluatedName != null)
-                        clone.setName(evaluatedName);
+                for (int j = fromVal; j <= toVal; j++) {
+                    EvaluationContext innerCtx = ctx.withVariable(varName, j);
+                    applyPermuteMethodAptClone(method, toAdd, innerCtx, classDecl,
+                            originalHasExplicitReturn, declaredTypeParams, nameTempl,
+                            element, j);
                 }
-
-                toAdd.add(clone);
             }
         });
 
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
         toAdd.forEach(classDecl::addMember);
+    }
+
+    /**
+     * Processes a single {@code @PermuteMethod} clone for one inner-loop value in APT mode.
+     *
+     * <p>
+     * Shared by both the integer-range path and the string-set path of
+     * {@link #applyPermuteMethodApt}. When {@code j} is negative (string-set path),
+     * j-based implicit type expansion is skipped.
+     *
+     * @param j inner integer value (for implicit expansion); {@code -1} for string-set
+     */
+    private void applyPermuteMethodAptClone(MethodDeclaration method,
+            List<MethodDeclaration> toAdd,
+            EvaluationContext innerCtx,
+            ClassOrInterfaceDeclaration classDecl,
+            boolean originalHasExplicitReturn,
+            java.util.Set<String> declaredTypeParams,
+            String nameTempl,
+            TypeElement element,
+            int j) {
+
+        MethodDeclaration clone = method.clone();
+
+        // Strip @PermuteMethod from clone
+        clone.getAnnotations().removeIf(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod");
+        });
+
+        // Expand method-level @PermuteTypeParam with the inner context
+        io.quarkiverse.permuplate.core.PermuteTypeParamTransformer
+                .transformMethod(clone, innerCtx, processingEnv.getMessager(), element);
+
+        // Apply @PermuteReturn: evaluate return type (no boundary omission)
+        applyPermuteReturnSimple(clone, innerCtx, element);
+
+        // J-based implicit type expansion: only for integer path (j >= 1).
+        // String-set path passes j=-1 to skip this.
+        if (j >= 1 && !originalHasExplicitReturn) {
+            expandMethodTypesForJ(clone, declaredTypeParams, j);
+        }
+
+        // Apply @PermuteDeclr on parameters with innerCtx
+        io.quarkiverse.permuplate.core.PermuteDeclrTransformer
+                .processMethodParamDeclr(clone, innerCtx);
+
+        // Apply @PermuteBody with innerCtx so body templates can reference
+        // the @PermuteMethod inner variable.
+        {
+            com.github.javaparser.ast.body.ClassOrInterfaceDeclaration tmpBody = new com.github.javaparser.ast.body.ClassOrInterfaceDeclaration();
+            tmpBody.addMember(clone);
+            io.quarkiverse.permuplate.core.PermuteBodyTransformer.transform(tmpBody, innerCtx);
+            if (!tmpBody.getMethods().isEmpty())
+                clone = tmpBody.getMethods().get(0);
+        }
+
+        // Apply name template if set
+        if (nameTempl != null && !nameTempl.isEmpty()) {
+            String evaluatedName = evaluateOrError(innerCtx, nameTempl,
+                    "PermuteMethod", "name", element);
+            if (evaluatedName != null)
+                clone.setName(evaluatedName);
+        }
+
+        toAdd.add(clone);
     }
 
     /**
