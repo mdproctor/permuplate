@@ -1093,6 +1093,18 @@ The primary variable (`varName`) is the outermost loop; `extraVars` are inner lo
 
 Note: the template class (`BiCallable1x1`) is named with values outside the generated range so it never collides with a generated type. The leading literal `"BiCallable"` of `className` must be a prefix of the template class name — `"BiCallable1x1".startsWith("BiCallable")` ✓.
 
+**String-set axis:** Use `values` instead of `from`/`to` to cross-product over named strings:
+
+```java
+@Permute(varName="i", from="1", to="2",
+         className="${capitalize(T)}Widget${i}Factory",
+         extraVars={@PermuteVar(varName="T", values={"sync","async"})})
+public class WidgetFactory1 { ... }
+// Generates: SyncWidget1Factory, SyncWidget2Factory, AsyncWidget1Factory, AsyncWidget2Factory
+```
+
+String variables bind as `String` in JEXL. `capitalize(T)`, `decapitalize(T)`, and string comparison (`T == "sync"`) all work. `values` and `from`/`to` are mutually exclusive — specifying both is a compile error.
+
 ---
 
 ## Built-in Expression Functions
