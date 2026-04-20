@@ -1,6 +1,6 @@
 # Permuplate Roadmap
 
-Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batch 4).
+Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batch 5).
 
 ---
 
@@ -24,6 +24,7 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 | `@PermuteSwitchArm` | Java 21+ arrow-switch pattern arms. IntelliJ rename propagation for `pattern`. |
 | `@PermuteCase` arrow-switch | Detects and generates arrow-form entries for Java 21 switch statements and expressions. |
 | `@PermuteSwitchArm` APT source-level validation | Clear error when project source level < Java 21. |
+| `@PermuteMethod` string-set axis | `values={"Sync","Async"}` generates one overload per string. Mirrors `@Permute(values=...)` semantics. |
 
 ---
 
@@ -45,8 +46,6 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 - **Gradle plugin** — inline generation mode unavailable to Gradle users (Priority 2 above, listed here for completeness)
 - **Ant / Bazel / Buck support** — long tail after Gradle
 
-### New annotation capabilities
-- **`@PermuteVar` string-set on `@PermuteMethod`** — `@PermuteMethod` supports integer ranges; string-set axes (`values={"Sync","Async"}`) are not yet supported there
 
 ### Developer experience
 - **VS Code extension** — port the IntelliJ plugin to VS Code (parked, issue #4)
