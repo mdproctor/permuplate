@@ -32,6 +32,7 @@ import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteEnumConstTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
 import io.quarkiverse.permuplate.core.PermuteStatementsTransformer;
+import io.quarkiverse.permuplate.core.PermuteSwitchArmTransformer;
 import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
 import io.quarkiverse.permuplate.core.PermuteValueTransformer;
 
@@ -196,6 +197,9 @@ public class InlineGenerator {
                 // @PermuteCase — expand switch statement cases per permutation
                 PermuteCaseTransformer.transform(generated, ctx);
 
+                // @PermuteSwitchArm — generate Java 21+ arrow-switch pattern arms
+                PermuteSwitchArmTransformer.transform(generated, ctx);
+
                 // @PermuteValue — replace field initializers and method statement RHS
                 PermuteValueTransformer.transform(generated, ctx);
 
@@ -249,6 +253,9 @@ public class InlineGenerator {
 
                 // @PermuteCase — expand switch statement cases per permutation (enums can have methods)
                 PermuteCaseTransformer.transform(generated, ctx);
+
+                // @PermuteSwitchArm — generate Java 21+ arrow-switch pattern arms
+                PermuteSwitchArmTransformer.transform(generated, ctx);
 
                 PermuteValueTransformer.transform(generated, ctx);
 
@@ -1763,6 +1770,7 @@ public class InlineGenerator {
                 "PermuteStatements", "io.quarkiverse.permuplate.PermuteStatements",
                 "PermuteBody", "io.quarkiverse.permuplate.PermuteBody",
                 "PermuteEnumConst", "io.quarkiverse.permuplate.PermuteEnumConst",
+                "PermuteSwitchArm", "io.quarkiverse.permuplate.PermuteSwitchArm",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
                 "PermuteImports", "io.quarkiverse.permuplate.PermuteImports");
 
