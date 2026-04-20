@@ -82,4 +82,27 @@ public @interface PermuteMethod {
      * }</pre>
      */
     String[] values() default {};
+
+    /**
+     * Named JEXL expression macros, evaluated with the inner method variable in scope.
+     * Format: {@code "name=jexlExpression"}. Evaluated in declaration order after the
+     * inner loop variable is bound; later macros may reference earlier ones.
+     *
+     * <p>
+     * Available as {@code ${name}} in {@code typeArgs}, {@code @PermuteReturn},
+     * and {@code @PermuteBody} on this method.
+     *
+     * <p>
+     * Example:
+     *
+     * <pre>{@code
+     * &#64;PermuteMethod(varName = "n", from = "2", to = "6", name = "path${n}", macros = { "tail=typeArgList(i,i+n-1,'alpha')",
+     *         "prev=typeArgList(i,i+n-2,'alpha')" })
+     * &#64;PermuteReturn(className = "Path${n}", typeArgs = "... + tail + ... + prev + ...")
+     * public Object pathTemplate() {
+     *     return this;
+     * }
+     * }</pre>
+     */
+    String[] macros() default {};
 }

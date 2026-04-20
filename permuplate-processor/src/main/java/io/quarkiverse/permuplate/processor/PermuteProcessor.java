@@ -1094,6 +1094,30 @@ public class PermuteProcessor extends AbstractProcessor {
      * {@code to < from} (e.g. {@code to = "${max - i}"} with {@code i = max}),
      * the inner loop produces zero iterations, so no overloads are emitted.
      */
+
+    /**
+     * Applies {@code @PermuteMethod macros=} to an evaluation context in APT mode.
+     * Each macro is evaluated in declaration order; later macros may reference earlier ones.
+     * Macro format: {@code "name=jexlExpression"}.
+     */
+    private static EvaluationContext applyMethodMacrosApt(java.util.List<String> macros,
+            EvaluationContext innerCtx) {
+        for (String macro : macros) {
+            int eq = macro.indexOf('=');
+            if (eq < 0)
+                continue;
+            String name = macro.substring(0, eq).trim();
+            String expr = macro.substring(eq + 1).trim();
+            try {
+                String value = innerCtx.evaluate("${" + expr + "}");
+                innerCtx = innerCtx.withVariable(name, value);
+            } catch (Exception ignored) {
+                // Malformed macro — skip silently; evaluation errors surface later
+            }
+        }
+        return innerCtx;
+    }
+
     private void applyPermuteMethodApt(ClassOrInterfaceDeclaration classDecl,
             EvaluationContext ctx,
             Permute permute,
@@ -1124,17 +1148,20 @@ public class PermuteProcessor extends AbstractProcessor {
             if (varName == null || varName.isEmpty())
                 return;
 
-            // Read values array from the annotation (string-set axis)
+            // Read values and macros arrays from the annotation
             java.util.List<String> valuesList = new java.util.ArrayList<>();
+            java.util.List<String> macrosList = new java.util.ArrayList<>();
             for (com.github.javaparser.ast.expr.MemberValuePair pair : pmAnn.getPairs()) {
-                if (pair.getNameAsString().equals("values")) {
+                String pairName = pair.getNameAsString();
+                if (pairName.equals("values") || pairName.equals("macros")) {
                     com.github.javaparser.ast.expr.Expression val = pair.getValue();
+                    java.util.List<String> target = pairName.equals("values") ? valuesList : macrosList;
                     if (val instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr) {
                         for (com.github.javaparser.ast.expr.Expression elem : arr.getValues()) {
-                            valuesList.add(elem.asStringLiteralExpr().asString());
+                            target.add(elem.asStringLiteralExpr().asString());
                         }
                     } else if (val instanceof com.github.javaparser.ast.expr.StringLiteralExpr sle) {
-                        valuesList.add(sle.asString());
+                        target.add(sle.asString());
                     }
                 }
             }
@@ -1158,6 +1185,7 @@ public class PermuteProcessor extends AbstractProcessor {
                 // String-set path: one clone per string value.
                 for (String value : valuesList) {
                     EvaluationContext innerCtx = ctx.withVariable(varName, value);
+                    innerCtx = applyMethodMacrosApt(macrosList, innerCtx);
                     applyPermuteMethodAptClone(method, toAdd, innerCtx, classDecl,
                             originalHasExplicitReturn, declaredTypeParams, nameTempl,
                             element, /* j */ -1);
@@ -1192,6 +1220,7 @@ public class PermuteProcessor extends AbstractProcessor {
 
                 for (int j = fromVal; j <= toVal; j++) {
                     EvaluationContext innerCtx = ctx.withVariable(varName, j);
+                    innerCtx = applyMethodMacrosApt(macrosList, innerCtx);
                     applyPermuteMethodAptClone(method, toAdd, innerCtx, classDecl,
                             originalHasExplicitReturn, declaredTypeParams, nameTempl,
                             element, j);

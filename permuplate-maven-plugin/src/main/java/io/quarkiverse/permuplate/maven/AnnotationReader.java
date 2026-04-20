@@ -266,7 +266,8 @@ public class AnnotationReader {
     }
 
     /** Parsed @PermuteMethod configuration. */
-    public record PermuteMethodConfig(String varName, String from, String to, String name, String[] values) {
+    public record PermuteMethodConfig(String varName, String from, String to, String name, String[] values,
+            String[] macros) {
         public boolean hasExplicitTo() {
             return to != null && !to.isEmpty();
         }
@@ -277,6 +278,10 @@ public class AnnotationReader {
 
         public boolean hasValues() {
             return values != null && values.length > 0;
+        }
+
+        public boolean hasMacros() {
+            return macros != null && macros.length > 0;
         }
     }
 
@@ -290,9 +295,12 @@ public class AnnotationReader {
         NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
         String varName = null, from = "1", to = "", name = "";
         String[] values = new String[0];
+        String[] macros = new String[0];
         for (MemberValuePair pair : normal.getPairs()) {
             if (pair.getNameAsString().equals("values")) {
                 values = readStringArray(normal, "values");
+            } else if (pair.getNameAsString().equals("macros")) {
+                macros = readStringArray(normal, "macros");
             } else {
                 String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
                 switch (pair.getNameAsString()) {
@@ -303,7 +311,7 @@ public class AnnotationReader {
                 }
             }
         }
-        return varName == null ? null : new PermuteMethodConfig(varName, from, to, name, values);
+        return varName == null ? null : new PermuteMethodConfig(varName, from, to, name, values, macros);
     }
 
     /** Parsed {@code @PermuteExtends} configuration. */

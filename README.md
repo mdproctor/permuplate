@@ -927,6 +927,7 @@ Generates **multiple method overloads** per class using an inner loop variable. 
 | `to` | Inner upper bound. When omitted, **inferred as `@Permute.to - i`**. |
 | `name` | Optional method name template. When set (e.g. `"path${k}"`), each overload gets a distinct name. When omitted, all overloads share the sentinel method's name. |
 | `values` | String values to iterate over instead of an integer range. **Mutually exclusive with `from`/`to`.** |
+| `macros` | Named JEXL expression macros, evaluated with the inner variable in scope. Format: `"name=jexlExpression"`. Evaluated in declaration order — later macros may reference earlier ones. Available as `${name}` in `typeArgs`, `@PermuteReturn`, and `@PermuteBody` on this method. Example: `macros={"tail=typeArgList(i,i+n-1,'alpha')"}` makes `${tail}` available in `typeArgs`. |
 
 > **The leaf class:** when `from > to` (e.g. when `i = max`), **no overloads are generated** — the method disappears from that class entirely. This is the multi-join equivalent of G2's boundary omission.
 

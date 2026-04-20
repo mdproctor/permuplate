@@ -189,10 +189,11 @@ public class JoinBuilder {
          *
          * <p>Generated method names: {@code path2()} through {@code path6()}.
          */
-        @PermuteMethod(varName = "n", from = "2", to = "6", name = "path${n}")
+        @PermuteMethod(varName = "n", from = "2", to = "6", name = "path${n}",
+                macros = { "tail=typeArgList(i,i+n-1,'alpha')", "prev=typeArgList(i,i+n-2,'alpha')" })
         @PermuteReturn(
                 className = "RuleOOPathBuilder.Path${n}",
-                typeArgs = "'Join'+(i+1)+'First<END, DS, '+typeArgList(1,i,'alpha')+', BaseTuple.Tuple'+n+'<'+typeArgList(i,i+n-1,'alpha')+'>>,' +' BaseTuple.Tuple'+(n-1)+'<'+typeArgList(i,i+n-2,'alpha')+'>, '+ typeArgList(i,i+n-1,'alpha')",
+                typeArgs = "'Join'+(i+1)+'First<END, DS, '+typeArgList(1,i,'alpha')+', BaseTuple.Tuple'+n+'<'+tail+'>>,' +' BaseTuple.Tuple'+(n-1)+'<'+prev+'>, '+ tail",
                 when = "i < 6")
         @PermuteBody(body = "{ java.util.List<OOPathStep> steps = new java.util.ArrayList<>(); Object nextJoin = new @PermuteDeclr(type = \"Join${i+1}First\") Join1First<>(end(), rd); return cast(new RuleOOPathBuilder.Path${n}<>(nextJoin, rd, steps, rd.factArity() - 1)); }")
         @SuppressWarnings("unchecked")

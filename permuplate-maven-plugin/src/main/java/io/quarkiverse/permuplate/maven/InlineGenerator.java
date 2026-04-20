@@ -479,6 +479,7 @@ public class InlineGenerator {
                 // string-set mode, making vars.get(config.varName) a String, not a Number.
                 for (String value : pmCfg.values()) {
                     EvaluationContext innerCtx = ctx.withVariable(pmCfg.varName(), value);
+                    innerCtx = applyMethodMacros(pmCfg, innerCtx);
                     applyPermuteMethodClone(method, clone -> toAdd.add(clone),
                             innerCtx, classDecl, declaredTypeParams, pmCfg, allGeneratedNames,
                             /* j for implicit expansion */ -1);
@@ -511,6 +512,7 @@ public class InlineGenerator {
 
                 for (int j = fromVal; j <= toVal; j++) {
                     EvaluationContext innerCtx = ctx.withVariable(pmCfg.varName(), j);
+                    innerCtx = applyMethodMacros(pmCfg, innerCtx);
                     applyPermuteMethodClone(method, clone -> toAdd.add(clone),
                             innerCtx, classDecl, declaredTypeParams, pmCfg, allGeneratedNames, j);
                 }
@@ -519,6 +521,31 @@ public class InlineGenerator {
 
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
         toAdd.forEach(classDecl::addMember);
+    }
+
+    /**
+     * Applies {@code @PermuteMethod macros=} to an evaluation context.
+     * Each macro is evaluated in declaration order; later macros may reference earlier ones.
+     * Macro format: {@code "name=jexlExpression"}.
+     */
+    private static EvaluationContext applyMethodMacros(AnnotationReader.PermuteMethodConfig pmCfg,
+            EvaluationContext innerCtx) {
+        if (!pmCfg.hasMacros())
+            return innerCtx;
+        for (String macro : pmCfg.macros()) {
+            int eq = macro.indexOf('=');
+            if (eq < 0)
+                continue;
+            String name = macro.substring(0, eq).trim();
+            String expr = macro.substring(eq + 1).trim();
+            try {
+                String value = innerCtx.evaluate("${" + expr + "}");
+                innerCtx = innerCtx.withVariable(name, value);
+            } catch (Exception ignored) {
+                // Malformed macro — skip silently; evaluation errors surface later
+            }
+        }
+        return innerCtx;
     }
 
     /**
