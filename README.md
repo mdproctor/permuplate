@@ -671,6 +671,21 @@ public <T> T get(int index) {
 // Tuple3 (i=3): switch with cases 0, 1, 2 — all inlined, no super() calls
 ```
 
+**Arrow-switch support:** When the template switch uses arrow form (`case N -> body`), `@PermuteCase` detects this automatically and generates arrow-style arms. Both switch statements and switch expressions (`return switch (x) { ... }`) are supported:
+
+```java
+@PermuteCase(varName="k", from="1", to="${i-1}", index="${k}", body="yield ${k};")
+public int select(int x) {
+    return switch (x) {
+        case 0 -> 0;   // seed arm — preserved
+        default -> -1;
+    };
+}
+// Generated Expr3: case 1 -> { yield 1; } case 2 -> { yield 2; }
+```
+
+Use `yield` in the body for switch expressions. Arrow bodies without a trailing `;` have one appended automatically.
+
 ---
 
 ### `@PermuteSwitchArm`
