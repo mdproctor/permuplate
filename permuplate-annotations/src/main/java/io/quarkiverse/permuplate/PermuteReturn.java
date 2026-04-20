@@ -95,4 +95,11 @@ public @interface PermuteReturn {
      * in the generated set. Set to {@code "true"} to force generation regardless.
      */
     String when() default "";
+
+    /**
+     * When {@code true}, this method is always generated regardless of whether
+     * {@code className} evaluates to a class in the generated set. Equivalent to
+     * {@code when="true"} but self-documenting. Takes precedence over {@code when}.
+     */
+    boolean alwaysEmit() default false;
 }

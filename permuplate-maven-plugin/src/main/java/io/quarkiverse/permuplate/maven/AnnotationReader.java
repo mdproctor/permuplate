@@ -209,7 +209,8 @@ public class AnnotationReader {
             String typeArgTo,
             String typeArgName,
             String typeArgs,
-            String when) {
+            String when,
+            boolean alwaysEmit) {
 
         public boolean hasTypeArgLoop() {
             return typeArgVarName != null && !typeArgVarName.isEmpty();
@@ -232,23 +233,29 @@ public class AnnotationReader {
 
         String className = null, typeArgVarName = "", typeArgFrom = "1",
                 typeArgTo = "", typeArgName = "", typeArgs = "", when = "";
+        boolean alwaysEmit = false;
 
         for (MemberValuePair pair : normal.getPairs()) {
-            String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
-            switch (pair.getNameAsString()) {
-                case "className" -> className = val;
-                case "typeArgVarName" -> typeArgVarName = val;
-                case "typeArgFrom" -> typeArgFrom = val;
-                case "typeArgTo" -> typeArgTo = val;
-                case "typeArgName" -> typeArgName = val;
-                case "typeArgs" -> typeArgs = val;
-                case "when" -> when = val;
+            String name = pair.getNameAsString();
+            if (name.equals("alwaysEmit")) {
+                alwaysEmit = pair.getValue() instanceof com.github.javaparser.ast.expr.BooleanLiteralExpr b && b.getValue();
+            } else {
+                String val = PermuteDeclrTransformer.stripQuotes(pair.getValue().toString());
+                switch (name) {
+                    case "className" -> className = val;
+                    case "typeArgVarName" -> typeArgVarName = val;
+                    case "typeArgFrom" -> typeArgFrom = val;
+                    case "typeArgTo" -> typeArgTo = val;
+                    case "typeArgName" -> typeArgName = val;
+                    case "typeArgs" -> typeArgs = val;
+                    case "when" -> when = val;
+                }
             }
         }
         if (className == null)
             return null;
         return new PermuteReturnConfig(className, typeArgVarName, typeArgFrom,
-                typeArgTo, typeArgName, typeArgs, when);
+                typeArgTo, typeArgName, typeArgs, when, alwaysEmit);
     }
 
     /** Parsed @PermuteMethod configuration. */

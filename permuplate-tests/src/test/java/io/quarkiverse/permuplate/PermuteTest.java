@@ -11,7 +11,9 @@ import java.util.stream.IntStream;
 
 import org.junit.Test;
 
+import com.google.testing.compile.Compilation;
 import com.google.testing.compile.Compiler;
+import com.google.testing.compile.JavaFileObjects;
 
 import io.quarkiverse.permuplate.example.Combo1x1;
 import io.quarkiverse.permuplate.example.InterfaceLibrary;
@@ -311,6 +313,44 @@ public class PermuteTest {
         var inst33 = newInstance(loader, pkg + ".Combo3x3");
         invokeMethod(inst33, "combine", "L1", "L2", "L3", "R1", "R2", "R3");
         assertThat(readResultsField(inst33)).containsExactly("L1", "L2", "L3", "R1", "R2", "R3").inOrder();
+    }
+
+    @Test
+    public void testAlwaysEmitPreventsOmission() {
+        // alwaysEmit=true is equivalent to when="true": method is never omitted
+        // even when className evaluates to a class outside the generated set.
+        // A hand-written Pipe4 terminal is supplied so compilation succeeds.
+        var template = JavaFileObjects.forSourceString(
+                "io.permuplate.example.PipeTemplate",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteReturn;
+                        @Permute(varName="i", from="2", to="3", className="Pipe${i}")
+                        public class PipeTemplate {
+                            @PermuteReturn(className="Pipe${i+1}", typeArgs="", alwaysEmit=true)
+                            public Object next() { return null; }
+                        }
+                        """);
+        var terminal = JavaFileObjects.forSourceString(
+                "io.permuplate.example.Pipe4",
+                """
+                        package io.permuplate.example;
+                        public class Pipe4 {}
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(template, terminal);
+        assertThat(compilation).succeeded();
+        // Pipe3.next() would normally be omitted (Pipe4 not in generated set).
+        // alwaysEmit=true must prevent that omission.
+        String src3 = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Pipe3").orElseThrow());
+        assertThat(src3).contains("next()");
+        // Also confirm Pipe2 has next() returning Pipe3
+        String src2 = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Pipe2").orElseThrow());
+        assertThat(src2).contains("next()");
     }
 
     @SuppressWarnings("unchecked")

@@ -1173,6 +1173,7 @@ public class PermuteProcessor extends AbstractProcessor {
             String typeArgName = getAnnAttr(ann, "typeArgName");
             String typeArgs = getAnnAttr(ann, "typeArgs");
             String whenExpr = getAnnAttr(ann, "when");
+            String alwaysEmitAttr = getAnnAttr(ann, "alwaysEmit");
             String typeArgFrom = getAnnAttr(ann, "typeArgFrom");
 
             if (classNameTemplate == null || classNameTemplate.isEmpty())
@@ -1227,7 +1228,9 @@ public class PermuteProcessor extends AbstractProcessor {
 
             // Boundary omission check
             boolean shouldGenerate;
-            if (whenExpr == null || whenExpr.isEmpty()) {
+            if ("true".equals(alwaysEmitAttr)) {
+                shouldGenerate = true;
+            } else if (whenExpr == null || whenExpr.isEmpty()) {
                 shouldGenerate = generatedSet.contains(evaluatedClassName);
             } else {
                 try {

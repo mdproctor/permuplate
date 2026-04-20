@@ -938,7 +938,9 @@ public class InlineGenerator {
 
             // Boundary omission
             boolean shouldGenerate;
-            if (cfg.when().isEmpty()) {
+            if (cfg.alwaysEmit()) {
+                shouldGenerate = true;
+            } else if (cfg.when().isEmpty()) {
                 shouldGenerate = allGeneratedNames.contains(evaluatedClass);
             } else {
                 try {
