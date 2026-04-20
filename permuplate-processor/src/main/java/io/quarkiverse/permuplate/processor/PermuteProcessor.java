@@ -333,6 +333,21 @@ public class PermuteProcessor extends AbstractProcessor {
             return;
 
         Optional<TypeDeclaration<?>> foundForValidation = findTemplateType(templateCu, templateSimpleName);
+
+        // Validate @PermuteSwitchArm requires Java 21+ source level.
+        // Use ordinal comparison to avoid a compile-time reference to
+        // SourceVersion.RELEASE_21 (unavailable when building with Java 17 tools).
+        if (foundForValidation.isPresent()
+                && hasPermuteSwitchArm(foundForValidation.get())
+                && processingEnv.getSourceVersion().ordinal() < 21) {
+            error("@PermuteSwitchArm generates Java 21 pattern matching syntax. "
+                    + "Set --release 21 (or later) in your maven-compiler-plugin "
+                    + "configuration (current source level: "
+                    + processingEnv.getSourceVersion() + ").",
+                    typeElement);
+            return;
+        }
+
         // Skip all @PermuteDeclr and @PermuteParam prefix validation in string-set mode.
         // R4 (no-anchor) fires spuriously for pure-variable expressions like "${T}" where
         // the variable substitutes the entire type name with no literal prefix.
@@ -832,6 +847,21 @@ public class PermuteProcessor extends AbstractProcessor {
             }
         }
         return true;
+    }
+
+    /**
+     * Returns true if any method in {@code classDecl} carries a {@code @PermuteSwitchArm}
+     * annotation (by simple name or fully-qualified name).
+     */
+    private static boolean hasPermuteSwitchArm(TypeDeclaration<?> classDecl) {
+        return classDecl.findAll(com.github.javaparser.ast.body.MethodDeclaration.class)
+                .stream()
+                .anyMatch(m -> m.getAnnotations().stream()
+                        .anyMatch(a -> {
+                            String n = a.getNameAsString();
+                            return n.equals("PermuteSwitchArm")
+                                    || n.equals("io.quarkiverse.permuplate.PermuteSwitchArm");
+                        }));
     }
 
     /**

@@ -574,6 +574,74 @@ public class DegenerateInputTest {
         assertThat(compilation).hadErrorContaining("from");
     }
 
+    // -------------------------------------------------------------------------
+    // @PermuteSwitchArm: requires Java 21+ source level
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testPermuteSwitchArmBelowJava21EmitsError() {
+        // When compiled with -source 17, @PermuteSwitchArm on a method must emit
+        // a clear error pointing at the annotated class (not a confusing javac
+        // error on the generated file).
+        //
+        // Template uses arrow switch on int — valid from Java 14, so javac accepts
+        // the source. The processor must check the source level and report the error.
+        Compilation compilation = Compiler.javac()
+                .withOptions("-source", "17")
+                .withProcessors(new PermuteProcessor())
+                .compile(JavaFileObjects.forSourceString(
+                        PKG + ".SwitchArmSource2",
+                        """
+                                package %s;
+                                import %s;
+                                import io.quarkiverse.permuplate.PermuteSwitchArm;
+                                @Permute(varName = "i", from = "3", to = "3", className = "SwitchArmSource${i}")
+                                public class SwitchArmSource2 {
+                                    @PermuteSwitchArm(varName = "k", from = "1", to = "1",
+                                                     pattern = "Integer n",
+                                                     body = "yield n;")
+                                    public int dispatch(Object x) {
+                                        return switch (x) {
+                                            default -> -1;
+                                        };
+                                    }
+                                }
+                                """.formatted(PKG, PERMUTE_FQN)));
+
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("@PermuteSwitchArm");
+        assertThat(compilation).hadErrorContaining("21");
+    }
+
+    @Test
+    public void testPermuteSwitchArmAtJava21DoesNotError() {
+        // Happy path: without -source 17 override (default is 21+ in this project),
+        // @PermuteSwitchArm compiles without the source-level error.
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(JavaFileObjects.forSourceString(
+                        PKG + ".SwitchArmOk2",
+                        """
+                                package %s;
+                                import %s;
+                                import io.quarkiverse.permuplate.PermuteSwitchArm;
+                                @Permute(varName = "i", from = "3", to = "3", className = "SwitchArmOk${i}")
+                                public class SwitchArmOk2 {
+                                    @PermuteSwitchArm(varName = "k", from = "1", to = "1",
+                                                     pattern = "Integer n",
+                                                     body = "yield n;")
+                                    public int dispatch(Object x) {
+                                        return switch (x) {
+                                            default -> -1;
+                                        };
+                                    }
+                                }
+                                """.formatted(PKG, PERMUTE_FQN)));
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation.generatedSourceFile(PKG + ".SwitchArmOk3").isPresent()).isTrue();
+    }
+
     /**
      * When all declared variables appear in {@code className}, no R1b error.
      */
