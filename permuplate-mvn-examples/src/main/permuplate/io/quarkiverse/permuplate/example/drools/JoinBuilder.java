@@ -142,12 +142,14 @@ public class JoinBuilder {
          * sentinel {@code <C>} into j new alpha-named method type params (alpha(i+1)..alpha(i+j)).
          * {@code @PermuteDeclr} sets the parameter type to the correct {@code JoinNSecond} type.
          */
-        @PermuteMethod(varName = "j", from = "1", name = "join")
+        @PermuteMethod(varName = "j", from = "1", name = "join",
+                       macros = {"joinAll=typeArgList(1,i+j,'alpha')",
+                                 "joinRight=typeArgList(i+1,i+j,'alpha')"})
         @PermuteReturn(className = "Join${i+j}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i+j, 'alpha')")
+                       typeArgs = "'END, DS, ' + joinAll")
         public <@PermuteTypeParam(varName = "k", from = "${i+1}", to = "${i+j}",
                                    name = "${alpha(k)}") C> Object joinBilinear(
-                @PermuteDeclr(type = "Join${j}Second<Void, DS, ${typeArgList(i+1, i+j, 'alpha')}>")
+                @PermuteDeclr(type = "Join${j}Second<Void, DS, ${joinRight}>")
                 Object secondChain) {
             @SuppressWarnings("unchecked")
             JoinSecond<DS> second = (JoinSecond<DS>) secondChain;
@@ -191,10 +193,13 @@ public class JoinBuilder {
          * <p>Generated method names: {@code path2()} through {@code path6()}.
          */
         @PermuteMethod(varName = "n", from = "2", to = "6", name = "path${n}",
-                macros = { "tail=typeArgList(i,i+n-1,'alpha')", "prev=typeArgList(i,i+n-2,'alpha')" })
+                macros = {"tail=typeArgList(i,i+n-1,'alpha')",
+                          "prev=typeArgList(i,i+n-2,'alpha')",
+                          "outerJoin='Join'+(i+1)+'First<END, DS, '+alphaList+', BaseTuple.Tuple'+n+'<'+tail+'>'+'>'",
+                          "prevTuple='BaseTuple.Tuple'+(n-1)+'<'+prev+'>'"})
         @PermuteReturn(
                 className = "RuleOOPathBuilder.Path${n}",
-                typeArgs = "'Join'+(i+1)+'First<END, DS, '+alphaList+', BaseTuple.Tuple'+n+'<'+tail+'>>,' +' BaseTuple.Tuple'+(n-1)+'<'+prev+'>, '+ tail",
+                typeArgs = "outerJoin + ', ' + prevTuple + ', ' + tail",
                 when = "i < 6")
         @PermuteBody(body = "{ java.util.List<OOPathStep> steps = new java.util.ArrayList<>(); Object nextJoin = new @PermuteDeclr(type = \"Join${i+1}First\") Join1First<>(end(), rd); return cast(new RuleOOPathBuilder.Path${n}<>(nextJoin, rd, steps, rd.factArity() - 1)); }")
         @SuppressWarnings("unchecked")

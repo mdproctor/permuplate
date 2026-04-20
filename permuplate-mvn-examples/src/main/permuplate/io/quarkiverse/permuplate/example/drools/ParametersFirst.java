@@ -66,13 +66,14 @@ public class ParametersFirstTemplate<DS> extends AbstractRuleEntry<DS> {
         return new RuleResult<>(rd);
     }
 
-    @PermuteMethod(varName = "j", from = "2", to = "7", name = "extendsRule")
+    @PermuteMethod(varName = "j", from = "2", to = "7", name = "extendsRule",
+                   macros = {"prevAlpha=typeArgList(1,j-1,'alpha')"})
     @PermuteReturn(className = "JoinBuilder.Join${j-1}First",
-                   typeArgs = "'Void, DS, ' + typeArgList(1, j-1, 'alpha')",
+                   typeArgs = "'Void, DS, ' + prevAlpha",
                    alwaysEmit = true)
     public <@PermuteTypeParam(varName = "k", from = "1", to = "${j-1}", name = "${alpha(k)}") A>
             Object extendsRule(
-            @PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${j}<DS, ${typeArgList(1, j-1, 'alpha')}>")
+            @PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${j}<DS, ${prevAlpha}>")
             ExtendsPoint<DS> ep) {
         RuleDefinition<DS> child = new RuleDefinition<>(ruleName());
         ep.baseRd().copyInto(child);
