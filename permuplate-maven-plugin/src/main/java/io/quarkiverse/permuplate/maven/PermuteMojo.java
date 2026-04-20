@@ -314,7 +314,7 @@ public class PermuteMojo extends AbstractMojo {
 
         // keepTemplate=true: write the template class itself (annotations stripped) as its own file.
         // This is required when the template class is referenced directly by other code
-        // (e.g. NegationScope is used by JoinBuilder alongside the generated ExistenceScope).
+        // (e.g. NotScope is used by JoinBuilder alongside the generated ExistsScope).
         if (config.keepTemplate) {
             TypeDeclaration<?> templateDecl = entry.typeDecl().clone();
             if (templateDecl instanceof ClassOrInterfaceDeclaration coid)

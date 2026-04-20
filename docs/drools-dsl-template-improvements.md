@@ -40,9 +40,9 @@ See "Vol2 question" section at the bottom.
 
 ## Done (continued)
 
-### NegationScope + ExistenceScope ✅
+### NotScope + ExistsScope ✅
 - **Before:** 57 + 53 = 110 lines hand-written
-- **After:** 55-line template, `@Permute(values={"Existence"}, className="${T}Scope", inline=false, keepTemplate=true)` on NegationScope
+- **After:** 55-line template, `@Permute(values={"Exists"}, className="${T}Scope", inline=false, keepTemplate=true)` on NotScope
 - **Savings:** ~55 lines (50%)
 - **New features required:** Maven plugin string-set support (#51), `keepTemplate=true` for `inline=false` (#51)
 
@@ -72,7 +72,7 @@ See "Vol2 question" section at the bottom.
 | RuleExtendsPoint | ~51 |
 | BaseTuple (delegation refactor) | ~90 |
 | BaseTuple (template) | ~200 |
-| NegationScope + ExistenceScope | ~55 |
+| NotScope + ExistsScope | ~55 |
 | RuleOOPathBuilder | ~54 |
 | RuleBuilder + ParametersFirst (extendsRule) | ~46 |
 | **Total** | **~496** |
