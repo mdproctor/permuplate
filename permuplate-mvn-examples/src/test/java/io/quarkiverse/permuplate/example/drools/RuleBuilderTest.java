@@ -1031,6 +1031,43 @@ public class RuleBuilderTest {
         }
     }
 
+    @Test
+    public void testVariableFilter2BoundVars() {
+        Variable<Person> vp = new Variable<>();
+        Variable<Account> va = new Variable<>();
+
+        var rule = builder.from(ctx -> ctx.persons())
+                .var(vp)
+                .join(ctx -> ctx.accounts())
+                .var(va)
+                .filter(vp, va, (ctx, p, a) -> p.name().startsWith("A") && a.balance() > 500)
+                .fn((ctx, p, a) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1); // Alice (age 30, starts with A) + ACC1 (balance 1000)
+    }
+
+    @Test
+    public void testVariableFilter3BoundVars() {
+        Variable<Person> vp = new Variable<>();
+        Variable<Account> va = new Variable<>();
+        Variable<Order> vo = new Variable<>();
+
+        var rule = builder.from(ctx -> ctx.persons())
+                .var(vp)
+                .join(ctx -> ctx.accounts())
+                .var(va)
+                .join(ctx -> ctx.orders())
+                .var(vo)
+                .filter(vp, va, vo, (ctx, p, a, o) -> p.name().startsWith("A") && a.balance() > 500 && o.amount() > 100)
+                .fn((ctx, p, a, o) -> {
+                });
+
+        rule.run(ctx);
+        assertThat(rule.executionCount()).isEqualTo(1); // Alice + ACC1 + ORD1 (amount 150)
+    }
+
     // =========================================================================
     // run() reset semantics
     // =========================================================================
