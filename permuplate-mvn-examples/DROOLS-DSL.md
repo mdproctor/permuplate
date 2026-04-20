@@ -32,7 +32,7 @@ from hand-written ones.
 |---|---|---|---|
 | 1 | Linear join chain: `from()`, `join()`, `filter()`, `fn()` | Complete | `JoinBuilder` (templates), `DataSource`, `RuleDefinition`, `RuleResult` |
 | 2 | First/Second split, END phantom type, bi-linear joins (15 overloads) | Complete | `Join0Second`, `Join0First`, `BaseRuleBuilder`, `JoinSecond` |
-| 3a | `not()`/`exists()` constraint scopes | Complete | `NegationScope`, `ExistenceScope` |
+| 3a | `not()`/`exists()` constraint scopes | Complete | `NotScope`, `ExistsScope` |
 | 3b | OOPath traversal: `path2()..path6()` | Complete | `RuleOOPathBuilder`, `BaseTuple`, `PathContext`, `OOPathStep` |
 | 4 | `Variable<T>` cross-fact binding | Complete | `Variable`, `Predicate3`, `Predicate4` |
 | 5 | `extensionPoint()`/`extendsRule()` cross-rule inheritance | Complete | `RuleExtendsPoint`, `RuleBuilder.extendsRule()`, `ParametersFirst.extendsRule()` |
@@ -189,7 +189,7 @@ See [ADR-0003](../docs/adr/0003-end-phantom-type-added-in-phase-2.md).
 
 ```java
 builder.from(ctx -> ctx.persons())
-        .not()                                // returns NegationScope<Join1Second<...>, DS>
+        .not()                                // returns NotScope<Join1Second<...>, DS>
         .join(ctx -> ctx.accounts())
         .filter(...)
         .end()                                // returns Join1Second<Void, DS, Person>
@@ -252,18 +252,18 @@ builder.from(ctx -> ctx.persons())
         .fn((ctx, p) -> { });
 ```
 
-The `(Object) (Predicate2<...>)` double-cast is required because `NegationScope.filter()`
+The `(Object) (Predicate2<...>)` double-cast is required because `NotScope.filter()`
 takes `Object` — the scope's `join()` and `filter()` are intentionally untyped inside the
 scope. This is the known type-safety limitation (see Known Limitations).
 
-### NegationScope and ExistenceScope
+### NotScope and ExistsScope
 
 Both are independent classes (not subtypes of `JoinNSecond`) — this was the key design
 choice. The inheritance approach was rejected because `Join2Second` has one `rd` field, and
 inheriting it means `join()` inside the not-scope would add to the outer `rd` instead of the
 scope's private `rd`.
 
-`NegationScope<OUTER, DS>` and `ExistenceScope<OUTER, DS>`:
+`NotScope<OUTER, DS>` and `ExistsScope<OUTER, DS>`:
 - Hold a private `notRd`/`existsRd` separate from the outer chain's `rd`
 - `join(Function<DS, DataSource<?>> source)` adds to the scope's private `rd`
 - `filter(Object predicate)` adds to the scope's private `rd`
@@ -271,7 +271,7 @@ scope's private `rd`.
 
 The `@PermuteReturn` annotation on `not()` and `exists()` uses `when="true"` to prevent
 boundary omission (these methods should exist on all arities). The return type string
-constructs `NegationScope<Join${i}Second<END, DS, ...>, DS>`.
+constructs `NotScope<Join${i}Second<END, DS, ...>, DS>`.
 
 ### Sandbox Simplification: Global Scope Evaluation
 
@@ -640,7 +640,7 @@ not as a source. As a result, `rd.sourceCount()` does not include the params slo
 
 | Limitation | Root cause | Workaround / Note |
 |---|---|---|
-| `NegationScope.filter()` requires double-cast | `filter(Object predicate)` — intentionally untyped inside the scope (see ADR-0004) | Cast: `filter((Object) (Predicate2<Ctx, T>) (ctx, t) -> ...)` |
+| `NotScope.filter()` requires double-cast | `filter(Object predicate)` — intentionally untyped inside the scope (see ADR-0004) | Cast: `filter((Object) (Predicate2<Ctx, T>) (ctx, t) -> ...)` |
 | not()/exists() evaluate globally, not per outer-tuple | Sandbox simplification — full Drools uses beta memory for per-tuple scoping | Sufficient for API design validation; migration requires beta memory integration |
 | OOPath + extends combination not tested | No test exercises a rule with both `path2()` and `extendsRule()` | Structurally supported — `copyInto()` deliberately skips the OOPath pipeline |
 | Maximum arity is 6 | Practical limit for the sandbox | Change `to=6` to `to=10` on all templates; tests scale automatically |
@@ -720,7 +720,7 @@ GitHub epics: main `apache/incubator-kie-drools#6639` → DSL sub-epic #6638 (ch
 | [ADR-0001](../docs/adr/0001-standalone-method-level-permutetypeparam-with-propagation.md) | Standalone method-level `@PermuteTypeParam` with rename propagation |
 | [ADR-0002](../docs/adr/0002-oopath-runtime-as-pipeline-on-ruledefinition.md) | OOPath runtime as pipeline on `RuleDefinition` |
 | [ADR-0003](../docs/adr/0003-end-phantom-type-added-in-phase-2.md) | END phantom type added alongside First/Second split in Phase 2 |
-| [ADR-0004](../docs/adr/0004-negationscope-as-separate-class.md) | `NegationScope` as separate builder class, not `JoinNSecond` subtype |
+| [ADR-0004](../docs/adr/0004-negationscope-as-separate-class.md) | `NotScope`/`ExistsScope` as separate builder classes, not `JoinNSecond` subtypes |
 | [ADR-0005](../docs/adr/0005-sandbox-scope-boundary.md) | Sandbox scope boundary: DSL API design only; Rete engine out of scope |
 
 **Blog series:** `site/_posts/` — entries from 2026-04-04 through 2026-04-18 cover the Permuplate implementation journey including typed joins, First/Second split, not()/exists(), OOPath traversal, and the sandbox template consolidation.

@@ -1,5 +1,9 @@
 # 0004 — NegationScope as separate builder class, not JoinNSecond subtype
 
+> **Note (2026-04-21):** `NegationScope` was subsequently renamed to `NotScope` and
+> `ExistenceScope` to `ExistsScope` in issue #92 (batch 8) to align class names with
+> their method names (`not()` / `exists()`). The decision recorded here is otherwise unchanged.
+
 Date: 2026-04-05
 Status: Accepted
 
