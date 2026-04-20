@@ -1,6 +1,6 @@
 # Permuplate Roadmap
 
-Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batch 3).
+Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batch 4).
 
 ---
 
@@ -10,22 +10,20 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 |---|---|
 | IntelliJ plugin | Rename propagation, generated-file detection, safe delete, inspections. Phase 3, Apr 8–9. |
 | String-set iteration (`values=`) | `@Permute(values={"Foo","Bar",...})` — loops over named strings, not integers. |
-| `@PermuteFilter` | Skip specific permutations via JEXL boolean. Replaced the planned `@PermuteIf`. |
-| Record templates | `@Permute` on `record` types — `Tuple2Record.java` is the canonical example. |
-| `@PermuteAnnotation` | Adds annotations to generated classes/methods/fields with optional JEXL guard. |
-| `@PermuteThrows` | Adds throws clauses to generated methods with optional JEXL guard. |
-| `@PermuteSource` + `@PermuteDelegate` | Template composition — derive a class family from another generated family. |
-| `@PermuteBody` | Replaces an entire method or constructor body per permutation. |
-| `@PermuteEnumConst` | Expands a sentinel enum constant into a sequence of constants per permutation. |
-| Enum templates | `@Permute` on `enum` types — `PriorityEnum1.java` is the canonical example. |
-| Sealed class `permits` expansion | Maven plugin inline mode auto-expands the `permits` clause when the template name is used as a placeholder. |
-| `permuplate-test-support` module | Fluent `assertGenerated(compilation, className).hasField(...).hasCase(...)` assertion API. |
-| `alwaysEmit=true` on `@PermuteReturn` | Self-documenting alternative to `when="true"` for boundary omission opt-out. |
-| `capitalize()` / `decapitalize()` JEXL functions | First-character case manipulation for string-set permutations. |
-| `@PermuteBody` in `@PermuteMethod` context | Body templates can now reference the inner method variable (e.g. `${n}`). |
-| `@PermuteVar` string-set axis | `values={"A","B"}` on `@PermuteVar` for cross-product with string variables. Fully wired; tests and docs added. |
-| Better JEXL error messages | `@PermuteStatements` bad bounds and `@PermuteMethod` bad name templates now surface as compiler errors. |
-| `@PermuteSwitchArm` | Generates Java 21+ arrow-switch pattern arms (`case Type var -> body`). Full IntelliJ rename propagation for `pattern` attribute. |
+| `@PermuteFilter` | Skip specific permutations via JEXL boolean. Replaces `@PermuteIf` (stale roadmap item — already done). |
+| Record templates | `@Permute` on `record` types. |
+| `@PermuteAnnotation` + `@PermuteThrows` | Add annotations / throws clauses per permutation with optional JEXL guard. |
+| `@PermuteSource` + `@PermuteDelegate` | Template composition. |
+| `@PermuteBody` | Replaces an entire method or constructor body per permutation. Also works inside `@PermuteMethod` clones. |
+| `@PermuteEnumConst` + Enum templates | `@Permute` on `enum` types; `@PermuteEnumConst` expands sentinel constants. |
+| Sealed class `permits` expansion | Maven plugin auto-expands `permits` clause when template name is placeholder. |
+| `permuplate-test-support` module | Fluent `assertGenerated(compilation, className).hasField(...)` assertion API. |
+| `alwaysEmit=true` on `@PermuteReturn` | Self-documenting boundary omission opt-out. |
+| `capitalize()` / `decapitalize()` + `@PermuteVar` string-set | Case JEXL functions; `@PermuteVar(values={...})` cross-product axis fully wired. |
+| Better JEXL error messages | `@PermuteStatements` bounds and `@PermuteMethod` name failures surface as compiler errors. |
+| `@PermuteSwitchArm` | Java 21+ arrow-switch pattern arms. IntelliJ rename propagation for `pattern`. |
+| `@PermuteCase` arrow-switch | Detects and generates arrow-form entries for Java 21 switch statements and expressions. |
+| `@PermuteSwitchArm` APT source-level validation | Clear error when project source level < Java 21. |
 
 ---
 
@@ -44,16 +42,16 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 ## Feature ideas (not yet prioritised)
 
 ### Build tooling
+- **Gradle plugin** — inline generation mode unavailable to Gradle users (Priority 2 above, listed here for completeness)
 - **Ant / Bazel / Buck support** — long tail after Gradle
 
 ### New annotation capabilities
-- **`@PermuteIf` on the whole class** — suppress generation of an entire class for a specific value (range alone cannot skip a value in the middle)
-- **`@PermuteVar` string-set axis on `@PermuteMethod`** — `@PermuteMethod` currently only supports integer ranges; string-set axes are not yet supported
-- **`@PermuteSwitchArm` guard in APT mode** — guards work in inline (Maven plugin) mode; APT mode doesn't validate the generated Java 21 syntax
+- **`@PermuteVar` string-set on `@PermuteMethod`** — `@PermuteMethod` supports integer ranges; string-set axes (`values={"Sync","Async"}`) are not yet supported there
+- **`@PermuteCase` guard condition** — `@PermuteCase` has no `when` attribute; only `@PermuteSwitchArm` supports guards
 
 ### Developer experience
-- **VS Code extension** — port the IntelliJ plugin's template-aware navigation and refactoring to VS Code (tracked as issue #4)
-- **More JEXL error message coverage** — `@PermuteStatements` bounds and `@PermuteMethod` name are improved; remaining silent-catch sites (inference steps) could still be hardened
+- **VS Code extension** — port the IntelliJ plugin to VS Code (parked, issue #4)
+- **More JEXL error message coverage** — remaining silent-catch sites in inference steps could be hardened further
 
 ---
 
