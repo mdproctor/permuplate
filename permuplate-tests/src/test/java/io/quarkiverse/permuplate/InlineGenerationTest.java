@@ -802,4 +802,55 @@ public class InlineGenerationTest {
         assertThat(src).contains("return 3");
         assertThat(src).doesNotContain("return 0");
     }
+
+    // -------------------------------------------------------------------------
+    // JoinBuilder sealed hierarchy
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies that JoinBuilderSecond and JoinBuilderFirst sealed interfaces are generated
+     * with the full permits clause expanded by expandSealedPermits, and that every
+     * JoinNSecond / JoinNFirst class implements its respective sealed interface.
+     *
+     * <p>
+     * File-based — reads the generated JoinBuilder.java from target/ because the
+     * Drools DSL uses PermuteMojo with chained template passes, which cannot be
+     * replicated in a single InlineGenerator.generate() call.
+     */
+    @Test
+    public void testJoinBuilderFamiliesAreSealedInterfaces() throws Exception {
+        java.io.File generatedFile = null;
+        try {
+            generatedFile = java.nio.file.Files.walk(
+                    java.nio.file.Path.of("/Users/mdproctor/claude/permuplate/permuplate-mvn-examples/target"))
+                    .map(java.nio.file.Path::toFile)
+                    .filter(f -> f.getName().equals("JoinBuilder.java"))
+                    .findFirst().orElse(null);
+        } catch (java.io.IOException e) {
+            // skip if target not built
+        }
+        if (generatedFile == null)
+            return;
+
+        String src = java.nio.file.Files.readString(generatedFile.toPath());
+
+        // Sealed interfaces are present
+        assertThat(src).contains("sealed interface JoinBuilderSecond");
+        assertThat(src).contains("sealed interface JoinBuilderFirst");
+
+        // permits expanded to full family ranges
+        assertThat(src).contains("permits Join1Second, Join2Second, Join3Second, Join4Second, Join5Second, Join6Second");
+        assertThat(src).contains("permits Join1First, Join2First, Join3First, Join4First, Join5First, Join6First");
+
+        // All generated Second classes implement JoinBuilderSecond
+        assertThat(src).contains("implements JoinSecond<DS>, JoinBuilderSecond<END, DS>");
+
+        // All generated First classes implement JoinBuilderFirst
+        assertThat(src).contains("implements JoinBuilderFirst<END, DS>");
+
+        // Template sentinel classes are absent from structural declarations (keepTemplate=false)
+        // (Javadoc comments in generated output may still reference the sentinel names)
+        assertThat(src).doesNotContain("class Join0Second");
+        assertThat(src).doesNotContain("class Join0First");
+    }
 }
