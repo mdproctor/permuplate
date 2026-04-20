@@ -16,6 +16,7 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
+import com.google.testing.compile.Compilation;
 import com.google.testing.compile.Compiler;
 import com.google.testing.compile.JavaFileObjects;
 
@@ -592,6 +593,50 @@ public class PermuteDeclrTest {
         assertThat(src4).contains("GetterRename4<A, B, C>");
         assertThat(src4).contains("public C getC()");
         assertThat(src4).contains("public void setC(C c)");
+    }
+
+    /**
+     * Regression guard: @PermuteDeclr TYPE_USE on a qualified new expression
+     * (e.g. new @PermuteDeclr(type="Outer1.Box${i}") Outer1.Box1<>()) must correctly
+     * replace the full qualified type name in the generated output.
+     *
+     * <p>
+     * JavaParser places the annotation on the scope type (Outer1) rather than the
+     * full type (Outer1.Box1) for qualified names. The engine must find the annotation
+     * on the scope and produce the correct replacement.
+     */
+    @Test
+    public void testPermuteDeclrTypeUseOnQualifiedConstructor() {
+        // Regression guard: @PermuteDeclr TYPE_USE on a qualified new expression.
+        // Java requires the annotation be placed on the leaf type in a qualified name:
+        // `new Outer1.@PermuteDeclr(type="Outer1.Box${i}") Box1<>()` not on the scope.
+        // The engine must detect the annotation on the leaf type and replace the whole
+        // qualified name correctly.
+        var source = JavaFileObjects.forSourceString(
+                "io.permuplate.example.Outer1",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteDeclr;
+                        public class Outer1 {
+                            public static class Box1 {}
+                            public static class Box2 {}
+                            @Permute(varName="i", from="2", to="2", className="Outer${i}")
+                            public static class Outer1Template {
+                                public Object make() {
+                                    return new Outer1.@PermuteDeclr(type="Outer1.Box${i}") Box1();
+                                }
+                            }
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+        String src = sourceOf(compilation
+                .generatedSourceFile("io.permuplate.example.Outer2").orElseThrow());
+        assertThat(src).contains("new Outer1.Box2()");
+        assertThat(src).doesNotContain("new Outer1.Box1()");
     }
 
     /**
