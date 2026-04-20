@@ -24,15 +24,16 @@ import org.apache.commons.jexl3.introspection.JexlPermissions;
  * and merged into the context alongside it.
  *
  * <p>
- * Seven built-in functions are available in every annotation string attribute:
+ * Eight built-in functions are available in every annotation string attribute:
  * <ul>
  * <li>{@code alpha(n)} — integer to uppercase letter (1=A, 26=Z)</li>
  * <li>{@code lower(n)} — integer to lowercase letter (1=a, 26=z)</li>
- * <li>{@code typeArgList(from, to, style)} — comma-separated type argument list</li>
  * <li>{@code capitalize(s)} — uppercase first character of a string</li>
  * <li>{@code decapitalize(s)} — lowercase first character of a string</li>
+ * <li>{@code typeArgList(from, to, style)} — comma-separated type argument list</li>
  * <li>{@code max(a, b)} — returns the larger of two numeric values</li>
  * <li>{@code min(a, b)} — returns the smaller of two numeric values</li>
+ * <li>{@code __throwHelper} — internal; raises {@link IllegalArgumentException} from JEXL lambdas</li>
  * </ul>
  */
 public class EvaluationContext {
@@ -178,11 +179,19 @@ public class EvaluationContext {
     private static final JexlScript JEXL_DECAPITALIZE = JEXL.createScript(
             "function(s) { if (s == null || s.length() == 0) s; else s.substring(0, 1).toLowerCase() + s.substring(1); }");
 
-    /** JEXL lambda implementing {@code max(a, b)}: returns the larger of two values. */
+    /**
+     * JEXL lambda implementing {@code max(a, b)}: returns the larger of two values.
+     * Uses if/else rather than ternary — JEXL ternary triggers uberspect Integer dispatch
+     * failure when arguments are small literals (represented as Byte in JEXL's type system).
+     */
     private static final JexlScript JEXL_MAX = JEXL.createScript(
             "function(a, b) { if (a >= b) { a; } else { b; } }");
 
-    /** JEXL lambda implementing {@code min(a, b)}: returns the smaller of two values. */
+    /**
+     * JEXL lambda implementing {@code min(a, b)}: returns the smaller of two values.
+     * Uses if/else rather than ternary — JEXL ternary triggers uberspect Integer dispatch
+     * failure when arguments are small literals (represented as Byte in JEXL's type system).
+     */
     private static final JexlScript JEXL_MIN = JEXL.createScript(
             "function(a, b) { if (a <= b) { a; } else { b; } }");
 
@@ -255,8 +264,9 @@ public class EvaluationContext {
     }
 
     /**
-     * Builds a JEXL MapContext from the current variables plus the built-in functions
-     * ({@code alpha}, {@code lower}, {@code typeArgList}) pre-loaded as JEXL lambdas,
+     * Builds a JEXL MapContext from the current variables plus all eight built-in functions
+     * ({@code alpha}, {@code lower}, {@code capitalize}, {@code decapitalize},
+     * {@code typeArgList}, {@code max}, {@code min}) pre-loaded as JEXL lambdas,
      * and the {@code __throwHelper} used by those lambdas to raise
      * {@link IllegalArgumentException} for error conditions (unknown style, out-of-range n).
      * The static {@link #JEXL_FUNCTIONS} map is merged in once per call.
@@ -270,8 +280,9 @@ public class EvaluationContext {
     /**
      * Evaluates all {@code ${expr}} placeholders in the template string.
      * Each expression is evaluated with JEXL using the current variable bindings.
-     * Integer and string variables are both available, as are the built-in functions
-     * {@code alpha}, {@code lower}, and {@code typeArgList}.
+     * Integer and string variables are both available, as are all eight built-in functions
+     * ({@code alpha}, {@code lower}, {@code capitalize}, {@code decapitalize},
+     * {@code typeArgList}, {@code max}, {@code min}).
      */
     public String evaluate(String template) {
         Matcher m = INTERPOLATION.matcher(template);
