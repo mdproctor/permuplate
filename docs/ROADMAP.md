@@ -1,6 +1,6 @@
 # Permuplate Roadmap
 
-Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batch 5).
+Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batches 6–7).
 
 ---
 
@@ -25,6 +25,15 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 | `@PermuteCase` arrow-switch | Detects and generates arrow-form entries for Java 21 switch statements and expressions. |
 | `@PermuteSwitchArm` APT source-level validation | Clear error when project source level < Java 21. |
 | `@PermuteMethod` string-set axis | `values={"Sync","Async"}` generates one overload per string. Mirrors `@Permute(values=...)` semantics. |
+| `@PermuteSelf` | Method-level: return type = current generated class + type params. Zero-annotation self-return for fluent builders. |
+| Self-return inference (Maven) | Methods with `return this;` body and `Object` sentinel auto-get the generated class as return type. No annotation needed. |
+| `@PermuteDefaultReturn` | Class-level default return type for all `Object`-returning methods lacking explicit `@PermuteReturn`. |
+| `@Permute macros=` | Named JEXL expressions evaluated per permutation; available as `${name}` throughout the template. |
+| `@PermuteMethod macros=` | Named JEXL expressions evaluated with the inner method variable in scope. |
+| `@PermuteReturn replaceLastTypeArgWith=` | Return type = current class type params with last one replaced. Eliminates ternary typeArgs on type-narrowing methods. |
+| Alpha growing-tip inference | When `@PermuteReturn` has `className` but no `typeArgs` + single-value alpha `@PermuteTypeParam`, `typeArgs` is inferred automatically. |
+| Sealed JoinFirst/JoinSecond hierarchy | Generated families are `sealed`; enables Java 21 pattern dispatch over the builder arity. |
+| ADR-0006 | Documents why `extendsRule()` duplication is structurally unavoidable — constraint reference for real Drools integration. |
 
 ---
 
@@ -45,7 +54,6 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 ### Build tooling
 - **Gradle plugin** — inline generation mode unavailable to Gradle users (Priority 2 above, listed here for completeness)
 - **Ant / Bazel / Buck support** — long tail after Gradle
-
 
 ### Developer experience
 - **VS Code extension** — port the IntelliJ plugin to VS Code (parked, issue #4)
