@@ -14,6 +14,12 @@
     <name>Permuplate :: APT Examples</name>
     <description>Examples demonstrating Permuplate using the APT annotation processor. All generated classes are separate top-level files. For inline generation (nested classes inside a parent), see permuplate-mvn-examples.</description>
 
+    <properties>
+        <!-- @PermuteSwitchArm generates Java 21 pattern-matching arms; bump to 21 so
+             impsort can parse the template and javac can compile the generated output. -->
+        <maven.compiler.release>21</maven.compiler.release>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.quarkiverse.permuplate</groupId>

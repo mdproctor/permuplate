@@ -673,6 +673,35 @@ public <T> T get(int index) {
 
 ---
 
+### `@PermuteSwitchArm`
+
+Generates Java 21+ arrow-switch pattern arms (`case Type var -> body`) for the annotated method. The method must contain exactly one switch statement or switch expression. Each generated arm is inserted before the `default` arm.
+
+| Parameter | Meaning |
+|---|---|
+| `varName` | Inner loop variable name |
+| `from` | Inner loop lower bound (JEXL expression) |
+| `to` | Inner loop upper bound; empty range inserts no arms |
+| `pattern` | JEXL template for the type pattern (e.g. `"Shape${k} s"`) |
+| `body` | JEXL template for the arm body (expression or `{ block }`) |
+| `when` | Optional JEXL guard condition (e.g. `"${k} > 1"`) |
+
+```java
+@PermuteSwitchArm(varName="k", from="1", to="${i}",
+                  pattern="Shape${k} s",
+                  body="yield s.area();")
+public double area(Shape shape) {
+    return switch (shape) {
+        case Circle c -> c.radius() * c.radius() * Math.PI;  // seed arm — preserved
+        default -> throw new IllegalArgumentException();
+    };
+}
+```
+
+The `pattern` attribute may reference generated class names — the IntelliJ plugin propagates renames atomically. Use `@PermuteCase` for classic colon-switch; use `@PermuteSwitchArm` for Java 21+ arrow-switch.
+
+---
+
 ### `@PermuteEnumConst`
 
 Expands a sentinel enum constant into a sequence of constants per permutation. The sentinel is removed and replaced by constants generated from the inner loop.
