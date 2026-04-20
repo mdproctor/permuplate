@@ -1,6 +1,6 @@
 # Permuplate Roadmap
 
-Prioritised list of improvements beyond the current feature set. Updated 2026-04-20.
+Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batch 3).
 
 ---
 
@@ -23,6 +23,9 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 | `alwaysEmit=true` on `@PermuteReturn` | Self-documenting alternative to `when="true"` for boundary omission opt-out. |
 | `capitalize()` / `decapitalize()` JEXL functions | First-character case manipulation for string-set permutations. |
 | `@PermuteBody` in `@PermuteMethod` context | Body templates can now reference the inner method variable (e.g. `${n}`). |
+| `@PermuteVar` string-set axis | `values={"A","B"}` on `@PermuteVar` for cross-product with string variables. Fully wired; tests and docs added. |
+| Better JEXL error messages | `@PermuteStatements` bad bounds and `@PermuteMethod` bad name templates now surface as compiler errors. |
+| `@PermuteSwitchArm` | Generates Java 21+ arrow-switch pattern arms (`case Type var -> body`). Full IntelliJ rename propagation for `pattern` attribute. |
 
 ---
 
@@ -45,14 +48,12 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 
 ### New annotation capabilities
 - **`@PermuteIf` on the whole class** — suppress generation of an entire class for a specific value (range alone cannot skip a value in the middle)
-- **`@PermuteVar` string-set axis** — secondary loop variable with `values={"..."}` for cross-product generation with a string axis
+- **`@PermuteVar` string-set axis on `@PermuteMethod`** — `@PermuteMethod` currently only supports integer ranges; string-set axes are not yet supported
+- **`@PermuteSwitchArm` guard in APT mode** — guards work in inline (Maven plugin) mode; APT mode doesn't validate the generated Java 21 syntax
 
 ### Developer experience
-- **Better JEXL error messages** — raw JEXL exceptions surfaced as annotation processor errors are hard to parse; a smarter error layer would help
 - **VS Code extension** — port the IntelliJ plugin's template-aware navigation and refactoring to VS Code (tracked as issue #4)
-
-### Language coverage
-- **Java 21+ pattern matching in switch** — ensure `@PermuteCase` generates syntactically valid pattern match arms, not just classic `case N:` entries
+- **More JEXL error message coverage** — `@PermuteStatements` bounds and `@PermuteMethod` name are improved; remaining silent-catch sites (inference steps) could still be hardened
 
 ---
 
