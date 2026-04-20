@@ -24,11 +24,13 @@ import org.apache.commons.jexl3.introspection.JexlPermissions;
  * and merged into the context alongside it.
  *
  * <p>
- * Three built-in functions are available in every annotation string attribute:
+ * Five built-in functions are available in every annotation string attribute:
  * <ul>
  * <li>{@code alpha(n)} — integer to uppercase letter (1=A, 26=Z)</li>
  * <li>{@code lower(n)} — integer to lowercase letter (1=a, 26=z)</li>
  * <li>{@code typeArgList(from, to, style)} — comma-separated type argument list</li>
+ * <li>{@code capitalize(s)} — uppercase first character of a string</li>
+ * <li>{@code decapitalize(s)} — lowercase first character of a string</li>
  * </ul>
  */
 public class EvaluationContext {
@@ -37,7 +39,7 @@ public class EvaluationContext {
      * Built-in functions available in all Permuplate annotation string attributes.
      * Instances are pre-compiled as JEXL lambdas and injected into each JEXL context so
      * they can be called without a prefix: {@code ${alpha(j)}}, {@code ${lower(j)}},
-     * {@code ${typeArgList(1, i, "T")}}.
+     * {@code ${typeArgList(1, i, "T")}}, {@code ${capitalize(T)}}, {@code ${decapitalize(T)}}.
      *
      * <p>
      * The public static methods on this class are also callable directly from Java tests.
@@ -56,6 +58,18 @@ public class EvaluationContext {
                 throw new IllegalArgumentException(
                         "lower(n): n must be between 1 and 26, got " + n);
             return String.valueOf((char) ('a' + n - 1));
+        }
+
+        public static String capitalize(String s) {
+            if (s == null || s.isEmpty())
+                return s;
+            return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+        }
+
+        public static String decapitalize(String s) {
+            if (s == null || s.isEmpty())
+                return s;
+            return Character.toLowerCase(s.charAt(0)) + s.substring(1);
         }
 
         public static String typeArgList(int from, int to, String style) {
@@ -141,6 +155,20 @@ public class EvaluationContext {
             "function(n) { if (n < 1 || n > 26) { __throwHelper.throwOutOfRange('lower', n); } 'abcdefghijklmnopqrstuvwxyz'.substring(n - 1, n); }");
 
     /**
+     * JEXL lambda implementing {@code capitalize(s)}: uppercases the first character
+     * of a string. Returns the string unchanged if null or empty.
+     */
+    private static final JexlScript JEXL_CAPITALIZE = JEXL.createScript(
+            "function(s) { if (s == null || s.length() == 0) s; else s.substring(0, 1).toUpperCase() + s.substring(1); }");
+
+    /**
+     * JEXL lambda implementing {@code decapitalize(s)}: lowercases the first character
+     * of a string. Returns the string unchanged if null or empty.
+     */
+    private static final JexlScript JEXL_DECAPITALIZE = JEXL.createScript(
+            "function(s) { if (s == null || s.length() == 0) s; else s.substring(0, 1).toLowerCase() + s.substring(1); }");
+
+    /**
      * JEXL lambda implementing {@code typeArgList(from, to, style)}: produces a
      * comma-separated type argument list such as {@code "T2, T3, T4"}.
      *
@@ -173,7 +201,9 @@ public class EvaluationContext {
             "alpha", JEXL_ALPHA,
             "lower", JEXL_LOWER,
             "typeArgList", JEXL_TYPE_ARG_LIST,
-            "__throwHelper", JEXL_THROW_HELPER);
+            "__throwHelper", JEXL_THROW_HELPER,
+            "capitalize", JEXL_CAPITALIZE,
+            "decapitalize", JEXL_DECAPITALIZE);
 
     private final Map<String, Object> variables;
 

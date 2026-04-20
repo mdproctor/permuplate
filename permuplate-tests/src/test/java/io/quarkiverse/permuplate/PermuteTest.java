@@ -353,6 +353,35 @@ public class PermuteTest {
         assertThat(src2).contains("next()");
     }
 
+    @Test
+    public void testCapitalizeAndDecapitalizeInJexlExpressions() {
+        // capitalize() and decapitalize() must be callable in any JEXL expression.
+        // Test className (pure variable expression, no static literal — bypasses R2).
+        // Test decapitalize() via a String field initializer.
+        var source = JavaFileObjects.forSourceString(
+                "io.permuplate.example.WidgetTemplate",
+                """
+                        package io.permuplate.example;
+                        import io.quarkiverse.permuplate.Permute;
+                        import io.quarkiverse.permuplate.PermuteValue;
+                        @Permute(varName="T", values={"Widget","Gadget"}, className="${capitalize(T)}")
+                        public class WidgetTemplate {
+                            @PermuteValue("${decapitalize(T)}")
+                            String label = "placeholder";
+                        }
+                        """);
+        Compilation compilation = Compiler.javac()
+                .withProcessors(new PermuteProcessor())
+                .compile(source);
+        assertThat(compilation).succeeded();
+        assertThat(compilation.generatedSourceFile("io.permuplate.example.Widget").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.permuplate.example.Gadget").isPresent()).isTrue();
+        String widgetSrc = sourceOf(compilation.generatedSourceFile("io.permuplate.example.Widget").orElseThrow());
+        String gadgetSrc = sourceOf(compilation.generatedSourceFile("io.permuplate.example.Gadget").orElseThrow());
+        assertThat(widgetSrc).contains("\"widget\"");
+        assertThat(gadgetSrc).contains("\"gadget\"");
+    }
+
     @SuppressWarnings("unchecked")
     private static java.util.List<Object> readResultsField(Object instance) {
         try {
