@@ -292,12 +292,12 @@ public class JoinBuilder {
 
         /**
          * Single-fact filter — applies a predicate to the most recently joined fact only.
-         * Suppressed at i=1 via {@code @PermuteMethod} ternary: at arity 1 both overloads
-         * would have {@code filter(Predicate2<DS, A>)} — a compile error. The JEXL ternary
-         * {@code from="${i > 1 ? i : i+1}"} produces {@code from="2", to=1} at i=1 (empty
+         * Suppressed at i=1 via {@code @PermuteMethod} range: at arity 1 both overloads
+         * would have {@code filter(Predicate2<DS, A>)} — a compile error. The JEXL expression
+         * {@code from="${max(2, i)}"} produces {@code from="2", to=1} at i=1 (empty
          * range), silently omitting this method. At i≥2: from=to=i, one clone per arity.
          */
-        @PermuteMethod(varName = "x", from = "${i > 1 ? i : i+1}", to = "${i}", name = "filter")
+        @PermuteMethod(varName = "x", from = "${max(2, i)}", to = "${i}", name = "filter")
         @PermuteSelf
         public Object filterLatest(
                 @PermuteDeclr(type = "Predicate2<DS, ${alpha(i)}>")

@@ -24,13 +24,15 @@ import org.apache.commons.jexl3.introspection.JexlPermissions;
  * and merged into the context alongside it.
  *
  * <p>
- * Five built-in functions are available in every annotation string attribute:
+ * Seven built-in functions are available in every annotation string attribute:
  * <ul>
  * <li>{@code alpha(n)} — integer to uppercase letter (1=A, 26=Z)</li>
  * <li>{@code lower(n)} — integer to lowercase letter (1=a, 26=z)</li>
  * <li>{@code typeArgList(from, to, style)} — comma-separated type argument list</li>
  * <li>{@code capitalize(s)} — uppercase first character of a string</li>
  * <li>{@code decapitalize(s)} — lowercase first character of a string</li>
+ * <li>{@code max(a, b)} — returns the larger of two numeric values</li>
+ * <li>{@code min(a, b)} — returns the smaller of two numeric values</li>
  * </ul>
  */
 public class EvaluationContext {
@@ -70,6 +72,14 @@ public class EvaluationContext {
             if (s == null || s.isEmpty())
                 return s;
             return Character.toLowerCase(s.charAt(0)) + s.substring(1);
+        }
+
+        public static int max(int a, int b) {
+            return Math.max(a, b);
+        }
+
+        public static int min(int a, int b) {
+            return Math.min(a, b);
         }
 
         public static String typeArgList(int from, int to, String style) {
@@ -168,6 +178,14 @@ public class EvaluationContext {
     private static final JexlScript JEXL_DECAPITALIZE = JEXL.createScript(
             "function(s) { if (s == null || s.length() == 0) s; else s.substring(0, 1).toLowerCase() + s.substring(1); }");
 
+    /** JEXL lambda implementing {@code max(a, b)}: returns the larger of two values. */
+    private static final JexlScript JEXL_MAX = JEXL.createScript(
+            "function(a, b) { if (a >= b) { a; } else { b; } }");
+
+    /** JEXL lambda implementing {@code min(a, b)}: returns the smaller of two values. */
+    private static final JexlScript JEXL_MIN = JEXL.createScript(
+            "function(a, b) { if (a <= b) { a; } else { b; } }");
+
     /**
      * JEXL lambda implementing {@code typeArgList(from, to, style)}: produces a
      * comma-separated type argument list such as {@code "T2, T3, T4"}.
@@ -203,7 +221,9 @@ public class EvaluationContext {
             "typeArgList", JEXL_TYPE_ARG_LIST,
             "__throwHelper", JEXL_THROW_HELPER,
             "capitalize", JEXL_CAPITALIZE,
-            "decapitalize", JEXL_DECAPITALIZE);
+            "decapitalize", JEXL_DECAPITALIZE,
+            "max", JEXL_MAX,
+            "min", JEXL_MIN);
 
     private final Map<String, Object> variables;
 
