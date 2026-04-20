@@ -269,7 +269,7 @@ public class PermuteCaseArrowTest {
                         @Permute(varName="i", from="3", to="5", className="ArrowE2E${i}")
                         public class ArrowE2E2 {
                             @PermuteCase(varName="k", from="1", to="${i-1}",
-                                         index="${k}", body="yield ${k} * 10;")
+                                         index="${k}", body="yield ${k * 10};")
                             public int compute(int x) {
                                 return switch (x) {
                                     case 0 -> 0;
