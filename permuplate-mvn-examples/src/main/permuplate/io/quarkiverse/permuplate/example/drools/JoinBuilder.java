@@ -144,41 +144,32 @@ public class JoinBuilder {
         }
 
         /**
-         * Starts a negation scope. The outer fact combination is valid ONLY IF this
-         * scope produces zero matching tuples. Models "there is no X satisfying Y."
+         * Starts a negation scope (k=1) or existence scope (k=2).
          *
-         * <p>Inside the scope: call {@code join()} to add sources, {@code filter()} to
+         * <p>Negation: the outer fact combination is valid ONLY IF this scope produces
+         * zero matching tuples. Models "there is no X satisfying Y." Corresponds to
+         * the Rete NegativeExistsNode pattern.
+         *
+         * <p>Existence: the outer fact combination is valid ONLY IF this scope produces
+         * at least one matching tuple. Models "there exists an X satisfying Y."
+         * Corresponds to the Rete PositiveExistsNode pattern.
+         *
+         * <p>Inside either scope: call {@code join()} to add sources, {@code filter()} to
          * add constraints, then {@code end()} to close the scope and return to the outer
          * builder at its original arity. The scope facts do NOT add to the outer chain.
-         *
-         * <p>Corresponds to the Rete NegativeExistsNode pattern.
          *
          * <p>Sandbox simplification: the scope evaluates independently of the specific
          * outer fact combination (runs against ctx globally). Full Drools tracks the
          * per-tuple connection via beta memory.
          */
-        @PermuteReturn(className = "NegationScope",
+        @PermuteMethod(varName = "k", from = "1", to = "2",
+                       name = "${k == 1 ? 'not' : 'exists'}")
+        @PermuteReturn(className = "${k == 1 ? 'NegationScope' : 'ExistenceScope'}",
                        typeArgs = "'Join' + i + 'Second<END, DS, ' + typeArgList(1, i, 'alpha') + '>, DS'",
-                       when = "true")
-        public Object not() {
-            RuleDefinition<DS> notRd = new RuleDefinition<>("not-scope");
-            rd.addNegation(notRd);
-            return new NegationScope<>(this, notRd);
-        }
-
-        /**
-         * Starts an existence scope. The outer fact combination is valid ONLY IF this
-         * scope produces at least one matching tuple. Models "there exists an X satisfying Y."
-         *
-         * <p>Corresponds to the Rete PositiveExistsNode pattern.
-         */
-        @PermuteReturn(className = "ExistenceScope",
-                       typeArgs = "'Join' + i + 'Second<END, DS, ' + typeArgList(1, i, 'alpha') + '>, DS'",
-                       when = "true")
-        public Object exists() {
-            RuleDefinition<DS> existsRd = new RuleDefinition<>("exists-scope");
-            rd.addExistence(existsRd);
-            return new ExistenceScope<>(this, existsRd);
+                       alwaysEmit = true)
+        @PermuteBody(body = "{ RuleDefinition<DS> scopeRd = new RuleDefinition<>(\"${k == 1 ? 'not-scope' : 'exists-scope'}\"); rd.${k == 1 ? 'addNegation' : 'addExistence'}(scopeRd); return new ${k == 1 ? 'Negation' : 'Existence'}Scope<>(this, scopeRd); }")
+        public Object scopeTemplate() {
+            return null; // replaced by @PermuteBody
         }
 
         /**
