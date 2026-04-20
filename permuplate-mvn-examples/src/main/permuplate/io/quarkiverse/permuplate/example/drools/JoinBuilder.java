@@ -155,13 +155,13 @@ public class JoinBuilder {
         }
 
         /**
-         * Starts a negation scope (k=1) or existence scope (k=2).
+         * Starts a not scope or exists scope.
          *
-         * <p>Negation: the outer fact combination is valid ONLY IF this scope produces
+         * <p>Not: the outer fact combination is valid ONLY IF this scope produces
          * zero matching tuples. Models "there is no X satisfying Y." Corresponds to
          * the Rete NegativeExistsNode pattern.
          *
-         * <p>Existence: the outer fact combination is valid ONLY IF this scope produces
+         * <p>Exists: the outer fact combination is valid ONLY IF this scope produces
          * at least one matching tuple. Models "there exists an X satisfying Y."
          * Corresponds to the Rete PositiveExistsNode pattern.
          *
@@ -173,12 +173,11 @@ public class JoinBuilder {
          * outer fact combination (runs against ctx globally). Full Drools tracks the
          * per-tuple connection via beta memory.
          */
-        @PermuteMethod(varName = "k", from = "1", to = "2",
-                       name = "${k == 1 ? 'not' : 'exists'}")
-        @PermuteReturn(className = "${k == 1 ? 'NegationScope' : 'ExistenceScope'}",
+        @PermuteMethod(varName = "scope", values = {"not", "exists"}, name = "${scope}")
+        @PermuteReturn(className = "${capitalize(scope)}Scope",
                        typeArgs = "'Join' + i + 'Second<END, DS, ' + alphaList + '>, DS'",
                        alwaysEmit = true)
-        @PermuteBody(body = "{ RuleDefinition<DS> scopeRd = new RuleDefinition<>(\"${k == 1 ? 'not-scope' : 'exists-scope'}\"); rd.${k == 1 ? 'addNegation' : 'addExistence'}(scopeRd); return new ${k == 1 ? 'Negation' : 'Existence'}Scope<>(this, scopeRd); }")
+        @PermuteBody(body = "{ RuleDefinition<DS> scopeRd = new RuleDefinition<>(\"${scope}-scope\"); rd.add${capitalize(scope)}(scopeRd); return new ${capitalize(scope)}Scope<>(this, scopeRd); }")
         public Object scopeTemplate() {
             return null; // replaced by @PermuteBody
         }

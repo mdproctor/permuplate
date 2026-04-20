@@ -5,7 +5,7 @@ import io.quarkiverse.permuplate.PermuteDeclr;
 
 /**
  * Scope builder returned by {@code JoinNSecond.not()}.
- * Template (keepTemplate=true) generates {@link ExistenceScope} via string-set permutation.
+ * Template (keepTemplate=true) generates {@link ExistsScope} via string-set permutation.
  *
  * <p>
  * Accumulates sources and filters into a private {@link RuleDefinition} representing
@@ -16,14 +16,14 @@ import io.quarkiverse.permuplate.PermuteDeclr;
  * Inside the scope, {@code join()} and {@code filter()} are intentionally untyped —
  * the scope is a constraint, not a typed fact chain the caller accesses by name.
  */
-@Permute(varName = "T", values = {"Existence"}, className = "${T}Scope",
+@Permute(varName = "T", values = {"Exists"}, className = "${T}Scope",
          inline = false, keepTemplate = true)
-public class NegationScope<OUTER, DS> {
+public class NotScope<OUTER, DS> {
 
     private final OUTER outer;
     private final RuleDefinition<DS> scopeRd;
 
-    public NegationScope(OUTER outer, RuleDefinition<DS> scopeRd) {
+    public NotScope(OUTER outer, RuleDefinition<DS> scopeRd) {
         this.outer = outer;
         this.scopeRd = scopeRd;
     }
@@ -32,7 +32,7 @@ public class NegationScope<OUTER, DS> {
      * Adds a data source to the sub-network.
      */
     @PermuteDeclr(type = "${T}Scope<OUTER, DS>")
-    public NegationScope<OUTER, DS> join(java.util.function.Function<DS, DataSource<?>> source) {
+    public NotScope<OUTER, DS> join(java.util.function.Function<DS, DataSource<?>> source) {
         scopeRd.addSource(source);
         return this;
     }
@@ -41,7 +41,7 @@ public class NegationScope<OUTER, DS> {
      * Adds a filter predicate to the sub-network.
      */
     @PermuteDeclr(type = "${T}Scope<OUTER, DS>")
-    public NegationScope<OUTER, DS> filter(Object predicate) {
+    public NotScope<OUTER, DS> filter(Object predicate) {
         scopeRd.addFilter(predicate);
         return this;
     }

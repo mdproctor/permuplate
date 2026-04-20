@@ -121,18 +121,18 @@ public class RuleDefinition<DS> {
     /**
      * Registers a negation sub-network. During {@link #matchedTuples}, outer tuples
      * are excluded if this sub-network produces ANY matching result (zero-match required).
-     * Called by {@code JoinNSecond.not()} before returning the NegationScope.
+     * Called by {@code JoinNSecond.not()} before returning the NotScope.
      */
-    public void addNegation(RuleDefinition<DS> notScope) {
+    public void addNot(RuleDefinition<DS> notScope) {
         negations.add(notScope);
     }
 
     /**
      * Registers an existence sub-network. During {@link #matchedTuples}, outer tuples
      * are excluded if this sub-network produces ZERO matching results (at-least-one required).
-     * Called by {@code JoinNSecond.exists()} before returning the ExistenceScope.
+     * Called by {@code JoinNSecond.exists()} before returning the ExistsScope.
      */
-    public void addExistence(RuleDefinition<DS> existsScope) {
+    public void addExists(RuleDefinition<DS> existsScope) {
         existences.add(existsScope);
     }
 
