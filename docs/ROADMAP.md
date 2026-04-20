@@ -47,7 +47,6 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 
 ### New annotation capabilities
 - **`@PermuteVar` string-set on `@PermuteMethod`** — `@PermuteMethod` supports integer ranges; string-set axes (`values={"Sync","Async"}`) are not yet supported there
-- **`@PermuteCase` guard condition** — `@PermuteCase` has no `when` attribute; only `@PermuteSwitchArm` supports guards
 
 ### Developer experience
 - **VS Code extension** — port the IntelliJ plugin to VS Code (parked, issue #4)
@@ -59,3 +58,4 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 
 - **Runtime bytecode generation** — contradicts the core value proposition (compile-time, IDE-navigable, zero runtime dep)
 - **External template files (Freemarker, Mustache)** — contradicts the core value proposition (template must be valid, compilable Java)
+- **`@PermuteCase` guard condition** — integer case labels (`case 1:`, `case 2 ->`) cannot have guards in Java 21+. Guards are only valid for pattern labels (`case Integer n when guard ->`). Use `@PermuteSwitchArm` which already has `when=` for guarded pattern cases.
