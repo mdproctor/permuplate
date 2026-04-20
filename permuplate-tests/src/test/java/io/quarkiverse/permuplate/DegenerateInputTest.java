@@ -523,6 +523,57 @@ public class DegenerateInputTest {
         assertThat(compilation).hadErrorContaining("PermuteImport");
     }
 
+    // -------------------------------------------------------------------------
+    // JEXL expression evaluation failures
+    // -------------------------------------------------------------------------
+
+    /**
+     * A {@code @PermuteMethod} {@code name} expression that references an undefined variable
+     * must surface as a compiler error rather than being silently ignored.
+     */
+    @Test
+    public void testBadPermuteMethodNameExpressionIsError() {
+        var compilation = compile(Callable2.class, "BadMethodName2",
+                """
+                        package %s;
+                        import %s;
+                        import io.quarkiverse.permuplate.PermuteMethod;
+                        @Permute(varName = "i", from = "1", to = "1", className = "BadMethodName${i}")
+                        public class BadMethodName2 {
+                            @PermuteMethod(varName = "j", from = "1", to = "2",
+                                           name = "${undefinedNameVar}Method${j}")
+                            public void templateMethod() {}
+                        }
+                        """.formatted(PKG, PERMUTE_FQN));
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("PermuteMethod");
+        assertThat(compilation).hadErrorContaining("name");
+    }
+
+    /**
+     * A {@code @PermuteStatements} {@code from} expression that references an undefined variable
+     * must surface as a compiler error rather than being silently ignored.
+     */
+    @Test
+    public void testBadPermuteStatementsBoundExpressionIsError() {
+        var compilation = compile(Callable2.class, "BadStmts2",
+                """
+                        package %s;
+                        import %s;
+                        import io.quarkiverse.permuplate.PermuteStatements;
+                        @Permute(varName = "i", from = "2", to = "2", className = "BadStmts${i}")
+                        public class BadStmts2 {
+                            @PermuteStatements(varName = "k", from = "${undefinedBoundVar}",
+                                               to = "${i}", position = "first",
+                                               body = "System.out.println(${k});")
+                            public void init() {}
+                        }
+                        """.formatted(PKG, PERMUTE_FQN));
+        assertThat(compilation).failed();
+        assertThat(compilation).hadErrorContaining("PermuteStatements");
+        assertThat(compilation).hadErrorContaining("from");
+    }
+
     /**
      * When all declared variables appear in {@code className}, no R1b error.
      */

@@ -151,6 +151,7 @@ Requires Maven modules built first (`mvn install`) — the plugin depends on `pe
 | `@PermuteSource` stripped from output | @PermuteSource and @PermuteSources annotations are stripped from generated classes (same as @Permute, @PermuteFilter etc.) to prevent "cannot find symbol" compile errors on the generated output. |
 | IntelliJ rename propagation covers @PermuteAnnotation, @PermuteThrows, @PermuteSource | All three are in `AnnotationStringRenameProcessor.ALL_ANNOTATION_FQNS`. Renaming a class updates their `.value` strings atomically. `@PermuteFilter` is excluded — its `.value` is a boolean JEXL expression with no class references. |
 | IntelliJ `PsiAnnotation.getQualifiedName()` simple-name fallback | When annotation imports are unresolved (e.g. in tests), `getQualifiedName()` returns the bare simple name with no dot prefix — `endsWith(".AnnotationName")` is false. All inspections add a third guard: `|| fqn.equals("AnnotationSimpleName")`. Required whenever adding a new `LocalInspectionTool` for a Permuplate annotation. |
+| `evaluateIntOrError` / `evaluateOrError` helpers | Private methods in `PermuteProcessor` that wrap JEXL evaluation and call `error()` with the annotation name, attribute name, failing expression, and JEXL message when evaluation fails. Apply to every new catch site that processes user-facing JEXL expressions. Leave intentional silent-fallback sites (inference, optional expansion steps) unchanged. |
 
 ---
 

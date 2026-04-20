@@ -506,7 +506,27 @@ public class PermuteProcessor extends AbstractProcessor {
         // 5f. @PermuteValue — replace field initializers and method statement RHS (before insertions)
         PermuteValueTransformer.transform(classDecl, ctx);
 
-        // 5g. @PermuteStatements — insert accumulated statements into method bodies
+        // 5g. @PermuteStatements — pre-flight: validate from/to JEXL expressions before running transformer
+        classDecl.findAll(com.github.javaparser.ast.body.MethodDeclaration.class).forEach(m -> m.getAnnotations().stream()
+                .filter(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteStatements")
+                            || n.equals("io.quarkiverse.permuplate.PermuteStatements");
+                })
+                .filter(a -> a instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr)
+                .map(a -> (com.github.javaparser.ast.expr.NormalAnnotationExpr) a)
+                .forEach(ann -> {
+                    for (com.github.javaparser.ast.expr.MemberValuePair pair : ann.getPairs()) {
+                        String attrName = pair.getNameAsString();
+                        if (!attrName.equals("from") && !attrName.equals("to"))
+                            continue;
+                        String val = pair.getValue().asStringLiteralExpr().asString();
+                        if (!val.isEmpty())
+                            evaluateIntOrError(ctx, val, "PermuteStatements", attrName, typeElement);
+                    }
+                }));
+
+        // @PermuteStatements — insert accumulated statements into method bodies
         PermuteStatementsTransformer.transform(classDecl, ctx);
 
         // 5g2. @PermuteBody — replace entire method or constructor body per permutation
@@ -969,6 +989,48 @@ public class PermuteProcessor extends AbstractProcessor {
     }
 
     /**
+     * Convenience overload — element-level error only (no annotation or attribute precision).
+     */
+    private void error(String message, Element element) {
+        processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, message, element);
+    }
+
+    /**
+     * Evaluates {@code expression} as an integer. On failure, reports a compiler error
+     * at {@code element} with the annotation name, attribute name, failing expression,
+     * and JEXL error message. Returns {@code null} on failure.
+     */
+    private Integer evaluateIntOrError(EvaluationContext ctx, String expression,
+            String annotationName, String attributeName,
+            Element element) {
+        try {
+            return ctx.evaluateInt(expression);
+        } catch (Exception e) {
+            error("@" + annotationName + " '" + attributeName
+                    + "' failed to evaluate: \"" + expression + "\" — " + e.getMessage(),
+                    element);
+            return null;
+        }
+    }
+
+    /**
+     * Evaluates {@code expression} as a String. On failure, reports a compiler error
+     * and returns {@code null}.
+     */
+    private String evaluateOrError(EvaluationContext ctx, String expression,
+            String annotationName, String attributeName,
+            Element element) {
+        try {
+            return ctx.evaluate(expression);
+        } catch (Exception e) {
+            error("@" + annotationName + " '" + attributeName
+                    + "' failed to evaluate: \"" + expression + "\" — " + e.getMessage(),
+                    element);
+            return null;
+        }
+    }
+
+    /**
      * Processes {@code @PermuteMethod} annotations in APT mode.
      *
      * <p>
@@ -1096,10 +1158,10 @@ public class PermuteProcessor extends AbstractProcessor {
 
                 // Apply name template if set
                 if (nameTempl != null && !nameTempl.isEmpty()) {
-                    try {
-                        clone.setName(innerCtx.evaluate(nameTempl));
-                    } catch (Exception ignored) {
-                    }
+                    String evaluatedName = evaluateOrError(innerCtx, nameTempl,
+                            "PermuteMethod", "name", element);
+                    if (evaluatedName != null)
+                        clone.setName(evaluatedName);
                 }
 
                 toAdd.add(clone);
