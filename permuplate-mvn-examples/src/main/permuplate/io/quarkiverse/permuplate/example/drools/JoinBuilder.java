@@ -5,6 +5,7 @@ import io.quarkiverse.permuplate.PermuteBody;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteMethod;
 import io.quarkiverse.permuplate.PermuteReturn;
+import io.quarkiverse.permuplate.PermuteSelf;
 import io.quarkiverse.permuplate.PermuteTypeParam;
 
 /**
@@ -256,11 +257,8 @@ public class JoinBuilder {
 
         /**
          * All-facts filter — applies a predicate to all accumulated facts.
-         * {@code alwaysEmit=true} prevents boundary omission — JoinNFirst is always generated.
          */
-        @PermuteReturn(className = "Join${i}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       alwaysEmit = true)
+        @PermuteSelf
         public Object filter(
                 @PermuteDeclr(type = "Predicate${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
                 Object predicate) {
@@ -276,9 +274,7 @@ public class JoinBuilder {
          * range), silently omitting this method. At i≥2: from=to=i, one clone per arity.
          */
         @PermuteMethod(varName = "x", from = "${i > 1 ? i : i+1}", to = "${i}", name = "filter")
-        @PermuteReturn(className = "Join${i}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       alwaysEmit = true)
+        @PermuteSelf
         public Object filterLatest(
                 @PermuteDeclr(type = "Predicate2<DS, ${alpha(i)}>")
                 Object predicate) {
@@ -290,9 +286,7 @@ public class JoinBuilder {
          * DSL hint for Rete index optimization. No-op in the sandbox runtime —
          * present for API completeness and migration fidelity with vol2.
          */
-        @PermuteReturn(className = "Join${i}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       alwaysEmit = true)
+        @PermuteSelf
         public Object index() {
             return this;
         }
@@ -301,9 +295,7 @@ public class JoinBuilder {
          * Binds a variable to the most recently accumulated fact.
          * After this call, v.index() equals rd.factArity() - 1.
          */
-        @PermuteReturn(className = "Join${i}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       alwaysEmit = true)
+        @PermuteSelf
         public <T> Object var(Variable<T> v) {
             rd.bindVariable(v, rd.factArity() - 1);
             return this;
@@ -315,9 +307,7 @@ public class JoinBuilder {
          * enclosing class's arity type parameters A, B, etc.
          * Both variables must have been bound via var() before this call.
          */
-        @PermuteReturn(className = "Join${i}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       alwaysEmit = true)
+        @PermuteSelf
         public <V1, V2> Object filter(Variable<V1> v1, Variable<V2> v2,
                                       Predicate3<DS, V1, V2> predicate) {
             rd.addVariableFilter(v1, v2, predicate);
@@ -328,9 +318,7 @@ public class JoinBuilder {
          * Cross-fact filter using three named variable bindings.
          * All three variables must have been bound via var() before this call.
          */
-        @PermuteReturn(className = "Join${i}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       alwaysEmit = true)
+        @PermuteSelf
         public <V1, V2, V3> Object filter(Variable<V1> v1, Variable<V2> v2, Variable<V3> v3,
                                            Predicate4<DS, V1, V2, V3> predicate) {
             rd.addVariableFilter(v1, v2, v3, predicate);

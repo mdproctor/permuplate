@@ -464,6 +464,9 @@ public class PermuteProcessor extends AbstractProcessor {
         PermuteTypeParamTransformer.transform(classDecl, ctx,
                 processingEnv.getMessager(), typeElement, globalGeneratedNames);
 
+        // 1b2. @PermuteSelf — set return type to current generated class (after type param expansion)
+        io.quarkiverse.permuplate.core.PermuteSelfTransformer.transform(classDecl);
+
         // 1c. Extends clause expansion — only applies to classes/interfaces, not records.
         // Must run after @PermuteTypeParam so postG1TypeParams reflects the expanded list.
         if (classDecl instanceof ClassOrInterfaceDeclaration coid) {

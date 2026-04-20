@@ -32,6 +32,7 @@ import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
 import io.quarkiverse.permuplate.core.PermuteEnumConstTransformer;
 import io.quarkiverse.permuplate.core.PermuteParamTransformer;
+import io.quarkiverse.permuplate.core.PermuteSelfTransformer;
 import io.quarkiverse.permuplate.core.PermuteStatementsTransformer;
 import io.quarkiverse.permuplate.core.PermuteSwitchArmTransformer;
 import io.quarkiverse.permuplate.core.PermuteTypeParamTransformer;
@@ -164,6 +165,9 @@ public class InlineGenerator {
             // type param injection so that implicit expansion (triggered by @PermuteParam type=T${j}
             // matching a class type param) does not fire on source-injected params.
             PermuteTypeParamTransformer.transform(generated, ctx, null, null);
+
+            // @PermuteSelf — set return type to current generated class (after type param expansion)
+            PermuteSelfTransformer.transform(generated);
 
             // Infer type parameters from @PermuteSource if present — after @PermuteTypeParam so
             // that implicit expansion does not confuse source-injected params with sentinel params.
@@ -1818,7 +1822,8 @@ public class InlineGenerator {
                 "PermuteEnumConst", "io.quarkiverse.permuplate.PermuteEnumConst",
                 "PermuteSwitchArm", "io.quarkiverse.permuplate.PermuteSwitchArm",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
-                "PermuteImports", "io.quarkiverse.permuplate.PermuteImports");
+                "PermuteImports", "io.quarkiverse.permuplate.PermuteImports",
+                "PermuteSelf", "io.quarkiverse.permuplate.PermuteSelf");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));

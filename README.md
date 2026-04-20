@@ -856,6 +856,20 @@ public class Step1<T1> {
 
 ---
 
+### `@PermuteSelf`
+
+Shorthand for `@PermuteReturn` on fluent builder methods that return `this`. The return type is automatically set to the current generated class with all its type parameters.
+
+```java
+@PermuteSelf
+public Object index() { return this; }
+// Generated Join3First<END,DS,A,B,C>: public Join3First<END,DS,A,B,C> index() { return this; }
+```
+
+Eliminates the verbose `@PermuteReturn(className="Join${i}First", typeArgs="'END, DS, '+typeArgList(1,i,'alpha')", alwaysEmit=true)` pattern on every fluent method. Runs after `@PermuteTypeParam` expansion, so type parameters are already in their final form.
+
+---
+
 ### `@PermuteMethod`
 
 Generates **multiple method overloads** per class using an inner loop variable. For each outer permutation value `i` and inner value `j`, one overload is generated.
