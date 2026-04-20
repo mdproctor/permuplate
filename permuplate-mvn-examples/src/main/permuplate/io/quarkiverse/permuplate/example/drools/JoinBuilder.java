@@ -195,7 +195,7 @@ public class JoinBuilder {
         @SuppressWarnings({"unchecked", "varargs"})
         @PermuteReturn(className = "Join${i}First",
                        typeArgs = "'END, DS, ' + typeArgList(1, i-1, 'alpha') + (i > 1 ? ', ' : '') + 'T'",
-                       when = "true")
+                       alwaysEmit = true)
         public <T> Object type(Class<T>... cls) {
             return cast(this);
         }
@@ -212,20 +212,20 @@ public class JoinBuilder {
         @SuppressWarnings("unchecked")
         @PermuteReturn(className = "RuleExtendsPoint.RuleExtendsPoint${i+1}",
                        typeArgs = "'DS, ' + typeArgList(1, i, 'alpha')",
-                       when = "true")
+                       alwaysEmit = true)
         public Object extensionPoint() {
             return cast(new RuleExtendsPoint.@PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${i+1}") RuleExtendsPoint2<>(rd));
         }
 
         /**
-         * Terminal operation. {@code when="true"} prevents boundary omission —
+         * Terminal operation. {@code alwaysEmit=true} prevents boundary omission —
          * RuleDefinition is not in the generated set.
          *
          * <p>Placed on Join0Second so that after {@code not()...end()} or
          * {@code exists()...end()} (which return JoinNSecond), the fluent chain
          * can call {@code fn()} directly. Join0First inherits this via extends.
          */
-        @PermuteReturn(className = "RuleResult", typeArgs = "'DS'", when = "true")
+        @PermuteReturn(className = "RuleResult", typeArgs = "'DS'", alwaysEmit = true)
         public Object fn(
                 @PermuteDeclr(type = "Consumer${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
                 Object action) {
@@ -256,11 +256,11 @@ public class JoinBuilder {
 
         /**
          * All-facts filter — applies a predicate to all accumulated facts.
-         * {@code when="true"} prevents boundary omission — JoinNFirst is always generated.
+         * {@code alwaysEmit=true} prevents boundary omission — JoinNFirst is always generated.
          */
         @PermuteReturn(className = "Join${i}First",
                        typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       when = "true")
+                       alwaysEmit = true)
         public Object filter(
                 @PermuteDeclr(type = "Predicate${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
                 Object predicate) {
@@ -278,7 +278,7 @@ public class JoinBuilder {
         @PermuteMethod(varName = "x", from = "${i > 1 ? i : i+1}", to = "${i}", name = "filter")
         @PermuteReturn(className = "Join${i}First",
                        typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       when = "true")
+                       alwaysEmit = true)
         public Object filterLatest(
                 @PermuteDeclr(type = "Predicate2<DS, ${alpha(i)}>")
                 Object predicate) {
@@ -292,7 +292,7 @@ public class JoinBuilder {
          */
         @PermuteReturn(className = "Join${i}First",
                        typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       when = "true")
+                       alwaysEmit = true)
         public Object index() {
             return this;
         }
@@ -303,7 +303,7 @@ public class JoinBuilder {
          */
         @PermuteReturn(className = "Join${i}First",
                        typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       when = "true")
+                       alwaysEmit = true)
         public <T> Object var(Variable<T> v) {
             rd.bindVariable(v, rd.factArity() - 1);
             return this;
@@ -317,7 +317,7 @@ public class JoinBuilder {
          */
         @PermuteReturn(className = "Join${i}First",
                        typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       when = "true")
+                       alwaysEmit = true)
         public <V1, V2> Object filter(Variable<V1> v1, Variable<V2> v2,
                                       Predicate3<DS, V1, V2> predicate) {
             rd.addVariableFilter(v1, v2, predicate);
@@ -330,7 +330,7 @@ public class JoinBuilder {
          */
         @PermuteReturn(className = "Join${i}First",
                        typeArgs = "'END, DS, ' + typeArgList(1, i, 'alpha')",
-                       when = "true")
+                       alwaysEmit = true)
         public <V1, V2, V3> Object filter(Variable<V1> v1, Variable<V2> v2, Variable<V3> v3,
                                            Predicate4<DS, V1, V2, V3> predicate) {
             rd.addVariableFilter(v1, v2, v3, predicate);

@@ -15,16 +15,16 @@ import io.quarkiverse.permuplate.PermuteTypeParam;
  */
 @Permute(varName = "i", from = "1", to = "1", className = "ParametersFirst",
          inline = true, keepTemplate = false)
-public class ParametersFirstTemplate<DS> {
+public class ParametersFirstTemplate<DS> extends AbstractRuleEntry<DS> {
     private final String name;
-
-    @SuppressWarnings("unchecked")
-    private static <T> T cast(Object o) {
-        return (T) o;
-    }
 
     public ParametersFirstTemplate(String name) {
         this.name = name;
+    }
+
+    @Override
+    protected String ruleName() {
+        return name;
     }
 
     @SuppressWarnings({ "unchecked", "varargs" })
@@ -69,12 +69,12 @@ public class ParametersFirstTemplate<DS> {
     @PermuteMethod(varName = "j", from = "2", to = "7", name = "extendsRule")
     @PermuteReturn(className = "JoinBuilder.Join${j-1}First",
                    typeArgs = "'Void, DS, ' + typeArgList(1, j-1, 'alpha')",
-                   when = "true")
+                   alwaysEmit = true)
     public <@PermuteTypeParam(varName = "k", from = "1", to = "${j-1}", name = "${alpha(k)}") A>
             Object extendsRule(
             @PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${j}<DS, ${typeArgList(1, j-1, 'alpha')}>")
             ExtendsPoint<DS> ep) {
-        RuleDefinition<DS> child = new RuleDefinition<>(name);
+        RuleDefinition<DS> child = new RuleDefinition<>(ruleName());
         ep.baseRd().copyInto(child);
         return cast(new JoinBuilder.@PermuteDeclr(type = "JoinBuilder.Join${j-1}First") Join1First<>(null, child));
     }

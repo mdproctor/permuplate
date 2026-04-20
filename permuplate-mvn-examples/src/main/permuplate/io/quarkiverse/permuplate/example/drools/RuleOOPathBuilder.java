@@ -62,7 +62,7 @@ public class RuleOOPathBuilder {
         @SuppressWarnings("unchecked")
         @PermuteReturn(className = "RuleOOPathBuilder.Path${i-1}",
                        typeArgs = "'END, T, ' + typeArgList(2, i, 'alpha')",
-                       when = "true")
+                       alwaysEmit = true)
         public Path2<END, T, B, C> path(Function2<PathContext<T>, A, Iterable<B>> fn2,
                 Predicate2<PathContext<T>, B> flt2) {
             steps.add(new OOPathStep(
