@@ -116,9 +116,48 @@ public class ExpressionFunctionsTest {
                 .isEqualTo("");
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testTypeArgListUnknownStyle() {
-        EvaluationContext.PermuplateStringFunctions.typeArgList(1, 3, "X");
+        // Unknown style is treated as a literal prefix + index (not an error).
+        assertThat(EvaluationContext.PermuplateStringFunctions.typeArgList(1, 3, "X"))
+                .isEqualTo("X1, X2, X3");
+    }
+
+    // ---- typeArgList custom prefix ----
+
+    @Test
+    public void testTypeArgListVPrefix() {
+        assertThat(eval("${typeArgList(1, 3, 'V')}", Map.of())).isEqualTo("V1, V2, V3");
+    }
+
+    @Test
+    public void testTypeArgListLowercasevPrefix() {
+        assertThat(eval("${typeArgList(1, 2, 'v')}", Map.of())).isEqualTo("v1, v2");
+    }
+
+    @Test
+    public void testTypeArgListMultiCharPrefix() {
+        assertThat(eval("${typeArgList(2, 4, 'Param')}", Map.of())).isEqualTo("Param2, Param3, Param4");
+    }
+
+    @Test
+    public void testTypeArgListTStyleStillWorks() {
+        assertThat(eval("${typeArgList(1, 3, 'T')}", Map.of())).isEqualTo("T1, T2, T3");
+    }
+
+    @Test
+    public void testTypeArgListAlphaStillWorks() {
+        assertThat(eval("${typeArgList(1, 3, 'alpha')}", Map.of())).isEqualTo("A, B, C");
+    }
+
+    @Test
+    public void testTypeArgListLowerStillWorks() {
+        assertThat(eval("${typeArgList(1, 3, 'lower')}", Map.of())).isEqualTo("a, b, c");
+    }
+
+    @Test
+    public void testTypeArgListEmptyRangeWithCustomPrefix() {
+        assertThat(eval("${typeArgList(3, 2, 'V')}", Map.of())).isEqualTo("");
     }
 
     // -------------------------------------------------------------------------
@@ -190,33 +229,6 @@ public class ExpressionFunctionsTest {
     }
 
     // -------------------------------------------------------------------------
-    // End-to-end: typeArgList unknown style throws via JEXL path
-    // -------------------------------------------------------------------------
-
-    @Test
-    public void testTypeArgListUnknownStyleInJexlExpression() {
-        var source = JavaFileObjects.forSourceString(
-                "io.quarkiverse.permuplate.example.BadStyle3",
-                """
-                        package io.quarkiverse.permuplate.example;
-                        import io.quarkiverse.permuplate.Permute;
-                        import io.quarkiverse.permuplate.PermuteDeclr;
-                        @Permute(varName="i", from="3", to="3", className="BadStyle${i}")
-                        public class BadStyle3 {
-                            @PermuteDeclr(type="${typeArgList(1, i, 'X')}", name="field${i}")
-                            Object field3;
-                        }
-                        """);
-
-        Compilation compilation = Compiler.javac()
-                .withProcessors(new PermuteProcessor())
-                .compile(source);
-
-        assertThat(compilation).failed();
-        assertThat(compilation).hadErrorContaining("typeArgList");
-    }
-
-    // -------------------------------------------------------------------------
     // End-to-end: alpha out-of-range throws via JEXL path
     // -------------------------------------------------------------------------
 
@@ -281,6 +293,10 @@ public class ExpressionFunctionsTest {
     // -------------------------------------------------------------------------
     // max(a, b) JEXL-path tests (via EvaluationContext.evaluate)
     // -------------------------------------------------------------------------
+
+    private static String eval(String template) {
+        return eval(template, Map.of());
+    }
 
     private static String eval(String template, Map<String, Object> vars) {
         return new EvaluationContext(vars).evaluate(template);

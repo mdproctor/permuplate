@@ -101,8 +101,7 @@ public class EvaluationContext {
                         sb.append((char) ('a' + k - 1));
                         break;
                     default:
-                        throw new IllegalArgumentException(
-                                "typeArgList: unknown style \"" + style + "\" — use \"T\", \"alpha\", or \"lower\"");
+                        sb.append(style).append(k);
                 }
             }
             return sb.toString();
@@ -117,7 +116,6 @@ public class EvaluationContext {
      * autoboxing complications, and {@code safe(false)} ensures exceptions propagate
      * rather than being silently swallowed.
      * <ul>
-     * <li>{@link #throwFor(String)} — used by the {@code typeArgList} lambda for unknown styles</li>
      * <li>{@link #throwOutOfRange(String, int)} — used by the {@code alpha} and {@code lower}
      * lambdas for out-of-range n</li>
      * </ul>
@@ -200,10 +198,10 @@ public class EvaluationContext {
      * comma-separated type argument list such as {@code "T2, T3, T4"}.
      *
      * <p>
-     * The {@code else} branch calls {@code __throwHelper.throwFor(style)} — a Java
-     * helper registered in every JEXL context — because JEXL3 has no native {@code throw}
-     * statement. With {@code safe(false)}, the {@link IllegalArgumentException} thrown by
-     * that helper propagates as a {@link JexlException} rather than being silently swallowed.
+     * Known styles: {@code "alpha"} → uppercase letters (A, B, C…); {@code "lower"} → lowercase
+     * letters (a, b, c…). Any other style is treated as a literal prefix concatenated with the
+     * index (e.g. {@code "V"} → V1, V2, V3; {@code "Param"} → Param2, Param3, Param4).
+     * This covers the common {@code "T"} style as well (T1, T2, T3).
      */
     private static final JexlScript JEXL_TYPE_ARG_LIST = JEXL.createScript(
             "function(from, to, style) {" +
@@ -212,10 +210,9 @@ public class EvaluationContext {
                     "  for (var k = from; k <= to; k++) {" +
                     "    if (!first) result = result + ', ';" +
                     "    first = false;" +
-                    "    if (style == 'T') result = result + 'T' + k;" +
-                    "    else if (style == 'alpha') result = result + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.substring(k - 1, k);" +
+                    "    if (style == 'alpha') result = result + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.substring(k - 1, k);" +
                     "    else if (style == 'lower') result = result + 'abcdefghijklmnopqrstuvwxyz'.substring(k - 1, k);" +
-                    "    else __throwHelper.throwFor(style);" +
+                    "    else result = result + style + k;" +
                     "  }" +
                     "  result;" +
                     "}");
