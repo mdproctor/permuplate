@@ -193,6 +193,61 @@ public class StringSetIterationTest {
     }
 
     /**
+     * @PermuteVar(values={...}) produces a cross-product of classes.
+     *                           i ∈ [2,3], T ∈ {"Sync","Async"} → 4 generated classes.
+     */
+    @Test
+    public void testPermuteVarStringValuesProducesCrossProduct() {
+        Compilation compilation = compile("io.example.PairTemplate",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteVar;\n" +
+                        "@Permute(varName=\"i\", from=\"2\", to=\"3\",\n" +
+                        "         className=\"${T}Pair${i}\",\n" +
+                        "         extraVars={@PermuteVar(varName=\"T\", values={\"Sync\",\"Async\"})})\n" +
+                        "public class PairTemplate {}");
+
+        assertThat(compilation).succeeded();
+
+        // All four cross-product classes must be generated
+        assertThat(compilation.generatedSourceFile("io.example.SyncPair2").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.example.SyncPair3").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.example.AsyncPair2").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.example.AsyncPair3").isPresent()).isTrue();
+
+        // Verify no @Permute annotations remain in a generated class
+        String src = ProcessorTestSupport.sourceOf(
+                compilation.generatedSourceFile("io.example.SyncPair2").get());
+        assertThat(src).contains("class SyncPair2");
+        assertThat(src).doesNotContain("@Permute");
+        assertThat(src).doesNotContain("@PermuteVar");
+    }
+
+    /**
+     * String variable from @PermuteVar(values=) works with capitalize() JEXL function.
+     * Values are lowercase; capitalize() produces proper class names.
+     */
+    @Test
+    public void testPermuteVarStringValuesWithCapitalize() {
+        Compilation compilation = compile("io.example.WidgetTemplate",
+                "package io.example;\n" +
+                        "import io.quarkiverse.permuplate.Permute;\n" +
+                        "import io.quarkiverse.permuplate.PermuteVar;\n" +
+                        "@Permute(varName=\"i\", from=\"2\", to=\"2\",\n" +
+                        "         className=\"${capitalize(T)}Widget${i}\",\n" +
+                        "         extraVars={@PermuteVar(varName=\"T\", values={\"fancy\",\"plain\"})})\n" +
+                        "public class WidgetTemplate {}");
+
+        assertThat(compilation).succeeded();
+        assertThat(compilation.generatedSourceFile("io.example.FancyWidget2").isPresent()).isTrue();
+        assertThat(compilation.generatedSourceFile("io.example.PlainWidget2").isPresent()).isTrue();
+
+        String fancySrc = ProcessorTestSupport.sourceOf(
+                compilation.generatedSourceFile("io.example.FancyWidget2").get());
+        assertThat(fancySrc).contains("class FancyWidget2");
+    }
+
+    /**
      * @PermuteVar cannot have both values and from/to — compile error.
      */
     @Test

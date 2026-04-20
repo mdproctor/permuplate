@@ -290,11 +290,13 @@ public class PermuteProcessor extends AbstractProcessor {
             return;
         }
 
-        // R1b: every extraVars variable must appear somewhere in className
+        // R1b: every extraVars variable must appear somewhere in className.
+        // Accept both the bare form ${varName} and embedded forms like ${capitalize(varName)}.
+        // We check that the variable name appears inside at least one ${...} block.
         String classNameTemplate = permute.className();
         List<String> missingVars = new ArrayList<>();
         for (PermuteVar extra : permute.extraVars()) {
-            if (!classNameTemplate.contains("${" + extra.varName() + "}")) {
+            if (!varAppearsInExpressions(classNameTemplate, extra.varName())) {
                 missingVars.add(extra.varName());
             }
         }
@@ -901,6 +903,38 @@ public class PermuteProcessor extends AbstractProcessor {
     // -------------------------------------------------------------------------
     // Error-reporting helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Returns true if {@code varName} appears as an identifier inside at least one
+     * {@code ${...}} expression in {@code template}. Accepts both the bare form
+     * {@code ${varName}} and embedded forms such as {@code ${capitalize(varName)}}.
+     */
+    private static boolean varAppearsInExpressions(String template, String varName) {
+        String wordPattern = ".*\\b" + java.util.regex.Pattern.quote(varName) + "\\b.*";
+        int start = 0;
+        while (true) {
+            int exprStart = template.indexOf("${", start);
+            if (exprStart < 0)
+                break;
+            int depth = 1;
+            int i = exprStart + 2;
+            while (i < template.length() && depth > 0) {
+                char c = template.charAt(i);
+                if (c == '{')
+                    depth++;
+                else if (c == '}')
+                    depth--;
+                i++;
+            }
+            if (depth != 0)
+                break; // malformed — unclosed ${
+            String expr = template.substring(exprStart + 2, i - 1);
+            if (expr.matches(wordPattern))
+                return true;
+            start = i;
+        }
+        return false;
+    }
 
     private static AnnotationMirror findAnnotationMirror(Element element, String fqn) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
