@@ -49,7 +49,7 @@ public class InlineGenerator {
 
     static {
         StaticJavaParser.getParserConfiguration()
-                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_17);
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_21);
     }
 
     private static final String PM_SIMPLE = "PermuteMethod";

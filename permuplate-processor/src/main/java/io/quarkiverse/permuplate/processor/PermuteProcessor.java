@@ -91,9 +91,9 @@ public class PermuteProcessor extends AbstractProcessor {
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
-        // Enable Java 17 syntax (records, sealed classes) in JavaParser
+        // Enable Java 21 syntax (records, sealed classes, pattern matching in switch) in JavaParser
         com.github.javaparser.StaticJavaParser.getParserConfiguration()
-                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_17);
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_21);
         super.init(processingEnv);
         try {
             trees = Trees.instance(processingEnv);
@@ -502,6 +502,9 @@ public class PermuteProcessor extends AbstractProcessor {
 
         // 5e. @PermuteCase — expand switch statement cases per permutation
         io.quarkiverse.permuplate.core.PermuteCaseTransformer.transform(classDecl, ctx);
+
+        // 5e2. @PermuteSwitchArm — generate Java 21+ arrow-switch pattern arms
+        io.quarkiverse.permuplate.core.PermuteSwitchArmTransformer.transform(classDecl, ctx);
 
         // 5f. @PermuteValue — replace field initializers and method statement RHS (before insertions)
         PermuteValueTransformer.transform(classDecl, ctx);
