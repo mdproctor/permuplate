@@ -113,8 +113,7 @@ public class JoinBuilder {
          * {@code Join1First} to {@code Join${i+1}First} per permutation — no reflection needed.
          */
         @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "${alpha(m)}")
-        @PermuteReturn(className = "Join${i+1}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i+1, 'alpha')")
+        @PermuteReturn(className = "Join${i+1}First")
         public <B> Object join(java.util.function.Function<DS, DataSource<B>> source) {
             rd.addSource(source);
             return cast(new @PermuteDeclr(type = "Join${i+1}First") Join1First<>(end(), rd));

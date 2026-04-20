@@ -220,6 +220,12 @@ public class AnnotationReader {
         public boolean hasTypeArgsExpr() {
             return typeArgs != null && !typeArgs.isEmpty();
         }
+
+        /** Returns a copy of this config with the typeArgs field replaced. */
+        public PermuteReturnConfig withTypeArgs(String newTypeArgs) {
+            return new PermuteReturnConfig(className, typeArgVarName, typeArgFrom,
+                    typeArgTo, typeArgName, newTypeArgs, when, alwaysEmit);
+        }
     }
 
     /**

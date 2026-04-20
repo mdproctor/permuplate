@@ -819,14 +819,29 @@ Controls the **return type** of a method per permutation. Enables stateful build
 | `typeArgs` | Full JEXL expression for the complete type argument list — for mixed fixed+growing args (e.g. `"DS, ${typeArgList(1, i, 'T')}"`) |
 | `when` | JEXL guard expression. Default: method is omitted when `className` not in generated set. `when="true"` forces generation regardless. |
 
+**Alpha growing-tip inference:** When `typeArgs` is omitted and the method has a single-value `@PermuteTypeParam` (from==to) whose `name` template contains `alpha()`, `typeArgs` is inferred automatically as the current generated class's type parameters plus the new alpha letter. This fires in both APT and Maven plugin modes. Explicit `typeArgs` always takes precedence.
+
+```java
+// Before inference (explicit):
+@PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "${alpha(m)}")
+@PermuteReturn(className = "Join${i+1}First",
+               typeArgs = "'END, DS, ' + typeArgList(1, i+1, 'alpha')")
+public <B> Object join(...) { ... }
+
+// After inference (typeArgs inferred automatically):
+@PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "${alpha(m)}")
+@PermuteReturn(className = "Join${i+1}First")
+public <B> Object join(...) { ... }
+```
+
 **When is `@PermuteReturn` needed?** In Maven plugin inline mode with `T${j}` naming, return type and parameter types are inferred automatically — **no annotation required**. Use `@PermuteReturn` when:
 
 | Situation | Why explicit is needed |
 |---|---|
 | **APT mode** | Template must compile; use `Object` as the sentinel return type |
-| **`alpha(j)` naming** | Inference requires `T${j}` convention — single-letter names don't trigger it |
+| **`alpha(j)` naming** | `typeArgs` is now inferred automatically when a single-value `@PermuteTypeParam` with `alpha()` naming is present |
 | **Non-linear offset** | Inference assumes `i+1`; use explicit for other offsets |
-| **Mixed fixed+growing type args** | Use `typeArgs="DS, ${typeArgList(1, i, 'T')}"` |
+| **Mixed fixed+growing type args** | Use `typeArgs="DS, ${typeArgList(1, i, 'T')}"` when extra fixed args precede the growing tip |
 
 **Builder chain — inline mode (zero annotations):**
 ```java

@@ -30,6 +30,7 @@ import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.RecordDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.sun.source.util.TreePath;
@@ -455,6 +456,13 @@ public class PermuteProcessor extends AbstractProcessor {
         // getConstructors() is on TypeDeclaration<?> — works for both classes and records.
         classDecl.getConstructors().forEach(ctor -> ctor.setName(newClassName));
 
+        // 1b-pre. Collect alpha growing-tip inference data BEFORE PermuteTypeParamTransformer
+        // consumes method-level @PermuteTypeParam annotations. The map holds the new alpha letter
+        // per method that has @PermuteReturn (no typeArgs) + single-value alpha @PermuteTypeParam.
+        java.util.IdentityHashMap<MethodDeclaration, String> alphaLetters = classDecl instanceof ClassOrInterfaceDeclaration coidPre2
+                ? collectAlphaLettersApt(coidPre2, ctx)
+                : new java.util.IdentityHashMap<>();
+
         // 1b. Expand class type parameters (@PermuteTypeParam — explicit and implicit)
         // Note: @PermuteTypeParam is on TypeParameters (not the class annotation list).
         // The transformer replaces each sentinel TypeParameter with j expanded TypeParameters
@@ -509,8 +517,10 @@ public class PermuteProcessor extends AbstractProcessor {
         // so that step 5d can exclude them from implicit inference.
         // Only applies to class/interface declarations.
         if (classDecl instanceof ClassOrInterfaceDeclaration coid) {
+            // Phase 2: build full alpha inference map now that class type params are expanded.
+            java.util.IdentityHashMap<MethodDeclaration, String> alphaInference = buildAlphaInferenceApt(coid, alphaLetters);
             java.util.Set<String> explicitReturnMethods = collectExplicitReturnMethods(coid);
-            applyPermuteReturn(coid, ctx, generatedSet, typeElement);
+            applyPermuteReturn(coid, ctx, generatedSet, typeElement, alphaInference);
 
             // 5c2. @PermuteDefaultReturn — apply class-level default return type to remaining Object-returning methods
             applyDefaultReturn(coid, ctx, generatedSet, typeElement);
@@ -1320,6 +1330,98 @@ public class PermuteProcessor extends AbstractProcessor {
     }
 
     /**
+     * Alpha growing-tip inference — Phase 1 (APT path):
+     * Collects the new alpha letter for each method that has @PermuteReturn (no typeArgs)
+     * AND a single-value @PermuteTypeParam with alpha naming. Must be called BEFORE
+     * PermuteTypeParamTransformer consumes method-level @PermuteTypeParam annotations.
+     *
+     * <p>
+     * Uses identity keys (method node references) so that parameter type renames by
+     * downstream transformers do not invalidate the lookup.
+     */
+    private java.util.IdentityHashMap<MethodDeclaration, String> collectAlphaLettersApt(
+            ClassOrInterfaceDeclaration classDecl, EvaluationContext ctx) {
+        java.util.IdentityHashMap<MethodDeclaration, String> result = new java.util.IdentityHashMap<>();
+
+        classDecl.getMethods().forEach(method -> {
+            // Only fire when @PermuteReturn is present with no typeArgs
+            Optional<NormalAnnotationExpr> retAnnOpt = method.getAnnotations().stream()
+                    .filter(a -> {
+                        String n = a.getNameAsString();
+                        return (n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn"))
+                                && a instanceof NormalAnnotationExpr;
+                    })
+                    .map(a -> (NormalAnnotationExpr) a)
+                    .findFirst();
+            if (retAnnOpt.isEmpty())
+                return;
+            String existingTypeArgs = getAnnAttr(retAnnOpt.get(), "typeArgs");
+            String existingTypeArgVarName = getAnnAttr(retAnnOpt.get(), "typeArgVarName");
+            if ((existingTypeArgs != null && !existingTypeArgs.isEmpty())
+                    || (existingTypeArgVarName != null && !existingTypeArgVarName.isEmpty()))
+                return; // explicit typeArgs — inference must not override
+
+            // Find a single-value @PermuteTypeParam with alpha naming on this method
+            for (AnnotationExpr ann : method.getAnnotations()) {
+                String n = ann.getNameAsString();
+                if (!n.equals("PermuteTypeParam") && !n.equals("io.quarkiverse.permuplate.PermuteTypeParam"))
+                    continue;
+                if (!(ann instanceof NormalAnnotationExpr normal))
+                    continue;
+                String varName = null, fromStr = null, toStr = null, nameTemplate = null;
+                for (MemberValuePair p : normal.getPairs()) {
+                    switch (p.getNameAsString()) {
+                        case "varName" -> varName = p.getValue().asStringLiteralExpr().asString();
+                        case "from" -> fromStr = p.getValue().asStringLiteralExpr().asString();
+                        case "to" -> toStr = p.getValue().asStringLiteralExpr().asString();
+                        case "name" -> nameTemplate = p.getValue().asStringLiteralExpr().asString();
+                    }
+                }
+                if (varName == null || fromStr == null || toStr == null || nameTemplate == null)
+                    continue;
+                if (!nameTemplate.contains("alpha"))
+                    continue;
+                try {
+                    int from = ctx.evaluateInt(fromStr);
+                    int to = ctx.evaluateInt(toStr);
+                    if (from != to)
+                        continue; // must be single-value expansion
+                    EvaluationContext innerCtx = ctx.withVariable(varName, from);
+                    String newLetter = innerCtx.evaluate(nameTemplate);
+                    result.put(method, newLetter);
+                } catch (Exception ignored) {
+                }
+                break; // only consider the first matching @PermuteTypeParam per method
+            }
+        });
+        return result;
+    }
+
+    /**
+     * Alpha growing-tip inference — Phase 2 (APT path):
+     * Combines pre-collected alpha letters with post-expansion class type params
+     * to produce the full inferred typeArgs string per method (identity-keyed).
+     */
+    private java.util.IdentityHashMap<MethodDeclaration, String> buildAlphaInferenceApt(
+            ClassOrInterfaceDeclaration classDecl,
+            java.util.IdentityHashMap<MethodDeclaration, String> alphaLetters) {
+        if (alphaLetters.isEmpty())
+            return new java.util.IdentityHashMap<>();
+
+        List<String> classTypeParams = classDecl.getTypeParameters().stream()
+                .map(com.github.javaparser.ast.type.TypeParameter::getNameAsString)
+                .collect(java.util.stream.Collectors.toList());
+        String currentParams = String.join(", ", classTypeParams);
+
+        java.util.IdentityHashMap<MethodDeclaration, String> result = new java.util.IdentityHashMap<>();
+        alphaLetters.forEach((method, newLetter) -> {
+            String inferred = currentParams.isEmpty() ? newLetter : currentParams + ", " + newLetter;
+            result.put(method, inferred);
+        });
+        return result;
+    }
+
+    /**
      * Processes @PermuteReturn annotations on methods:
      * - Validates V2 (typeArgVarName requires typeArgTo+typeArgName) and V3 (from > to) and V6 (typeArgs+typeArgVarName)
      * - Evaluates className; applies boundary omission (omit method if class not in generated set, unless when="true")
@@ -1330,6 +1432,14 @@ public class PermuteProcessor extends AbstractProcessor {
             EvaluationContext ctx,
             Set<String> generatedSet,
             TypeElement element) {
+        applyPermuteReturn(classDecl, ctx, generatedSet, element, new java.util.IdentityHashMap<>());
+    }
+
+    private void applyPermuteReturn(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            Set<String> generatedSet,
+            TypeElement element,
+            java.util.IdentityHashMap<MethodDeclaration, String> alphaInference) {
 
         List<MethodDeclaration> toRemove = new ArrayList<>();
 
@@ -1432,9 +1542,20 @@ public class PermuteProcessor extends AbstractProcessor {
                 return;
             }
 
+            // Alpha inference: when typeArgs is absent, use pre-collected inference map (identity lookup)
+            String effectiveTypeArgs = typeArgs;
+            if ((effectiveTypeArgs == null || effectiveTypeArgs.isEmpty())
+                    && (typeArgVarName == null || typeArgVarName.isEmpty())) {
+                String inferred = alphaInference.get(method);
+                if (inferred != null) {
+                    // Pass as JEXL string literal so buildReturnTypeStr evaluates it correctly
+                    effectiveTypeArgs = "'" + inferred + "'";
+                }
+            }
+
             // Build return type string
             String returnTypeStr = buildReturnTypeStr(evaluatedClassName,
-                    typeArgVarName, typeArgFrom, typeArgTo, typeArgName, typeArgs, ctx);
+                    typeArgVarName, typeArgFrom, typeArgTo, typeArgName, effectiveTypeArgs, ctx);
 
             // Replace the method return type
             try {
