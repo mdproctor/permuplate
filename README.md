@@ -1341,7 +1341,7 @@ For a detailed explanation of the architecture, transformation pipeline, design 
 - [`OVERVIEW.md`](OVERVIEW.md) — Deep-dive into the annotation processor architecture
 - [`permuplate-mvn-examples/DROOLS-DSL.md`](permuplate-mvn-examples/DROOLS-DSL.md) — Drools DSL sandbox: six phases of type-safe API generation
 - [`docs/design-snapshots/`](docs/design-snapshots/) — Frozen architecture state records (2026-04-06 is current)
-- [`docs/adr/`](docs/adr/) — Formal architectural decisions (ADR-0001 through ADR-0005)
+- [`docs/adr/`](docs/adr/) — Formal architectural decisions (ADR-0001 through ADR-0006)
 - [`site/_posts/`](site/_posts/) — Development diary: blog entries covering the full Permuplate journey
 
 ---
