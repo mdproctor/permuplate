@@ -76,15 +76,6 @@ public class ParametersFirstTemplate<DS> {
             ExtendsPoint<DS> ep) {
         RuleDefinition<DS> child = new RuleDefinition<>(name);
         ep.baseRd().copyInto(child);
-        String cn = ep.getClass().getSimpleName();
-        int n = Integer.parseInt(cn.replaceAll("[^0-9]", "")) - 1;
-        String joinName = getClass().getPackage().getName() + ".JoinBuilder$Join" + n + "First";
-        try {
-            return cast(Class.forName(joinName)
-                    .getConstructor(Object.class, RuleDefinition.class)
-                    .newInstance(null, child));
-        } catch (Exception e) {
-            throw new RuntimeException("extendsRule: " + e.getMessage(), e);
-        }
+        return cast(new JoinBuilder.@PermuteDeclr(type = "JoinBuilder.Join${j-1}First") Join1First<>(null, child));
     }
 }

@@ -126,21 +126,7 @@ public class JoinBuilder {
             @SuppressWarnings("unchecked")
             JoinSecond<DS> second = (JoinSecond<DS>) secondChain;
             rd.addBilinearSource(second.getRuleDefinition());
-            // Reflection required: j is a @PermuteMethod inner variable, unavailable to
-            // @PermuteDeclr TYPE_USE which is processed by the outer PermuteDeclrTransformer.
-            String myCn = getClass().getSimpleName();
-            int myN = Integer.parseInt(myCn.replaceAll("[^0-9]", ""));
-            String otherCn = secondChain.getClass().getSimpleName();
-            int otherN = Integer.parseInt(otherCn.replaceAll("[^0-9]", ""));
-            String nextName = getClass().getEnclosingClass().getName()
-                    + "$Join" + (myN + otherN) + "First";
-            try {
-                return cast(Class.forName(nextName)
-                        .getConstructor(Object.class, RuleDefinition.class)
-                        .newInstance(end(), rd));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate " + nextName, e);
-            }
+            return cast(new JoinBuilder.@PermuteDeclr(type = "Join${i+j}First") Join1First<>(end(), rd));
         }
 
         /**
@@ -219,26 +205,16 @@ public class JoinBuilder {
          * Pass the result to RuleBuilder.extendsRule() to start a child rule that
          * inherits all sources, filters, and constraint scopes up to this point.
          *
-         * <p>Uses reflection to instantiate {@code RuleExtendsPoint.RuleExtendsPoint(N+1)}
-         * because the target type is a qualified name ({@code RuleExtendsPoint.RuleExtendsPointN})
-         * — {@code @PermuteDeclr TYPE_USE} requires a simple (unqualified) name on the
-         * {@code new} expression. Reflection is the correct workaround for this case.
+         * <p>Uses {@code @PermuteDeclr TYPE_USE} on the constructor to rename
+         * {@code RuleExtendsPoint2} to {@code RuleExtendsPoint${i+1}} per permutation —
+         * no reflection needed.
          */
         @SuppressWarnings("unchecked")
         @PermuteReturn(className = "RuleExtendsPoint.RuleExtendsPoint${i+1}",
                        typeArgs = "'DS, ' + typeArgList(1, i, 'alpha')",
                        when = "true")
         public Object extensionPoint() {
-            String cn = getClass().getSimpleName();
-            int n = Integer.parseInt(cn.replaceAll("[^0-9]", ""));
-            String className = RuleExtendsPoint.class.getName() + "$RuleExtendsPoint" + (n + 1);
-            try {
-                return cast(Class.forName(className)
-                        .getConstructor(RuleDefinition.class)
-                        .newInstance(rd));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to instantiate " + className, e);
-            }
+            return cast(new RuleExtendsPoint.@PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${i+1}") RuleExtendsPoint2<>(rd));
         }
 
         /**
