@@ -50,6 +50,11 @@ public final class PermuteConfig {
     public final String[] values;
     public final String className;
     public final String[] strings;
+    /**
+     * Named JEXL expression macros in {@code "name=jexlExpression"} format.
+     * Evaluated after all loop variables are bound; later macros may reference earlier ones.
+     */
+    public final String[] macros;
     public final PermuteVarConfig[] extraVars;
     public final boolean inline;
     public final boolean keepTemplate;
@@ -57,11 +62,17 @@ public final class PermuteConfig {
     public PermuteConfig(String varName, String from, String to, String className,
             String[] strings, PermuteVarConfig[] extraVars,
             boolean inline, boolean keepTemplate) {
-        this(varName, from, to, null, className, strings, extraVars, inline, keepTemplate);
+        this(varName, from, to, null, className, strings, null, extraVars, inline, keepTemplate);
     }
 
     public PermuteConfig(String varName, String from, String to, String[] values, String className,
             String[] strings, PermuteVarConfig[] extraVars,
+            boolean inline, boolean keepTemplate) {
+        this(varName, from, to, values, className, strings, null, extraVars, inline, keepTemplate);
+    }
+
+    public PermuteConfig(String varName, String from, String to, String[] values, String className,
+            String[] strings, String[] macros, PermuteVarConfig[] extraVars,
             boolean inline, boolean keepTemplate) {
         this.varName = varName;
         this.from = from;
@@ -69,6 +80,7 @@ public final class PermuteConfig {
         this.values = values == null ? new String[0] : values.clone();
         this.className = className;
         this.strings = strings != null ? strings : new String[0];
+        this.macros = macros != null ? macros : new String[0];
         this.extraVars = extraVars != null ? extraVars : new PermuteVarConfig[0];
         this.inline = inline;
         this.keepTemplate = keepTemplate;
@@ -82,7 +94,7 @@ public final class PermuteConfig {
         }
         return new PermuteConfig(
                 permute.varName(), permute.from(), permute.to(), permute.values(),
-                permute.className(), permute.strings(), extraVars,
+                permute.className(), permute.strings(), permute.macros(), extraVars,
                 permute.inline(), permute.keepTemplate());
     }
 
@@ -212,6 +224,29 @@ public final class PermuteConfig {
                 }
             }
             result = expanded;
+        }
+
+        // Apply macros: evaluate each "name=jexlExpr" in declaration order per combination.
+        // Later macros may reference earlier ones since vars is mutated in place.
+        if (config.macros.length > 0) {
+            for (Map<String, Object> vars : result) {
+                for (String macro : config.macros) {
+                    int eq = macro.indexOf('=');
+                    if (eq < 0)
+                        continue; // malformed — skip
+                    String name = macro.substring(0, eq).trim();
+                    String expr = macro.substring(eq + 1).trim();
+                    try {
+                        // Wrap bare expressions in ${} so EvaluationContext handles them;
+                        // if already contains ${}, evaluate as-is (it's an interpolated string).
+                        String template = expr.contains("${") ? expr : "${" + expr + "}";
+                        Object value = new EvaluationContext(vars).evaluate(template);
+                        vars.put(name, value);
+                    } catch (Exception ignored) {
+                        // Malformed or unevaluatable macro — skip silently
+                    }
+                }
+            }
         }
 
         return result;

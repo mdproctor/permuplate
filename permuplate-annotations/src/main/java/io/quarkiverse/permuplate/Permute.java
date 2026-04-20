@@ -188,6 +188,26 @@ public @interface Permute {
     String[] strings() default {};
 
     /**
+     * Named JEXL expression macros, evaluated in the permutation context.
+     * Format: {@code "name=jexlExpression"} where {@code name} becomes a variable
+     * available as {@code ${name}} in any other JEXL expression in this template.
+     *
+     * <p>
+     * Macros are evaluated AFTER all loop variables ({@code varName}, {@code extraVars},
+     * {@code strings}) are bound, in declaration order (later macros may reference earlier ones).
+     *
+     * <p>
+     * Example:
+     *
+     * <pre>{@code
+     * &#64;Permute(varName="i", from="1", to="6", className="Join${i}",
+     *          macros={"selfArgs=\"'A, B, '\"+typeArgList(1,i,'alpha')"})
+     * // ${selfArgs} evaluates to "'A, B, A, B, C'" at i=3 etc.
+     * }</pre>
+     */
+    String[] macros() default {};
+
+    /**
      * Additional integer loop variables for cross-product generation.
      *
      * @see PermuteVar

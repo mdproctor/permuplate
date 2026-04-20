@@ -65,11 +65,12 @@ public class AnnotationReader {
         String to = values.length > 0 ? "" : optionalStringOrInt(normal, "to");
         String className = requireString(normal, "className");
         String[] strings = readStringArray(normal, "strings");
+        String[] macros = readStringArray(normal, "macros");
         PermuteVarConfig[] extraVars = readExtraVars(normal);
         boolean inline = readBoolean(normal, "inline", false);
         boolean keepTemplate = readBoolean(normal, "keepTemplate", false);
 
-        return new PermuteConfig(varName, from, to, values, className, strings, extraVars, inline, keepTemplate);
+        return new PermuteConfig(varName, from, to, values, className, strings, macros, extraVars, inline, keepTemplate);
     }
 
     private static String requireString(NormalAnnotationExpr ann, String name)
