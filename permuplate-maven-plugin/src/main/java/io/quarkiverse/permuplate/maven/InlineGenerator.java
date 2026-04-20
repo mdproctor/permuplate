@@ -196,6 +196,9 @@ public class InlineGenerator {
                 Set<String> explicitReturnMethods = collectExplicitReturnMethodNames(coid);
                 applyPermuteReturn(coid, ctx, allGeneratedNames);
 
+                // Apply @PermuteDefaultReturn — class-level default return for remaining Object-returning methods
+                applyInlineDefaultReturn(coid, ctx, allGeneratedNames);
+
                 // Apply implicit return type + parameter type inference (Mechanism 1)
                 applyImplicitInference(coid, ctx, allGeneratedNames, explicitReturnMethods);
 
@@ -1028,6 +1031,94 @@ public class InlineGenerator {
         });
 
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+    }
+
+    /**
+     * Applies @PermuteDefaultReturn: for every Object-returning method without an explicit
+     * @PermuteReturn, replaces the return type with the evaluated class-level default.
+     * Must run AFTER applyPermuteReturn so explicit @PermuteReturn annotations are already gone.
+     */
+    private static void applyInlineDefaultReturn(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            Set<String> allGeneratedNames) {
+
+        java.util.Optional<AnnotationExpr> annOpt = classDecl.getAnnotations().stream()
+                .filter(a -> a.getNameAsString().equals("PermuteDefaultReturn")
+                        || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteDefaultReturn"))
+                .findFirst();
+
+        if (annOpt.isEmpty())
+            return;
+
+        AnnotationExpr ann = annOpt.get();
+        if (!(ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normalAnn))
+            return;
+
+        String classNameTemplate = null;
+        String typeArgsExpr = "";
+        boolean alwaysEmit = true;
+
+        for (com.github.javaparser.ast.expr.MemberValuePair pair : normalAnn.getPairs()) {
+            switch (pair.getNameAsString()) {
+                case "className" -> classNameTemplate = pair.getValue().asStringLiteralExpr().asString();
+                case "typeArgs" -> typeArgsExpr = pair.getValue().asStringLiteralExpr().asString();
+                case "alwaysEmit" -> {
+                    if (pair.getValue() instanceof com.github.javaparser.ast.expr.BooleanLiteralExpr b)
+                        alwaysEmit = b.getValue();
+                }
+            }
+        }
+
+        if (classNameTemplate == null || classNameTemplate.isEmpty())
+            return;
+
+        String evaluatedClass;
+        try {
+            evaluatedClass = ctx.evaluate(classNameTemplate);
+        } catch (Exception ignored) {
+            return;
+        }
+
+        boolean shouldGenerate = alwaysEmit || allGeneratedNames.contains(evaluatedClass);
+
+        String typeArgs = "";
+        if (!typeArgsExpr.isEmpty()) {
+            try {
+                typeArgs = ctx.evaluate("${" + typeArgsExpr + "}");
+            } catch (Exception ignored) {
+            }
+        }
+
+        // typeArgs is a JEXL expression that evaluates to the full type argument string including "<>",
+        // e.g. "'<END, A>'" evaluates to "<END, A>". Append directly as suffix — no extra wrapping.
+        final String typeSrc = typeArgs.isEmpty() ? evaluatedClass : evaluatedClass + typeArgs;
+
+        List<MethodDeclaration> toRemove = new ArrayList<>();
+
+        classDecl.getMethods().stream()
+                .filter(m -> m.getType().asString().equals("Object"))
+                .filter(m -> m.getAnnotations().stream().noneMatch(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn");
+                }))
+                .forEach(m -> {
+                    if (!shouldGenerate) {
+                        toRemove.add(m);
+                    } else {
+                        try {
+                            m.setType(StaticJavaParser.parseType(typeSrc));
+                        } catch (Exception ignored) {
+                        }
+                    }
+                });
+
+        toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+
+        // Strip @PermuteDefaultReturn from the generated class
+        classDecl.getAnnotations().removeIf(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteDefaultReturn") || n.equals("io.quarkiverse.permuplate.PermuteDefaultReturn");
+        });
     }
 
     private static String buildReturnTypeStr(String className,
@@ -1897,7 +1988,8 @@ public class InlineGenerator {
                 "PermuteSwitchArm", "io.quarkiverse.permuplate.PermuteSwitchArm",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
                 "PermuteImports", "io.quarkiverse.permuplate.PermuteImports",
-                "PermuteSelf", "io.quarkiverse.permuplate.PermuteSelf");
+                "PermuteSelf", "io.quarkiverse.permuplate.PermuteSelf",
+                "PermuteDefaultReturn", "io.quarkiverse.permuplate.PermuteDefaultReturn");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));

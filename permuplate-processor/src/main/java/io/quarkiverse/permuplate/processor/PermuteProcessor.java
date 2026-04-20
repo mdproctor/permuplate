@@ -512,6 +512,9 @@ public class PermuteProcessor extends AbstractProcessor {
             java.util.Set<String> explicitReturnMethods = collectExplicitReturnMethods(coid);
             applyPermuteReturn(coid, ctx, generatedSet, typeElement);
 
+            // 5c2. @PermuteDefaultReturn — apply class-level default return type to remaining Object-returning methods
+            applyDefaultReturn(coid, ctx, generatedSet, typeElement);
+
             // 5d. Implicit return type inference — fires on methods with T+number growing tips
             // that have no explicit @PermuteReturn. Uses globalGeneratedNames for cross-template
             // boundary omission. Runs AFTER applyPermuteReturn so explicit return types are already set.
@@ -1450,6 +1453,96 @@ public class PermuteProcessor extends AbstractProcessor {
 
         // Remove boundary-omitted methods
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+    }
+
+    /**
+     * Applies @PermuteDefaultReturn: for every Object-returning method without an explicit
+     * @PermuteReturn, replaces the return type with the evaluated class-level default.
+     * Must run AFTER applyPermuteReturn so explicit @PermuteReturn annotations are already gone.
+     */
+    private void applyDefaultReturn(ClassOrInterfaceDeclaration classDecl,
+            EvaluationContext ctx,
+            Set<String> generatedSet,
+            TypeElement element) {
+
+        Optional<NormalAnnotationExpr> annOpt = classDecl.getAnnotations().stream()
+                .filter(a -> {
+                    String n = a.getNameAsString();
+                    return (n.equals("PermuteDefaultReturn")
+                            || n.equals("io.quarkiverse.permuplate.PermuteDefaultReturn"))
+                            && a instanceof NormalAnnotationExpr;
+                })
+                .map(a -> (NormalAnnotationExpr) a)
+                .findFirst();
+
+        if (annOpt.isEmpty())
+            return;
+
+        NormalAnnotationExpr ann = annOpt.get();
+        String classNameTemplate = getAnnAttr(ann, "className");
+        String typeArgsExpr = getAnnAttr(ann, "typeArgs");
+        String alwaysEmitAttr = getAnnAttr(ann, "alwaysEmit");
+        // alwaysEmit defaults to true; only false when explicitly set to "false"
+        boolean alwaysEmit = !"false".equals(alwaysEmitAttr);
+
+        if (classNameTemplate == null || classNameTemplate.isEmpty())
+            return;
+
+        String evaluatedClass;
+        try {
+            evaluatedClass = ctx.evaluate(classNameTemplate);
+        } catch (Exception e) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "@PermuteDefaultReturn: cannot evaluate className \"" + classNameTemplate + "\": " + e.getMessage(),
+                    element);
+            return;
+        }
+
+        boolean shouldGenerate = alwaysEmit || generatedSet.contains(evaluatedClass);
+
+        String typeArgs = "";
+        if (typeArgsExpr != null && !typeArgsExpr.isEmpty()) {
+            try {
+                typeArgs = ctx.evaluate("${" + typeArgsExpr + "}");
+            } catch (Exception ignored) {
+            }
+        }
+
+        // typeArgs is a JEXL expression that evaluates to the full type argument string including "<>",
+        // e.g. "'<END, A>'" evaluates to "<END, A>". Append directly as suffix — no extra wrapping.
+        final String typeSrc = typeArgs.isEmpty() ? evaluatedClass : evaluatedClass + typeArgs;
+
+        List<MethodDeclaration> toRemove = new ArrayList<>();
+
+        classDecl.getMethods().stream()
+                .filter(m -> m.getType().asString().equals("Object"))
+                // Only methods that have no @PermuteReturn left (explicit ones were already processed)
+                .filter(m -> m.getAnnotations().stream().noneMatch(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn");
+                }))
+                .forEach(m -> {
+                    if (!shouldGenerate) {
+                        toRemove.add(m);
+                    } else {
+                        try {
+                            m.setType(StaticJavaParser.parseType(typeSrc));
+                        } catch (Exception e) {
+                            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                                    "@PermuteDefaultReturn: cannot parse computed return type \""
+                                            + typeSrc + "\": " + e.getMessage(),
+                                    element);
+                        }
+                    }
+                });
+
+        toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+
+        // Strip @PermuteDefaultReturn from the generated class
+        classDecl.getAnnotations().removeIf(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteDefaultReturn") || n.equals("io.quarkiverse.permuplate.PermuteDefaultReturn");
+        });
     }
 
     /** Builds the return type string from className + type argument configuration. */

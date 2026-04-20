@@ -870,6 +870,36 @@ Eliminates the verbose `@PermuteReturn(className="Join${i}First", typeArgs="'END
 
 ---
 
+### `@PermuteDefaultReturn`
+
+A **class-level** annotation that sets a default return type for all `Object`-returning methods that lack an explicit `@PermuteReturn`. Use it when most methods in a generated class share the same return type, avoiding repetitive per-method annotations.
+
+| Attribute | Meaning |
+|---|---|
+| `className` | JEXL template for the return class name (e.g. `"Builder${i}"`) |
+| `typeArgs` | JEXL expression evaluating to the full type argument suffix including `<>` (e.g. `"'<A, B>'"`) — empty string for no type args |
+| `alwaysEmit` | When `true` (default), methods are always generated. When `false`, boundary omission applies (method omitted if evaluated class is not in the generated set) |
+
+```java
+@PermuteDefaultReturn(className = "Join${i}First",
+                      typeArgs  = "'<END, DS, ' + typeArgList(1, i, 'alpha') + '>'")
+@Permute(varName="i", from="2", to="4", className="Join${i}First")
+public static class Join0First<END, DS,
+        @PermuteTypeParam(varName="k", from="1", to="${i}", name="${alpha(k)}") A> {
+
+    public Object filter(Predicate<DS> p) { ... return this; }  // gets default return type
+    public Object index()                 { return this; }       // gets default return type
+
+    // Override for a terminal method:
+    @PermuteReturn(className="RuleResult", typeArgs="'<DS>'", alwaysEmit=true)
+    public Object fn(...) { ... }
+}
+```
+
+Explicit `@PermuteReturn` on a method always takes precedence over the class-level default. Methods with non-`Object` return types are never affected.
+
+---
+
 ### `@PermuteMethod`
 
 Generates **multiple method overloads** per class using an inner loop variable. For each outer permutation value `i` and inner value `j`, one overload is generated.
