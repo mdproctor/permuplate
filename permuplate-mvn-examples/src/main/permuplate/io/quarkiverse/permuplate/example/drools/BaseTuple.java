@@ -1,7 +1,7 @@
 package io.quarkiverse.permuplate.example.drools;
 
 import io.quarkiverse.permuplate.Permute;
-import io.quarkiverse.permuplate.PermuteConst;
+import io.quarkiverse.permuplate.PermuteBody;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteExtends;
 import io.quarkiverse.permuplate.PermuteParam;
@@ -112,18 +112,18 @@ public abstract class BaseTuple {
             this.a = a;
         }
 
+        @PermuteBody(body = "{ if (index == ${i-1}) return unchecked(${lower(i)}); return super.get(index); }")
         @Override
         public <T> T get(int index) {
-            @PermuteConst("${i-1}") int idx = 0;
-            if (index == idx)
+            if (index == 0)
                 return unchecked(a);
             return super.get(index);
         }
 
+        @PermuteBody(body = "{ if (index == ${i-1}) { ${lower(i)} = unchecked(t); return; } super.set(index, t); }")
         @Override
         public <T> void set(int index, T t) {
-            @PermuteConst("${i-1}") int idx = 0;
-            if (index == idx) {
+            if (index == 0) {
                 a = unchecked(t);
                 return;
             }
