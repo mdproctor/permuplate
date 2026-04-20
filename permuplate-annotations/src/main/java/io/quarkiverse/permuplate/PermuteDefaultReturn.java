@@ -26,7 +26,7 @@ import java.lang.annotation.Target;
  *     public Object step1() { return this; }  // returns Builder2<A,B>, Builder3<A,B,C>...
  *     public Object step2() { return this; }  // same
  *     // Override for a terminal method:
- *     @PermuteReturn(className="Result", typeArgs="", alwaysEmit=true)
+ *     &#64;PermuteReturn(className="Result", typeArgs="", alwaysEmit=true)
  *     public Object build() { ... }
  * }
  * }

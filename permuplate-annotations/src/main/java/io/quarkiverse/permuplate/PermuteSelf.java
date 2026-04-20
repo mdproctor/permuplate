@@ -29,7 +29,8 @@ import java.lang.annotation.Target;
  * Applied in the pipeline after {@link PermuteTypeParam} expansion, so type parameters
  * are already in their final expanded form when {@code @PermuteSelf} fires.
  *
- * <p><b>Interaction with {@code @PermuteMethod}:</b> When placed on a method that also
+ * <p>
+ * <b>Interaction with {@code @PermuteMethod}:</b> When placed on a method that also
  * carries {@code @PermuteMethod}, {@code @PermuteSelf} fires before cloning. All clones
  * inherit the outer class's return type. Only safe when the inner loop variable does not
  * affect which class should be returned.
