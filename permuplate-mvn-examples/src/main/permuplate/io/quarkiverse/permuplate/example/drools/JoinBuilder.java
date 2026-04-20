@@ -76,7 +76,8 @@ public class JoinBuilder {
      * </ul>
      */
     @Permute(varName = "i", from = "1", to = "6", className = "Join${i}Second",
-             inline = true, keepTemplate = false)
+             inline = true, keepTemplate = false,
+             macros = {"alphaList=typeArgList(1,i,'alpha')"})
     public static non-sealed class Join0Second<END, DS,
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
             extends BaseRuleBuilder<END>
@@ -175,7 +176,7 @@ public class JoinBuilder {
         @PermuteMethod(varName = "k", from = "1", to = "2",
                        name = "${k == 1 ? 'not' : 'exists'}")
         @PermuteReturn(className = "${k == 1 ? 'NegationScope' : 'ExistenceScope'}",
-                       typeArgs = "'Join' + i + 'Second<END, DS, ' + typeArgList(1, i, 'alpha') + '>, DS'",
+                       typeArgs = "'Join' + i + 'Second<END, DS, ' + alphaList + '>, DS'",
                        alwaysEmit = true)
         @PermuteBody(body = "{ RuleDefinition<DS> scopeRd = new RuleDefinition<>(\"${k == 1 ? 'not-scope' : 'exists-scope'}\"); rd.${k == 1 ? 'addNegation' : 'addExistence'}(scopeRd); return new ${k == 1 ? 'Negation' : 'Existence'}Scope<>(this, scopeRd); }")
         public Object scopeTemplate() {
@@ -193,7 +194,7 @@ public class JoinBuilder {
                 macros = { "tail=typeArgList(i,i+n-1,'alpha')", "prev=typeArgList(i,i+n-2,'alpha')" })
         @PermuteReturn(
                 className = "RuleOOPathBuilder.Path${n}",
-                typeArgs = "'Join'+(i+1)+'First<END, DS, '+typeArgList(1,i,'alpha')+', BaseTuple.Tuple'+n+'<'+tail+'>>,' +' BaseTuple.Tuple'+(n-1)+'<'+prev+'>, '+ tail",
+                typeArgs = "'Join'+(i+1)+'First<END, DS, '+alphaList+', BaseTuple.Tuple'+n+'<'+tail+'>>,' +' BaseTuple.Tuple'+(n-1)+'<'+prev+'>, '+ tail",
                 when = "i < 6")
         @PermuteBody(body = "{ java.util.List<OOPathStep> steps = new java.util.ArrayList<>(); Object nextJoin = new @PermuteDeclr(type = \"Join${i+1}First\") Join1First<>(end(), rd); return cast(new RuleOOPathBuilder.Path${n}<>(nextJoin, rd, steps, rd.factArity() - 1)); }")
         @SuppressWarnings("unchecked")
@@ -234,7 +235,7 @@ public class JoinBuilder {
          */
         @SuppressWarnings("unchecked")
         @PermuteReturn(className = "RuleExtendsPoint.RuleExtendsPoint${i+1}",
-                       typeArgs = "'DS, ' + typeArgList(1, i, 'alpha')",
+                       typeArgs = "'DS, ' + alphaList",
                        alwaysEmit = true)
         public Object extensionPoint() {
             return cast(new RuleExtendsPoint.@PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${i+1}") RuleExtendsPoint2<>(rd));
@@ -250,7 +251,7 @@ public class JoinBuilder {
          */
         @PermuteReturn(className = "RuleResult", typeArgs = "'DS'", alwaysEmit = true)
         public Object fn(
-                @PermuteDeclr(type = "Consumer${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
+                @PermuteDeclr(type = "Consumer${i+1}<DS, ${alphaList}>")
                 Object action) {
             rd.setAction(action);
             return new RuleResult<>(rd);
@@ -268,7 +269,8 @@ public class JoinBuilder {
      * the template; inherited {@code join()} and {@code fn()} come from Second via extends.
      */
     @Permute(varName = "i", from = "1", to = "6", className = "Join${i}First",
-             inline = true, keepTemplate = false)
+             inline = true, keepTemplate = false,
+             macros = {"alphaList=typeArgList(1,i,'alpha')"})
     public static non-sealed class Join0First<END, DS,
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
             extends Join0Second<END, DS, A>
@@ -283,7 +285,7 @@ public class JoinBuilder {
          */
         @PermuteSelf
         public Object filter(
-                @PermuteDeclr(type = "Predicate${i+1}<DS, ${typeArgList(1, i, 'alpha')}>")
+                @PermuteDeclr(type = "Predicate${i+1}<DS, ${alphaList}>")
                 Object predicate) {
             rd.addFilter(predicate);
             return this;
