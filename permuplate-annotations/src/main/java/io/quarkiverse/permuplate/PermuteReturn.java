@@ -102,4 +102,19 @@ public @interface PermuteReturn {
      * {@code when="true"} but self-documenting. Takes precedence over {@code when}.
      */
     boolean alwaysEmit() default false;
+
+    /**
+     * When non-empty, the return type is the current generated class with all its
+     * type parameters except the last, which is replaced by this value.
+     *
+     * <p>
+     * Useful for type-narrowing methods that return the current class but with
+     * the last type parameter constrained (e.g. narrowing
+     * {@code Join3First<END, DS, A, B, C>} to {@code Join3First<END, DS, A, B, T>}).
+     *
+     * <p>
+     * The value is a literal type name or type variable (e.g. {@code "T"}).
+     * Mutually exclusive with {@code typeArgs}.
+     */
+    String replaceLastTypeArgWith() default "";
 }

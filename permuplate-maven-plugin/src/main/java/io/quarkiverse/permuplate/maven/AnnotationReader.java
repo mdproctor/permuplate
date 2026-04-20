@@ -211,7 +211,8 @@ public class AnnotationReader {
             String typeArgName,
             String typeArgs,
             String when,
-            boolean alwaysEmit) {
+            boolean alwaysEmit,
+            String replaceLastTypeArgWith) {
 
         public boolean hasTypeArgLoop() {
             return typeArgVarName != null && !typeArgVarName.isEmpty();
@@ -221,10 +222,14 @@ public class AnnotationReader {
             return typeArgs != null && !typeArgs.isEmpty();
         }
 
+        public boolean hasReplaceLastTypeArgWith() {
+            return replaceLastTypeArgWith != null && !replaceLastTypeArgWith.isEmpty();
+        }
+
         /** Returns a copy of this config with the typeArgs field replaced. */
         public PermuteReturnConfig withTypeArgs(String newTypeArgs) {
             return new PermuteReturnConfig(className, typeArgVarName, typeArgFrom,
-                    typeArgTo, typeArgName, newTypeArgs, when, alwaysEmit);
+                    typeArgTo, typeArgName, newTypeArgs, when, alwaysEmit, replaceLastTypeArgWith);
         }
     }
 
@@ -239,7 +244,8 @@ public class AnnotationReader {
         NormalAnnotationExpr normal = (NormalAnnotationExpr) ann;
 
         String className = null, typeArgVarName = "", typeArgFrom = "1",
-                typeArgTo = "", typeArgName = "", typeArgs = "", when = "";
+                typeArgTo = "", typeArgName = "", typeArgs = "", when = "",
+                replaceLastTypeArgWith = "";
         boolean alwaysEmit = false;
 
         for (MemberValuePair pair : normal.getPairs()) {
@@ -256,13 +262,14 @@ public class AnnotationReader {
                     case "typeArgName" -> typeArgName = val;
                     case "typeArgs" -> typeArgs = val;
                     case "when" -> when = val;
+                    case "replaceLastTypeArgWith" -> replaceLastTypeArgWith = val;
                 }
             }
         }
         if (className == null)
             return null;
         return new PermuteReturnConfig(className, typeArgVarName, typeArgFrom,
-                typeArgTo, typeArgName, typeArgs, when, alwaysEmit);
+                typeArgTo, typeArgName, typeArgs, when, alwaysEmit, replaceLastTypeArgWith);
     }
 
     /** Parsed @PermuteMethod configuration. */

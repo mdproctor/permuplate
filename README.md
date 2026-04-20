@@ -817,6 +817,7 @@ Controls the **return type** of a method per permutation. Enables stateful build
 | `typeArgTo` | Loop upper bound (e.g. `"${i+1}"`) — required when `typeArgVarName` is set |
 | `typeArgName` | Type argument name template per loop value (e.g. `"T${j}"`) |
 | `typeArgs` | Full JEXL expression for the complete type argument list — for mixed fixed+growing args (e.g. `"DS, ${typeArgList(1, i, 'T')}"`) |
+| `replaceLastTypeArgWith` | When non-empty, the return type is the current generated class with all its type parameters except the last, which is replaced by this value (e.g. `"T"`). Mutually exclusive with `typeArgs`. |
 | `when` | JEXL guard expression. Default: method is omitted when `className` not in generated set. `when="true"` forces generation regardless. |
 
 **Alpha growing-tip inference:** When `typeArgs` is omitted and the method has a single-value `@PermuteTypeParam` (from==to) whose `name` template contains `alpha()`, `typeArgs` is inferred automatically as the current generated class's type parameters plus the new alpha letter. This fires in both APT and Maven plugin modes. Explicit `typeArgs` always takes precedence.

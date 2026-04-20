@@ -1265,7 +1265,7 @@ public class PermuteProcessor extends AbstractProcessor {
                 .transformMethod(clone, innerCtx, processingEnv.getMessager(), element);
 
         // Apply @PermuteReturn: evaluate return type (no boundary omission)
-        applyPermuteReturnSimple(clone, innerCtx, element);
+        applyPermuteReturnSimple(clone, innerCtx, element, classDecl);
 
         // J-based implicit type expansion: only for integer path (j >= 1).
         // String-set path passes j=-1 to skip this.
@@ -1305,7 +1305,8 @@ public class PermuteProcessor extends AbstractProcessor {
      */
     private void applyPermuteReturnSimple(MethodDeclaration method,
             EvaluationContext ctx,
-            TypeElement element) {
+            TypeElement element,
+            ClassOrInterfaceDeclaration classDecl) {
 
         Optional<NormalAnnotationExpr> annOpt = method.getAnnotations().stream()
                 .filter(a -> {
@@ -1326,6 +1327,7 @@ public class PermuteProcessor extends AbstractProcessor {
         String typeArgTo = getAnnAttr(ann, "typeArgTo");
         String typeArgName = getAnnAttr(ann, "typeArgName");
         String typeArgs = getAnnAttr(ann, "typeArgs");
+        String replaceLastTypeArgWith = getAnnAttr(ann, "replaceLastTypeArgWith");
 
         if (classNameTemplate == null || classNameTemplate.isEmpty())
             return;
@@ -1338,6 +1340,31 @@ public class PermuteProcessor extends AbstractProcessor {
                     "@PermuteReturn: cannot evaluate className \"" + classNameTemplate
                             + "\": " + e.getMessage(),
                     element);
+            return;
+        }
+
+        // replaceLastTypeArgWith= — replaces the last type param in the return type
+        if (replaceLastTypeArgWith != null && !replaceLastTypeArgWith.isEmpty()
+                && (typeArgs == null || typeArgs.isEmpty())
+                && (typeArgVarName == null || typeArgVarName.isEmpty())) {
+            java.util.List<String> params = new java.util.ArrayList<>();
+            classDecl.getTypeParameters().forEach(tp -> params.add(tp.getNameAsString()));
+            if (!params.isEmpty()) {
+                params.set(params.size() - 1, replaceLastTypeArgWith);
+            } else {
+                params.add(replaceLastTypeArgWith);
+            }
+            String typeSrc = evaluatedClassName + "<" + String.join(", ", params) + ">";
+            try {
+                method.setType(StaticJavaParser.parseType(typeSrc));
+            } catch (Exception e) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                        "@PermuteReturn: cannot parse computed return type \"" + typeSrc
+                                + "\": " + e.getMessage(),
+                        element);
+                return;
+            }
+            method.getAnnotations().removeIf(a -> a == ann);
             return;
         }
 
@@ -1497,6 +1524,7 @@ public class PermuteProcessor extends AbstractProcessor {
             String whenExpr = getAnnAttr(ann, "when");
             String alwaysEmitAttr = getAnnAttr(ann, "alwaysEmit");
             String typeArgFrom = getAnnAttr(ann, "typeArgFrom");
+            String replaceLastTypeArgWith = getAnnAttr(ann, "replaceLastTypeArgWith");
 
             if (classNameTemplate == null || classNameTemplate.isEmpty())
                 return;
@@ -1568,6 +1596,31 @@ public class PermuteProcessor extends AbstractProcessor {
 
             if (!shouldGenerate) {
                 toRemove.add(method);
+                return;
+            }
+
+            // replaceLastTypeArgWith= — replaces the last type param in the return type
+            if (replaceLastTypeArgWith != null && !replaceLastTypeArgWith.isEmpty()
+                    && (typeArgs == null || typeArgs.isEmpty())
+                    && (typeArgVarName == null || typeArgVarName.isEmpty())) {
+                java.util.List<String> params = new java.util.ArrayList<>();
+                classDecl.getTypeParameters().forEach(tp -> params.add(tp.getNameAsString()));
+                if (!params.isEmpty()) {
+                    params.set(params.size() - 1, replaceLastTypeArgWith);
+                } else {
+                    params.add(replaceLastTypeArgWith);
+                }
+                String typeSrc = evaluatedClassName + "<" + String.join(", ", params) + ">";
+                try {
+                    method.setType(StaticJavaParser.parseType(typeSrc));
+                } catch (Exception e) {
+                    processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                            "@PermuteReturn: cannot parse computed return type \"" + typeSrc
+                                    + "\": " + e.getMessage(),
+                            element);
+                    return;
+                }
+                method.getAnnotations().removeIf(a -> a == ann);
                 return;
             }
 

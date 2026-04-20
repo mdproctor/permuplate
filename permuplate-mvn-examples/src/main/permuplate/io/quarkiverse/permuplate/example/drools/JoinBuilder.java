@@ -218,9 +218,7 @@ public class JoinBuilder {
          * }</pre>
          */
         @SuppressWarnings({"unchecked", "varargs"})
-        @PermuteReturn(className = "Join${i}First",
-                       typeArgs = "'END, DS, ' + typeArgList(1, i-1, 'alpha') + (i > 1 ? ', ' : '') + 'T'",
-                       alwaysEmit = true)
+        @PermuteReturn(className = "Join${i}First", alwaysEmit = true, replaceLastTypeArgWith = "T")
         public <T> Object type(Class<T>... cls) {
             return cast(this);
         }

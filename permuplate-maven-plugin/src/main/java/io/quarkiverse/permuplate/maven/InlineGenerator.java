@@ -1148,6 +1148,24 @@ public class InlineGenerator {
                 return;
             }
 
+            // replaceLastTypeArgWith= — replaces the last type param in the return type
+            if (cfg.hasReplaceLastTypeArgWith() && !cfg.hasTypeArgsExpr() && !cfg.hasTypeArgLoop()) {
+                java.util.List<String> params = new java.util.ArrayList<>();
+                classDecl.getTypeParameters().forEach(tp -> params.add(tp.getNameAsString()));
+                if (!params.isEmpty()) {
+                    params.set(params.size() - 1, cfg.replaceLastTypeArgWith());
+                } else {
+                    params.add(cfg.replaceLastTypeArgWith());
+                }
+                String typeSrc = evaluatedClass + "<" + String.join(", ", params) + ">";
+                try {
+                    method.setType(StaticJavaParser.parseType(typeSrc));
+                } catch (Exception ignored) {
+                }
+                method.getAnnotations().removeIf(a -> a == annOpt.get());
+                return;
+            }
+
             // Alpha inference: when typeArgs is absent, use pre-collected inference map (identity lookup)
             AnnotationReader.PermuteReturnConfig effectiveCfg = cfg;
             if (!cfg.hasTypeArgsExpr() && !cfg.hasTypeArgLoop()) {
