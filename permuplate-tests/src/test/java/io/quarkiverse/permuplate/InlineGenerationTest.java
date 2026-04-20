@@ -472,6 +472,105 @@ public class InlineGenerationTest {
         assertThat(src).doesNotContain("@PermuteDeclr");
     }
 
+    // -------------------------------------------------------------------------
+    // Self-return inference — zero annotations needed
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testSelfReturnInferenceRequiresNoAnnotation() throws Exception {
+        // Methods with 'return this;' body and Object sentinel return type should
+        // automatically get the return type set to the current generated class.
+        // No @PermuteSelf, no @PermuteReturn needed.
+        StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_21);
+        CompilationUnit parentCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                public class Host {
+                }
+                """);
+        CompilationUnit templateCu = StaticJavaParser.parse("""
+                package io.permuplate.test;
+                import io.quarkiverse.permuplate.Permute;
+                public class Host {
+                    @Permute(varName="i", from="2", to="3", className="Fluent${i}", inline=true)
+                    static class FluentTemplate {
+                        // No @PermuteSelf, no @PermuteReturn — inference from 'return this;'
+                        public Object step() { return this; }
+                        public String name() { return "hello"; }  // NOT inferred — not Object return
+                    }
+                }
+                """);
+        ClassOrInterfaceDeclaration template = templateCu.findFirst(
+                ClassOrInterfaceDeclaration.class,
+                c -> "FluentTemplate".equals(c.getNameAsString())).orElseThrow();
+        var ann = template.getAnnotationByName("Permute").orElseThrow();
+        PermuteConfig config = AnnotationReader.readPermute(ann);
+        CompilationUnit result = InlineGenerator.generate(parentCu, template, config,
+                PermuteConfig.buildAllCombinations(config));
+        String src = result.toString();
+        // step() inferred as Fluent2 and Fluent3 return types
+        assertThat(src).contains("Fluent2 step()");
+        assertThat(src).contains("Fluent3 step()");
+        // name() unchanged (String return, not Object)
+        assertThat(src).contains("String name()");
+    }
+
+    @Test
+    public void testSelfReturnInferenceWithCastThis() throws Exception {
+        // cast(this) pattern also triggers inference (used in JoinBuilder).
+        StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_21);
+        CompilationUnit parentCu = StaticJavaParser.parse("package io.p.t; public class H {}");
+        CompilationUnit templateCu = StaticJavaParser.parse("""
+                package io.p.t;
+                import io.quarkiverse.permuplate.Permute;
+                public class H {
+                    @Permute(varName="i", from="2", to="2", className="R${i}", inline=true)
+                    static class RTemplate {
+                        @SuppressWarnings("unchecked")
+                        private static <T> T cast(Object o) { return (T) o; }
+                        public Object fluent() { return cast(this); }
+                    }
+                }
+                """);
+        ClassOrInterfaceDeclaration template = templateCu.findFirst(
+                ClassOrInterfaceDeclaration.class,
+                c -> "RTemplate".equals(c.getNameAsString())).orElseThrow();
+        var ann = template.getAnnotationByName("Permute").orElseThrow();
+        PermuteConfig config = AnnotationReader.readPermute(ann);
+        CompilationUnit result = InlineGenerator.generate(parentCu, template, config,
+                PermuteConfig.buildAllCombinations(config));
+        assertThat(result.toString()).contains("R2 fluent()");
+    }
+
+    @Test
+    public void testExplicitPermuteReturnTakesPrecedenceOverInference() throws Exception {
+        // @PermuteReturn explicitly set on a method prevents inference from firing.
+        StaticJavaParser.getParserConfiguration()
+                .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_21);
+        CompilationUnit parentCu = StaticJavaParser.parse("package io.p.t; public class H {}");
+        CompilationUnit templateCu = StaticJavaParser.parse("""
+                package io.p.t;
+                import io.quarkiverse.permuplate.*;
+                public class H {
+                    @Permute(varName="i", from="2", to="2", className="Ex${i}", inline=true)
+                    static class ExTemplate {
+                        @PermuteReturn(className="Ex${i}", typeArgs="", alwaysEmit=true)
+                        public Object explicit() { return this; }
+                    }
+                }
+                """);
+        ClassOrInterfaceDeclaration template = templateCu.findFirst(
+                ClassOrInterfaceDeclaration.class,
+                c -> "ExTemplate".equals(c.getNameAsString())).orElseThrow();
+        var ann = template.getAnnotationByName("Permute").orElseThrow();
+        PermuteConfig config = AnnotationReader.readPermute(ann);
+        CompilationUnit result = InlineGenerator.generate(parentCu, template, config,
+                PermuteConfig.buildAllCombinations(config));
+        // explicit() should still have Ex2 return type (from @PermuteReturn, not inference)
+        assertThat(result.toString()).contains("Ex2 explicit()");
+    }
+
     private static TypeDeclaration<?> findNestedType(
             ClassOrInterfaceDeclaration parent, String name) {
         return parent.getMembers().stream()

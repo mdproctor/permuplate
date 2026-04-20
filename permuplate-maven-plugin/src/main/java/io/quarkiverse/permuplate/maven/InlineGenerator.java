@@ -316,6 +316,10 @@ public class InlineGenerator {
                         generated, ctx, null, null);
             }
 
+            // Self-return inference: methods returning 'this' with Object sentinel and
+            // no explicit @PermuteReturn are automatically given the generated class return type.
+            applySelfReturnInference(generated);
+
             // Synthesise @PermuteDelegate method bodies
             applyPermuteDelegate(generated, parentCu);
 
@@ -1798,6 +1802,76 @@ public class InlineGenerator {
                 }
             });
         }
+    }
+
+    /**
+     * Returns true if every return statement in the method returns {@code this}
+     * or {@code cast(this)} — making this a fluent self-return method eligible
+     * for automatic return-type inference.
+     */
+    private static boolean isSelfReturning(MethodDeclaration method) {
+        if (!method.getType().asString().equals("Object"))
+            return false;
+        java.util.Optional<com.github.javaparser.ast.stmt.BlockStmt> body = method.getBody();
+        if (body.isEmpty())
+            return false;
+        java.util.List<com.github.javaparser.ast.stmt.ReturnStmt> returns = body.get()
+                .findAll(com.github.javaparser.ast.stmt.ReturnStmt.class);
+        if (returns.isEmpty())
+            return false;
+        return returns.stream().allMatch(ret -> {
+            if (ret.getExpression().isEmpty())
+                return false;
+            com.github.javaparser.ast.expr.Expression expr = ret.getExpression().get();
+            // Direct: return this;
+            if (expr instanceof com.github.javaparser.ast.expr.ThisExpr)
+                return true;
+            // Wrapped: return cast(this);
+            if (expr instanceof com.github.javaparser.ast.expr.MethodCallExpr call) {
+                return call.getNameAsString().equals("cast")
+                        && call.getArguments().size() == 1
+                        && call.getArgument(0) instanceof com.github.javaparser.ast.expr.ThisExpr;
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Post-pass: methods with {@code Object} sentinel return, no explicit
+     * {@code @PermuteReturn}, and a body that always returns {@code this} get their
+     * return type set to the current generated class automatically. No annotation needed.
+     *
+     * <p>
+     * Runs after {@code PermuteSelfTransformer} so that methods with explicit
+     * {@code @PermuteSelf} are already processed (their annotation consumed).
+     * This inference post-pass catches the remaining unannotated self-return methods.
+     */
+    private static void applySelfReturnInference(TypeDeclaration<?> classDecl) {
+        String className = classDecl.getNameAsString();
+        String typeParams = "";
+        if (classDecl instanceof NodeWithTypeParameters<?> nwtp) {
+            @SuppressWarnings("unchecked")
+            NodeList<TypeParameter> tps = ((NodeWithTypeParameters<TypeDeclaration<?>>) nwtp).getTypeParameters();
+            typeParams = tps.stream()
+                    .map(TypeParameter::getNameAsString)
+                    .collect(Collectors.joining(", "));
+        }
+        String returnTypeSrc = typeParams.isEmpty()
+                ? className
+                : className + "<" + typeParams + ">";
+        com.github.javaparser.ast.type.Type returnType = StaticJavaParser.parseType(returnTypeSrc);
+
+        classDecl.findAll(MethodDeclaration.class).forEach(method -> {
+            // Explicit @PermuteReturn takes precedence — skip
+            boolean hasExplicitReturn = method.getAnnotations().stream()
+                    .anyMatch(a -> a.getNameAsString().equals("PermuteReturn")
+                            || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteReturn"));
+            if (hasExplicitReturn)
+                return;
+            if (!isSelfReturning(method))
+                return;
+            method.setType(returnType.clone());
+        });
     }
 
     /**
