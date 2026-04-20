@@ -35,7 +35,8 @@ public class PermuteMethodNavigator implements GotoDeclarationHandler {
             "io.quarkiverse.permuplate.PermuteMethod",
             "io.quarkiverse.permuplate.PermuteVar",
             "io.quarkiverse.permuplate.PermuteReturn",
-            "io.quarkiverse.permuplate.PermuteExtends"
+            "io.quarkiverse.permuplate.PermuteExtends",
+            "io.quarkiverse.permuplate.PermuteSwitchArm"
     );
 
     @Override

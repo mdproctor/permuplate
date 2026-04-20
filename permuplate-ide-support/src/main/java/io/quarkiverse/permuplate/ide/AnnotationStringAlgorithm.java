@@ -271,6 +271,86 @@ public class AnnotationStringAlgorithm {
     }
 
     // =========================================================
+    // computeEmbeddedRename()
+    // =========================================================
+
+    /**
+     * Computes an updated annotation string when {@code oldClassName} appears as a
+     * whole-word token embedded inside one or more literal segments of the template
+     * (rather than the template as a whole representing a class name pattern).
+     *
+     * <p>
+     * This handles attributes like {@code @PermuteSwitchArm} {@code pattern} and
+     * {@code body} where the class name appears in a Java expression context, e.g.
+     * {@code "Shape2 s${k}"} → {@code "Geom2 s${k}"} after renaming Shape2 → Geom2.
+     *
+     * <p>
+     * A "whole-word" occurrence of {@code oldClassName} is one where the character
+     * immediately after it (if any) is not a Java identifier character — preventing
+     * spurious replacements of e.g. {@code "Shape22"} when renaming {@code "Shape2"}.
+     *
+     * <ul>
+     * <li>{@link RenameResult.Updated} — at least one replacement was made</li>
+     * <li>{@link RenameResult.NoMatch} — {@code oldClassName} does not appear as a
+     * whole-word token in any literal segment</li>
+     * </ul>
+     */
+    public static RenameResult computeEmbeddedRename(AnnotationStringTemplate t,
+            String oldClassName, String newClassName) {
+        boolean anyChanged = false;
+        List<AnnotationStringPart> newParts = new ArrayList<>();
+
+        for (AnnotationStringPart part : t.parts()) {
+            if (part.isVariable()) {
+                newParts.add(part);
+                continue;
+            }
+            String literal = part.text();
+            String replaced = replaceWholeWord(literal, oldClassName, newClassName);
+            if (!replaced.equals(literal)) {
+                anyChanged = true;
+            }
+            newParts.add(AnnotationStringPart.literal(replaced));
+        }
+
+        if (!anyChanged) {
+            return new RenameResult.NoMatch();
+        }
+        return new RenameResult.Updated(new AnnotationStringTemplate(newParts).toLiteral());
+    }
+
+    /**
+     * Replaces all whole-word occurrences of {@code target} in {@code s} with
+     * {@code replacement}. A whole-word occurrence is one where the character
+     * immediately following {@code target} (if any) is not a Java identifier part.
+     */
+    private static String replaceWholeWord(String s, String target, String replacement) {
+        if (target.isEmpty())
+            return s;
+        StringBuilder sb = new StringBuilder();
+        int searchFrom = 0;
+        while (true) {
+            int idx = s.indexOf(target, searchFrom);
+            if (idx < 0) {
+                sb.append(s, searchFrom, s.length());
+                break;
+            }
+            int after = idx + target.length();
+            // Whole-word check: char after target must not be a Java identifier part
+            if (after < s.length() && Character.isJavaIdentifierPart(s.charAt(after))) {
+                // Not a whole-word match — skip past this occurrence
+                sb.append(s, searchFrom, idx + 1);
+                searchFrom = idx + 1;
+            } else {
+                sb.append(s, searchFrom, idx);
+                sb.append(replacement);
+                searchFrom = after;
+            }
+        }
+        return sb.toString();
+    }
+
+    // =========================================================
     // validate()
     // =========================================================
 

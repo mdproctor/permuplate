@@ -53,7 +53,8 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
             "io.quarkiverse.permuplate.PermuteMethod",
             "io.quarkiverse.permuplate.PermuteSource",
             "io.quarkiverse.permuplate.PermuteAnnotation",
-            "io.quarkiverse.permuplate.PermuteThrows"
+            "io.quarkiverse.permuplate.PermuteThrows",
+            "io.quarkiverse.permuplate.PermuteSwitchArm"
     );
 
     /**
@@ -251,6 +252,14 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
 
             AnnotationStringTemplate template = AnnotationStringAlgorithm.parse(currentValue);
             RenameResult result = AnnotationStringAlgorithm.computeRename(template, oldName, newName);
+
+            // If the standard algorithm finds no match, try the embedded rename path.
+            // This handles attributes like @PermuteSwitchArm pattern/body where the class
+            // name appears as a whole-word token inside a larger Java expression string,
+            // e.g. "Shape2 s${k}" → "Geom2 s${k}".
+            if (result instanceof RenameResult.NoMatch) {
+                result = AnnotationStringAlgorithm.computeEmbeddedRename(template, oldName, newName);
+            }
 
             if (result instanceof RenameResult.Updated updated) {
                 SmartPsiElementPointer<PsiLiteralExpression> pointer =

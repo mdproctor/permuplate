@@ -739,6 +739,43 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
                 affected.stream().anyMatch(lit -> "@MyAnnotation".equals(lit.getValue())));
     }
 
+    public void testClassRenameUpdatesPermuteSwitchArmPattern() {
+        myFixture.configureByText("Dispatch2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Dispatch${i}\")\n" +
+                "public class Dispatch2 {\n" +
+                "    @PermuteSwitchArm(varName=\"k\", from=\"1\", to=\"${i-1}\",\n" +
+                "                     pattern=\"Shape2 s${k}\",\n" +
+                "                     body=\"yield s${k}.hashCode();\")\n" +
+                "    public int area(Object o) {\n" +
+                "        return switch (o) { default -> 0; };\n" +
+                "    }\n" +
+                "}");
+
+        myFixture.addFileToProject("Shape2.java",
+                "package io.example; public class Shape2 {}");
+
+        PsiClass shape2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Shape2",
+                        GlobalSearchScope.allScope(getProject()));
+        assertNotNull("Shape2 should be findable", shape2);
+        myFixture.renameElement(shape2, "Geom2");
+
+        myFixture.checkResult(
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Dispatch${i}\")\n" +
+                "public class Dispatch2 {\n" +
+                "    @PermuteSwitchArm(varName=\"k\", from=\"1\", to=\"${i-1}\",\n" +
+                "                     pattern=\"Geom2 s${k}\",\n" +
+                "                     body=\"yield s${k}.hashCode();\")\n" +
+                "    public int area(Object o) {\n" +
+                "        return switch (o) { default -> 0; };\n" +
+                "    }\n" +
+                "}");
+    }
+
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
         com.intellij.openapi.vfs.VirtualFile generatedFile =
                 myFixture.getTempDirFixture().createFile(
