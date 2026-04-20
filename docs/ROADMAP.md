@@ -1,6 +1,6 @@
 # Permuplate Roadmap
 
-Prioritised list of improvements beyond the current feature set. Updated 2026-04-18.
+Prioritised list of improvements beyond the current feature set. Updated 2026-04-20.
 
 ---
 
@@ -15,6 +15,14 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 | `@PermuteAnnotation` | Adds annotations to generated classes/methods/fields with optional JEXL guard. |
 | `@PermuteThrows` | Adds throws clauses to generated methods with optional JEXL guard. |
 | `@PermuteSource` + `@PermuteDelegate` | Template composition — derive a class family from another generated family. |
+| `@PermuteBody` | Replaces an entire method or constructor body per permutation. |
+| `@PermuteEnumConst` | Expands a sentinel enum constant into a sequence of constants per permutation. |
+| Enum templates | `@Permute` on `enum` types — `PriorityEnum1.java` is the canonical example. |
+| Sealed class `permits` expansion | Maven plugin inline mode auto-expands the `permits` clause when the template name is used as a placeholder. |
+| `permuplate-test-support` module | Fluent `assertGenerated(compilation, className).hasField(...).hasCase(...)` assertion API. |
+| `alwaysEmit=true` on `@PermuteReturn` | Self-documenting alternative to `when="true"` for boundary omission opt-out. |
+| `capitalize()` / `decapitalize()` JEXL functions | First-character case manipulation for string-set permutations. |
+| `@PermuteBody` in `@PermuteMethod` context | Body templates can now reference the inner method variable (e.g. `${n}`). |
 
 ---
 
@@ -36,14 +44,11 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 - **Ant / Bazel / Buck support** — long tail after Gradle
 
 ### New annotation capabilities
-- **Enum generation** — `@Permute` on an `enum` type; `@PermuteCase` generating the constants
-- **Sealed class `permits` expansion** — automatically add generated siblings to a sealed interface's `permits` clause
-- **`@PermuteBody`** — replace an entire method body per permutation (more powerful than `@PermuteStatements` which only inserts at first/last)
 - **`@PermuteIf` on the whole class** — suppress generation of an entire class for a specific value (range alone cannot skip a value in the middle)
+- **`@PermuteVar` string-set axis** — secondary loop variable with `values={"..."}` for cross-product generation with a string axis
 
 ### Developer experience
 - **Better JEXL error messages** — raw JEXL exceptions surfaced as annotation processor errors are hard to parse; a smarter error layer would help
-- **`permuplate-test-support` module** — fluent API for verifying generated output, e.g. `assertGenerated("Join3").hasField("Callable3 c3").hasMethod("join(Object, Object, List)")`, so template authors don't need to write raw string assertions
 - **VS Code extension** — port the IntelliJ plugin's template-aware navigation and refactoring to VS Code (tracked as issue #4)
 
 ### Language coverage
