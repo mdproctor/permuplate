@@ -341,6 +341,7 @@ public class PermuteMojo extends AbstractMojo {
 
     private void generateInline(SourceScanner.AnnotatedType entry, PermuteConfig config)
             throws Exception {
+        config = InlineGenerator.mergeContainerMacros(config, entry.typeDecl());
         List<Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
         CompilationUnit outputCu = InlineGenerator.generate(
                 entry.cu(), entry.typeDecl(), config, allCombinations);
@@ -407,6 +408,11 @@ public class PermuteMojo extends AbstractMojo {
             } catch (AnnotationReader.MojoAnnotationException e) {
                 throw new MojoExecutionException(sourceFile + ": " + e.getMessage(), e);
             }
+            // Use the original entry's typeDecl for container macro collection — the original
+            // source tree retains @PermuteMacros on the outer class, whereas currentTemplate
+            // may come from a previously-generated (stripped) CU when processing the second
+            // template in a chained group.
+            config = InlineGenerator.mergeContainerMacros(config, entry.typeDecl());
             java.util.List<java.util.Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
             currentCu = InlineGenerator.generate(currentCu, currentTemplate, config, allCombinations);
         }

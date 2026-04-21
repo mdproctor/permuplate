@@ -86,6 +86,15 @@ public final class PermuteConfig {
         this.keepTemplate = keepTemplate;
     }
 
+    /**
+     * Returns a copy of this config with the macros array replaced by {@code newMacros}.
+     * Used by the Maven plugin to prepend container macros from {@code @PermuteMacros}.
+     */
+    public PermuteConfig withMacros(String[] newMacros) {
+        return new PermuteConfig(varName, from, to, values, className, strings, newMacros, extraVars, inline,
+                keepTemplate);
+    }
+
     /** Constructs from the javac annotation proxy (APT path). */
     public static PermuteConfig from(io.quarkiverse.permuplate.Permute permute) {
         PermuteVarConfig[] extraVars = new PermuteVarConfig[permute.extraVars().length];

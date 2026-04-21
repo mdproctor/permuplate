@@ -4,6 +4,7 @@ import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteBody;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteMethod;
+import io.quarkiverse.permuplate.PermuteMacros;
 import io.quarkiverse.permuplate.PermuteParam;
 import io.quarkiverse.permuplate.PermuteReturn;
 import io.quarkiverse.permuplate.PermuteSelf;
@@ -35,6 +36,7 @@ import io.quarkiverse.permuplate.PermuteTypeParam;
  * and its matched tuples are cross-producted with the current chain's tuples. This models
  * the Rete bi-linear beta node for node-sharing between rules that share a common sub-network.
  */
+@PermuteMacros({"alphaList=typeArgList(1,i,'alpha')"})
 public class JoinBuilder {
 
     /**
@@ -77,8 +79,7 @@ public class JoinBuilder {
      * </ul>
      */
     @Permute(varName = "i", from = "1", to = "6", className = "Join${i}Second",
-             inline = true, keepTemplate = false,
-             macros = {"alphaList=typeArgList(1,i,'alpha')"})
+             inline = true, keepTemplate = false)
     public static non-sealed class Join0Second<END, DS,
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
             extends BaseRuleBuilder<END>
@@ -274,8 +275,7 @@ public class JoinBuilder {
      * the template; inherited {@code join()} and {@code fn()} come from Second via extends.
      */
     @Permute(varName = "i", from = "1", to = "6", className = "Join${i}First",
-             inline = true, keepTemplate = false,
-             macros = {"alphaList=typeArgList(1,i,'alpha')"})
+             inline = true, keepTemplate = false)
     public static non-sealed class Join0First<END, DS,
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
             extends Join0Second<END, DS, A>

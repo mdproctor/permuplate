@@ -91,6 +91,19 @@ public class InlineGenerator {
         // Clone the entire parent CU as the starting point for the output
         CompilationUnit outputCu = parentCu.clone();
 
+        // Strip @PermuteMacros from all types in the output CU — it is a source-only
+        // annotation that must not appear in the generated (compiled) output.
+        // Also remove the corresponding import so javac does not try to resolve it.
+        outputCu.findAll(TypeDeclaration.class).forEach(td -> {
+            @SuppressWarnings("unchecked")
+            TypeDeclaration<?> t = (TypeDeclaration<?>) td;
+            t.getAnnotations().removeIf(a -> {
+                String n = a.getNameAsString();
+                return n.equals("PermuteMacros") || n.equals("io.quarkiverse.permuplate.PermuteMacros");
+            });
+        });
+        outputCu.getImports().removeIf(imp -> imp.getNameAsString().equals("io.quarkiverse.permuplate.PermuteMacros"));
+
         // Top-level templates (inline=true on a non-nested class): the template IS the
         // top-level type. Generated classes are added directly to the CU, not as members
         // of an enclosing outer class. Nested templates follow the original path.
@@ -2270,5 +2283,83 @@ public class InlineGenerator {
         classDecl.findAll(com.github.javaparser.ast.expr.ObjectCreationExpr.class)
                 .forEach(newExpr -> newExpr.getType().getAnnotations()
                         .removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString())));
+    }
+
+    /**
+     * Merges container macros from {@code @PermuteMacros} on enclosing types into
+     * {@code config.macros}, returning an updated config. Container macros are prepended
+     * so that the template's own {@code macros=} entries (appended last) take precedence
+     * when names collide — {@code buildAllCombinations} evaluates in order and the last
+     * write wins for duplicate names.
+     *
+     * <p>
+     * Enclosing types are walked from innermost to outermost; the collected layers are
+     * reversed so outermost appears first in the merged list (declaration order).
+     *
+     * @param config the parsed {@code @Permute} config for the template
+     * @param templateDecl the template class declaration (used to find enclosing types)
+     * @return a new {@link PermuteConfig} with merged macros, or {@code config} unchanged
+     *         if no {@code @PermuteMacros} annotations are found on enclosing types
+     */
+    public static PermuteConfig mergeContainerMacros(PermuteConfig config,
+            TypeDeclaration<?> templateDecl) {
+        List<String> containerMacros = collectContainerMacros(templateDecl);
+        if (containerMacros.isEmpty())
+            return config;
+        // Container macros come first; template's own macros= are appended so they win
+        // on name collision (buildAllCombinations evaluates in declaration order, last write wins).
+        List<String> combined = new java.util.ArrayList<>(containerMacros);
+        if (config.macros != null)
+            combined.addAll(java.util.Arrays.asList(config.macros));
+        return config.withMacros(combined.toArray(String[]::new));
+    }
+
+    /**
+     * Collects macro strings from {@code @PermuteMacros} annotations on all enclosing
+     * types of the given template declaration. Walks from innermost to outermost enclosing
+     * type, then reverses the collected layers so the result is in outermost-first order.
+     */
+    private static List<String> collectContainerMacros(TypeDeclaration<?> templateDecl) {
+        List<String[]> layers = new java.util.ArrayList<>();
+        com.github.javaparser.ast.Node current = templateDecl.getParentNode().orElse(null);
+        while (current instanceof TypeDeclaration<?> enclosing) {
+            enclosing.getAnnotations().stream()
+                    .filter(a -> {
+                        String n = a.getNameAsString();
+                        return n.equals("PermuteMacros")
+                                || n.equals("io.quarkiverse.permuplate.PermuteMacros");
+                    })
+                    .findFirst()
+                    .ifPresent(ann -> {
+                        if (ann instanceof com.github.javaparser.ast.expr.SingleMemberAnnotationExpr sm) {
+                            layers.add(readStringArrayExpr(sm.getMemberValue()));
+                        } else if (ann instanceof NormalAnnotationExpr normal) {
+                            normal.getPairs().stream()
+                                    .filter(p -> p.getNameAsString().equals("value"))
+                                    .findFirst()
+                                    .ifPresent(p -> layers.add(readStringArrayExpr(p.getValue())));
+                        }
+                    });
+            current = enclosing.getParentNode().orElse(null);
+        }
+        // Reverse so outermost is first, innermost is last
+        java.util.Collections.reverse(layers);
+        List<String> result = new java.util.ArrayList<>();
+        for (String[] arr : layers)
+            result.addAll(java.util.Arrays.asList(arr));
+        return result;
+    }
+
+    /**
+     * Reads a string array from a JavaParser annotation value expression.
+     * Handles both {@code {"a", "b"}} (ArrayInitializerExpr) and {@code "a"} (single string).
+     */
+    private static String[] readStringArrayExpr(com.github.javaparser.ast.expr.Expression expr) {
+        if (expr instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr) {
+            return arr.getValues().stream()
+                    .map(v -> io.quarkiverse.permuplate.core.PermuteDeclrTransformer.stripQuotes(v.toString()))
+                    .toArray(String[]::new);
+        }
+        return new String[] { io.quarkiverse.permuplate.core.PermuteDeclrTransformer.stripQuotes(expr.toString()) };
     }
 }
