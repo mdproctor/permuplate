@@ -91,18 +91,26 @@ public class InlineGenerator {
         // Clone the entire parent CU as the starting point for the output
         CompilationUnit outputCu = parentCu.clone();
 
-        // Strip @PermuteMacros from all types in the output CU — it is a source-only
-        // annotation that must not appear in the generated (compiled) output.
-        // Also remove the corresponding import so javac does not try to resolve it.
+        // Strip @PermuteMacros / @PermuteBodyFragment(s) from all types in the output CU —
+        // these are source-only annotations that must not appear in the generated (compiled) output.
+        // Also remove the corresponding imports so javac does not try to resolve them.
         outputCu.findAll(TypeDeclaration.class).forEach(td -> {
             @SuppressWarnings("unchecked")
             TypeDeclaration<?> t = (TypeDeclaration<?>) td;
             t.getAnnotations().removeIf(a -> {
                 String n = a.getNameAsString();
-                return n.equals("PermuteMacros") || n.equals("io.quarkiverse.permuplate.PermuteMacros");
+                return n.equals("PermuteMacros") || n.equals("io.quarkiverse.permuplate.PermuteMacros")
+                        || n.equals("PermuteBodyFragment") || n.equals("io.quarkiverse.permuplate.PermuteBodyFragment")
+                        || n.equals("PermuteBodyFragments")
+                        || n.equals("io.quarkiverse.permuplate.PermuteBodyFragments");
             });
         });
-        outputCu.getImports().removeIf(imp -> imp.getNameAsString().equals("io.quarkiverse.permuplate.PermuteMacros"));
+        outputCu.getImports().removeIf(imp -> {
+            String name = imp.getNameAsString();
+            return name.equals("io.quarkiverse.permuplate.PermuteMacros")
+                    || name.equals("io.quarkiverse.permuplate.PermuteBodyFragment")
+                    || name.equals("io.quarkiverse.permuplate.PermuteBodyFragments");
+        });
 
         // Top-level templates (inline=true on a non-nested class): the template IS the
         // top-level type. Generated classes are added directly to the CU, not as members
@@ -242,6 +250,10 @@ public class InlineGenerator {
 
                 // Constructor super-call inference (after @PermuteStatements so explicit wins)
                 inferSuperCalls(coid, templateHasExtendsAnnotation);
+
+                // @PermuteBodyFragment — substitute named fragments into @PermuteBody strings
+                java.util.Map<String, String> bodyFragments = collectBodyFragments(templateClassDecl, ctx);
+                applyBodyFragments(coid, bodyFragments);
 
                 // @PermuteBody — replace entire method or constructor body per permutation
                 PermuteBodyTransformer.transform(generated, ctx);
@@ -2486,7 +2498,9 @@ public class InlineGenerator {
                 "PermuteThrows", "io.quarkiverse.permuplate.PermuteThrows",
                 "PermuteSource", "io.quarkiverse.permuplate.PermuteSource",
                 "PermuteSources", "io.quarkiverse.permuplate.PermuteSources",
-                "PermuteMixin", "io.quarkiverse.permuplate.PermuteMixin");
+                "PermuteMixin", "io.quarkiverse.permuplate.PermuteMixin",
+                "PermuteBodyFragment", "io.quarkiverse.permuplate.PermuteBodyFragment",
+                "PermuteBodyFragments", "io.quarkiverse.permuplate.PermuteBodyFragments");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
@@ -2625,5 +2639,101 @@ public class InlineGenerator {
                     .toArray(String[]::new);
         }
         return new String[] { io.quarkiverse.permuplate.core.PermuteDeclrTransformer.stripQuotes(expr.toString()) };
+    }
+
+    /**
+     * Collects {@code @PermuteBodyFragment} declarations from the template class and all enclosing
+     * types (outermost first, so innermost overrides outermost on name collision), evaluates each
+     * fragment {@code value} with the current permutation context, and returns a name→evaluated-code map.
+     */
+    private static java.util.Map<String, String> collectBodyFragments(
+            TypeDeclaration<?> templateDecl, EvaluationContext ctx) {
+        java.util.Deque<List<AnnotationExpr>> layers = new java.util.ArrayDeque<>();
+        com.github.javaparser.ast.Node current = templateDecl.getParentNode().orElse(null);
+        while (current instanceof TypeDeclaration<?> enc) {
+            layers.addFirst(enc.getAnnotations());
+            current = enc.getParentNode().orElse(null);
+        }
+        layers.addLast(templateDecl.getAnnotations());
+
+        java.util.Map<String, String> fragments = new java.util.LinkedHashMap<>();
+        for (List<AnnotationExpr> anns : layers) {
+            for (AnnotationExpr ann : anns) {
+                String n = ann.getNameAsString();
+                if (n.equals("PermuteBodyFragment")
+                        || n.equals("io.quarkiverse.permuplate.PermuteBodyFragment")) {
+                    readBodyFragment(ann, ctx, fragments);
+                } else if (n.equals("PermuteBodyFragments")
+                        || n.equals("io.quarkiverse.permuplate.PermuteBodyFragments")) {
+                    if (ann instanceof NormalAnnotationExpr normal) {
+                        normal.getPairs().stream()
+                                .filter(p -> p.getNameAsString().equals("value"))
+                                .findFirst()
+                                .ifPresent(p -> {
+                                    if (p.getValue() instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr) {
+                                        arr.getValues().forEach(v -> {
+                                            if (v instanceof AnnotationExpr inner)
+                                                readBodyFragment(inner, ctx, fragments);
+                                        });
+                                    } else if (p.getValue() instanceof AnnotationExpr inner) {
+                                        readBodyFragment(inner, ctx, fragments);
+                                    }
+                                });
+                    }
+                }
+            }
+        }
+        return fragments;
+    }
+
+    private static void readBodyFragment(AnnotationExpr ann, EvaluationContext ctx,
+            java.util.Map<String, String> out) {
+        if (!(ann instanceof NormalAnnotationExpr normal))
+            return;
+        String name = null, value = null;
+        for (com.github.javaparser.ast.expr.MemberValuePair p : normal.getPairs()) {
+            String raw = PermuteDeclrTransformer.stripQuotes(p.getValue().toString());
+            if (p.getNameAsString().equals("name"))
+                name = raw;
+            else if (p.getNameAsString().equals("value"))
+                value = raw;
+        }
+        if (name == null || value == null)
+            return;
+        try {
+            out.put(name, ctx.evaluate(value));
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * Substitutes {@code ${name}} fragment references in all {@code @PermuteBody} body attribute
+     * strings on the given type declaration. Must be called BEFORE {@link PermuteBodyTransformer} runs.
+     */
+    private static void applyBodyFragments(TypeDeclaration<?> classDecl,
+            java.util.Map<String, String> fragments) {
+        if (fragments.isEmpty())
+            return;
+        classDecl.findAll(AnnotationExpr.class).stream()
+                .filter(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteBody") || n.equals("io.quarkiverse.permuplate.PermuteBody");
+                })
+                .forEach(ann -> {
+                    if (!(ann instanceof NormalAnnotationExpr normal))
+                        return;
+                    normal.getPairs().stream()
+                            .filter(p -> p.getNameAsString().equals("body"))
+                            .forEach(p -> {
+                                String body = PermuteDeclrTransformer.stripQuotes(p.getValue().toString());
+                                String expanded = body;
+                                for (java.util.Map.Entry<String, String> entry : fragments.entrySet()) {
+                                    expanded = expanded.replace("${" + entry.getKey() + "}", entry.getValue());
+                                }
+                                if (!expanded.equals(body)) {
+                                    p.setValue(new com.github.javaparser.ast.expr.StringLiteralExpr(expanded));
+                                }
+                            });
+                });
     }
 }
