@@ -1,6 +1,7 @@
 package io.quarkiverse.permuplate;
 
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
@@ -50,6 +51,7 @@ import java.lang.annotation.Target;
  * }
  * </pre>
  */
+@Repeatable(PermuteReturns.class)
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.METHOD)
 public @interface PermuteReturn {
@@ -59,8 +61,9 @@ public @interface PermuteReturn {
      * (e.g., {@code "Step${i+1}"}), but may also be a type variable name
      * (e.g., {@code "${alpha(i)}"} to return the i-th type parameter).
      * Evaluated against the outer permutation context for each generated class.
+     * Mutually exclusive with {@code typeParam}.
      */
-    String className();
+    String className() default "";
 
     /**
      * Variable name for the type argument expansion loop (e.g., {@code "j"}).
@@ -117,4 +120,16 @@ public @interface PermuteReturn {
      * Mutually exclusive with {@code typeArgs}.
      */
     String replaceLastTypeArgWith() default "";
+
+    /**
+     * When non-empty, the return type is set to the named type parameter declared on
+     * this class (e.g., {@code "END"}). Used at boundary cases where the method
+     * returns the outer scope type rather than a generated class.
+     *
+     * <p>
+     * Mutually exclusive with {@code className}, {@code typeArgs}, {@code typeArgVarName},
+     * and {@code replaceLastTypeArgWith}. When {@code typeParam} is set, boundary omission
+     * does not apply — the method is always generated.
+     */
+    String typeParam() default "";
 }

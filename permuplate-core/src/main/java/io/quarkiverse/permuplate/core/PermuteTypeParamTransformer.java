@@ -462,12 +462,19 @@ public class PermuteTypeParamTransformer {
                 continue;
             }
             if (fromVal > toVal) {
-                if (messager != null)
+                if (messager != null) {
+                    // APT mode: report error and keep the sentinel unchanged
                     messager.printMessage(Diagnostic.Kind.ERROR,
                             "@PermuteTypeParam has invalid range: from=" + fromVal +
                                     " is greater than to=" + toVal,
                             element);
-                result.add(tp);
+                    result.add(tp);
+                } else {
+                    // Maven plugin mode: empty range — silently remove the sentinel type parameter.
+                    // Enables templates that start below the minimum sentinel expansion arity,
+                    // e.g. @PermuteTypeParam(from="3", to="${i}") with i=2 removes the sentinel.
+                    expanded.add(sentinelName);
+                }
                 continue;
             }
 

@@ -1105,21 +1105,87 @@ public class InlineGenerator {
             Set<String> allGeneratedNames,
             java.util.IdentityHashMap<MethodDeclaration, String> alphaInference) {
 
+        record CfgAnn(AnnotationReader.PermuteReturnConfig cfg, AnnotationExpr ann) {
+        }
+
         List<MethodDeclaration> toRemove = new ArrayList<>();
 
         classDecl.getMethods().forEach(method -> {
-            // Find @PermuteReturn on this method
-            java.util.Optional<AnnotationExpr> annOpt = method.getAnnotations().stream()
-                    .filter(a -> a.getNameAsString().equals("PermuteReturn")
-                            || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteReturn"))
-                    .findFirst();
+            // Collect all @PermuteReturn configs from direct or @PermuteReturns container annotations
+            List<CfgAnn> allCfgs = new ArrayList<>();
+            for (AnnotationExpr ann : List.copyOf(method.getAnnotations())) {
+                String n = ann.getNameAsString();
+                if (n.equals("PermuteReturns") || n.equals("io.quarkiverse.permuplate.PermuteReturns")) {
+                    // Unwrap container
+                    if (ann instanceof NormalAnnotationExpr normal) {
+                        for (com.github.javaparser.ast.expr.MemberValuePair p : normal.getPairs()) {
+                            if (p.getNameAsString().equals("value")
+                                    && p.getValue() instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr) {
+                                for (com.github.javaparser.ast.expr.Expression v : arr.getValues()) {
+                                    if (v instanceof AnnotationExpr inner) {
+                                        AnnotationReader.PermuteReturnConfig c = AnnotationReader.readPermuteReturn(inner);
+                                        if (c != null)
+                                            allCfgs.add(new CfgAnn(c, ann));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn")) {
+                    AnnotationReader.PermuteReturnConfig c = AnnotationReader.readPermuteReturn(ann);
+                    if (c != null)
+                        allCfgs.add(new CfgAnn(c, ann));
+                }
+            }
 
-            if (annOpt.isEmpty())
+            if (allCfgs.isEmpty())
                 return;
 
-            AnnotationReader.PermuteReturnConfig cfg = AnnotationReader.readPermuteReturn(annOpt.get());
-            if (cfg == null)
+            // Pick the first config whose when= evaluates to true (or has no when=)
+            CfgAnn selected = null;
+            for (CfgAnn ca : allCfgs) {
+                if (ca.cfg().when().isEmpty()) {
+                    selected = ca;
+                    break;
+                }
+                try {
+                    boolean matches = Boolean.parseBoolean(ctx.evaluate("${" + ca.cfg().when() + "}"));
+                    if (matches) {
+                        selected = ca;
+                        break;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            // Remove all @PermuteReturn/@PermuteReturns annotations regardless of outcome
+            method.getAnnotations().removeIf(a -> {
+                String n = a.getNameAsString();
+                return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn")
+                        || n.equals("PermuteReturns") || n.equals("io.quarkiverse.permuplate.PermuteReturns");
+            });
+
+            if (selected == null) {
+                // No condition matched — omit method
+                toRemove.add(method);
                 return;
+            }
+
+            AnnotationReader.PermuteReturnConfig cfg = selected.cfg();
+
+            // typeParam= path: set return type to the named type parameter, always emit
+            if (cfg.hasTypeParam()) {
+                String evaluatedTypeParam = cfg.typeParam();
+                try {
+                    evaluatedTypeParam = ctx.evaluate(cfg.typeParam());
+                } catch (Exception ignored) {
+                }
+                try {
+                    method.setType(StaticJavaParser.parseType(evaluatedTypeParam));
+                } catch (Exception ignored) {
+                }
+                return;
+            }
 
             // Evaluate className
             String evaluatedClass;
@@ -1129,18 +1195,15 @@ public class InlineGenerator {
                 return;
             }
 
-            // Boundary omission
+            // Boundary omission (only applies when when= was empty and className path is used)
             boolean shouldGenerate;
             if (cfg.alwaysEmit()) {
                 shouldGenerate = true;
             } else if (cfg.when().isEmpty()) {
                 shouldGenerate = allGeneratedNames.contains(evaluatedClass);
             } else {
-                try {
-                    shouldGenerate = Boolean.parseBoolean(ctx.evaluate("${" + cfg.when() + "}"));
-                } catch (Exception ignored) {
-                    shouldGenerate = allGeneratedNames.contains(evaluatedClass);
-                }
+                // when= was already evaluated above (selected != null means it was true)
+                shouldGenerate = true;
             }
 
             if (!shouldGenerate) {
@@ -1162,7 +1225,6 @@ public class InlineGenerator {
                     method.setType(StaticJavaParser.parseType(typeSrc));
                 } catch (Exception ignored) {
                 }
-                method.getAnnotations().removeIf(a -> a == annOpt.get());
                 return;
             }
 
@@ -1182,9 +1244,6 @@ public class InlineGenerator {
                 method.setType(StaticJavaParser.parseType(returnTypeStr));
             } catch (Exception ignored) {
             }
-
-            // Remove @PermuteReturn annotation
-            method.getAnnotations().removeIf(a -> a == annOpt.get());
         });
 
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
@@ -1308,12 +1367,14 @@ public class InlineGenerator {
         }
     }
 
-    /** Collects method keys that have explicit @PermuteReturn — used to exclude from implicit inference. */
+    /** Collects method keys that have explicit @PermuteReturn or @PermuteReturns — used to exclude from implicit inference. */
     private static Set<String> collectExplicitReturnMethodNames(ClassOrInterfaceDeclaration classDecl) {
         Set<String> names = new HashSet<>();
         classDecl.getMethods().forEach(method -> method.getAnnotations().stream()
                 .filter(a -> a.getNameAsString().equals("PermuteReturn")
-                        || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteReturn"))
+                        || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteReturn")
+                        || a.getNameAsString().equals("PermuteReturns")
+                        || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteReturns"))
                 .findFirst()
                 .ifPresent(a -> names.add(method.getNameAsString() + method.getParameters().toString())));
         return names;
@@ -2134,6 +2195,7 @@ public class InlineGenerator {
                 "PermuteParam", "io.quarkiverse.permuplate.PermuteParam",
                 "PermuteTypeParam", "io.quarkiverse.permuplate.PermuteTypeParam",
                 "PermuteReturn", "io.quarkiverse.permuplate.PermuteReturn",
+                "PermuteReturns", "io.quarkiverse.permuplate.PermuteReturns",
                 "PermuteMethod", "io.quarkiverse.permuplate.PermuteMethod",
                 "PermuteExtends", "io.quarkiverse.permuplate.PermuteExtends",
                 "PermuteConst", "io.quarkiverse.permuplate.PermuteConst",
@@ -2141,6 +2203,7 @@ public class InlineGenerator {
                 "PermuteValue", "io.quarkiverse.permuplate.PermuteValue",
                 "PermuteStatements", "io.quarkiverse.permuplate.PermuteStatements",
                 "PermuteBody", "io.quarkiverse.permuplate.PermuteBody",
+                "PermuteBodies", "io.quarkiverse.permuplate.PermuteBodies",
                 "PermuteEnumConst", "io.quarkiverse.permuplate.PermuteEnumConst",
                 "PermuteSwitchArm", "io.quarkiverse.permuplate.PermuteSwitchArm",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",

@@ -212,7 +212,8 @@ public class AnnotationReader {
             String typeArgs,
             String when,
             boolean alwaysEmit,
-            String replaceLastTypeArgWith) {
+            String replaceLastTypeArgWith,
+            String typeParam) {
 
         public boolean hasTypeArgLoop() {
             return typeArgVarName != null && !typeArgVarName.isEmpty();
@@ -226,17 +227,21 @@ public class AnnotationReader {
             return replaceLastTypeArgWith != null && !replaceLastTypeArgWith.isEmpty();
         }
 
+        public boolean hasTypeParam() {
+            return typeParam != null && !typeParam.isEmpty();
+        }
+
         /** Returns a copy of this config with the typeArgs field replaced. */
         public PermuteReturnConfig withTypeArgs(String newTypeArgs) {
             return new PermuteReturnConfig(className, typeArgVarName, typeArgFrom,
-                    typeArgTo, typeArgName, newTypeArgs, when, alwaysEmit, replaceLastTypeArgWith);
+                    typeArgTo, typeArgName, newTypeArgs, when, alwaysEmit, replaceLastTypeArgWith, typeParam);
         }
     }
 
     /**
      * Reads a {@code @PermuteReturn} annotation from a JavaParser {@link AnnotationExpr}.
      * Returns {@code null} if the annotation is not a {@link NormalAnnotationExpr}
-     * or if {@code className} is missing.
+     * or if neither {@code className} nor {@code typeParam} is present.
      */
     public static PermuteReturnConfig readPermuteReturn(AnnotationExpr ann) {
         if (!(ann instanceof NormalAnnotationExpr))
@@ -245,7 +250,7 @@ public class AnnotationReader {
 
         String className = null, typeArgVarName = "", typeArgFrom = "1",
                 typeArgTo = "", typeArgName = "", typeArgs = "", when = "",
-                replaceLastTypeArgWith = "";
+                replaceLastTypeArgWith = "", typeParam = "";
         boolean alwaysEmit = false;
 
         for (MemberValuePair pair : normal.getPairs()) {
@@ -263,13 +268,16 @@ public class AnnotationReader {
                     case "typeArgs" -> typeArgs = val;
                     case "when" -> when = val;
                     case "replaceLastTypeArgWith" -> replaceLastTypeArgWith = val;
+                    case "typeParam" -> typeParam = val;
                 }
             }
         }
-        if (className == null)
+        if ((className == null || className.isEmpty()) && typeParam.isEmpty())
             return null;
+        if (className == null)
+            className = "";
         return new PermuteReturnConfig(className, typeArgVarName, typeArgFrom,
-                typeArgTo, typeArgName, typeArgs, when, alwaysEmit, replaceLastTypeArgWith);
+                typeArgTo, typeArgName, typeArgs, when, alwaysEmit, replaceLastTypeArgWith, typeParam);
     }
 
     /** Parsed @PermuteMethod configuration. */

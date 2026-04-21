@@ -3,6 +3,7 @@ package io.quarkiverse.permuplate.example.drools;
 import java.util.List;
 
 import io.quarkiverse.permuplate.Permute;
+import io.quarkiverse.permuplate.PermuteBody;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteReturn;
 import io.quarkiverse.permuplate.PermuteTypeParam;
@@ -14,45 +15,23 @@ import io.quarkiverse.permuplate.PermuteTypeParam;
  * RuleDefinition and returns the JoinFirst END type.
  *
  * <p>
- * Path2 is hand-written (terminal: returns END, structurally distinct).
- * Path3 is the template ({@code keepTemplate=true}); Path4..Path6 are generated.
+ * All classes Path2..Path6 are generated from the single Path1 template
+ * ({@code keepTemplate=false}). Path2 is the i=2 case (terminal: returns END via
+ * {@code @PermuteReturn(typeParam="END")}). Path3..6 are non-terminal and chain
+ * back to the next lower class via {@code @PermuteReturn(className="Path${i-1}")}.
  */
 public class RuleOOPathBuilder {
 
-    public static class Path2<END, T extends BaseTuple, A, B> {
-        private final END end;
-        private final RuleDefinition<?> rd;
-        private final List<OOPathStep> steps;
-        private final int rootIndex;
-
-        public Path2(END end, RuleDefinition<?> rd, List<OOPathStep> steps, int rootIndex) {
-            this.end = end;
-            this.rd = rd;
-            this.steps = steps;
-            this.rootIndex = rootIndex;
-        }
-
-        @SuppressWarnings("unchecked")
-        public END path(Function2<PathContext<T>, A, Iterable<B>> fn2,
-                Predicate2<PathContext<T>, B> flt2) {
-            steps.add(new OOPathStep(
-                    (ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact),
-                    (ctx, child) -> flt2.test((PathContext<T>) ctx, (B) child)));
-            rd.addOOPathPipeline(rootIndex, steps);
-            return end;
-        }
-    }
-
-    @Permute(varName = "i", from = "4", to = "6", className = "Path${i}",
-             inline = true, keepTemplate = true)
-    public static class Path3<END, T extends BaseTuple, A, B,
+    @Permute(varName = "i", from = "2", to = "6", className = "Path${i}",
+             inline = true, keepTemplate = false)
+    public static class Path1<END, T extends BaseTuple, A, B,
             @PermuteTypeParam(varName = "k", from = "3", to = "${i}", name = "${alpha(k)}") C> {
         private final END end;
         private final RuleDefinition<?> rd;
         private final List<OOPathStep> steps;
         private final int rootIndex;
 
-        public Path3(END end, RuleDefinition<?> rd, List<OOPathStep> steps, int rootIndex) {
+        public Path1(END end, RuleDefinition<?> rd, List<OOPathStep> steps, int rootIndex) {
             this.end = end;
             this.rd = rd;
             this.steps = steps;
@@ -60,15 +39,17 @@ public class RuleOOPathBuilder {
         }
 
         @SuppressWarnings("unchecked")
-        @PermuteReturn(className = "RuleOOPathBuilder.Path${i-1}",
+        @PermuteReturn(when = "i == 2", typeParam = "END")
+        @PermuteReturn(when = "i > 2", className = "RuleOOPathBuilder.Path${i-1}",
                        typeArgs = "'END, T, ' + typeArgList(2, i, 'alpha')",
                        alwaysEmit = true)
-        public Path2<END, T, B, C> path(Function2<PathContext<T>, A, Iterable<B>> fn2,
+        @PermuteBody(when = "i == 2",
+                     body = "{ steps.add(new OOPathStep((ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact), (ctx, child) -> flt2.test((PathContext<T>) ctx, (B) child))); rd.addOOPathPipeline(rootIndex, steps); return end; }")
+        @PermuteBody(when = "i > 2",
+                     body = "{ steps.add(new OOPathStep((ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact), (ctx, child) -> flt2.test((PathContext<T>) ctx, (B) child))); return new RuleOOPathBuilder.Path${i-1}<>(end, rd, steps, rootIndex); }")
+        public Object path(Function2<PathContext<T>, A, Iterable<B>> fn2,
                 Predicate2<PathContext<T>, B> flt2) {
-            steps.add(new OOPathStep(
-                    (ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact),
-                    (ctx, child) -> flt2.test((PathContext<T>) ctx, (B) child)));
-            return new @PermuteDeclr(type = "RuleOOPathBuilder.Path${i-1}") Path2<>(end, rd, steps, rootIndex);
+            return null; // replaced by @PermuteBody
         }
     }
 }
