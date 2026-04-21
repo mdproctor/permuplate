@@ -569,6 +569,11 @@ public class PermuteProcessor extends AbstractProcessor {
         // 5g3. @PermuteEnumConst — expand sentinel enum constants (no-op for non-enum types)
         io.quarkiverse.permuplate.core.PermuteEnumConstTransformer.transform(classDecl, ctx);
 
+        // 5g4. Infer return type from last 'return new X<>()' in body when X is in generated set
+        if (classDecl instanceof ClassOrInterfaceDeclaration coidForBodyInference) {
+            inferReturnFromBodyApt(coidForBodyInference, generatedSet);
+        }
+
         // 5h. @PermuteAnnotation — add Java annotations to generated elements (runs last)
         io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
                 classDecl, ctx, processingEnv.getMessager(), typeElement);
@@ -2037,6 +2042,68 @@ public class PermuteProcessor extends AbstractProcessor {
         });
 
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
+    }
+
+    /**
+     * Post-pass inference: when a method has {@code Object} return, no explicit
+     * {@code @PermuteReturn} remaining, and its last statement is
+     * {@code return new X<>()} or {@code return cast(new X<>())} where X is in
+     * {@code generatedSet} — infer the return type as X.
+     *
+     * <p>
+     * Runs AFTER {@code PermuteBodyTransformer} so the final body is in place.
+     * Explicit {@code @PermuteReturn} annotations are already consumed and removed
+     * by this point, so any remaining annotation indicates a bug — the guard checks
+     * for the annotation name as a safety net.
+     */
+    private static void inferReturnFromBodyApt(
+            com.github.javaparser.ast.body.ClassOrInterfaceDeclaration classDecl,
+            java.util.Set<String> generatedSet) {
+        classDecl.getMethods().forEach(method -> {
+            if (!method.getType().asString().equals("Object"))
+                return;
+            boolean hasReturn = method.getAnnotations().stream().anyMatch(a -> {
+                String n = a.getNameAsString();
+                return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn")
+                        || n.equals("PermuteReturns") || n.equals("io.quarkiverse.permuplate.PermuteReturns");
+            });
+            if (hasReturn)
+                return;
+            method.getBody().ifPresent(body -> {
+                if (body.getStatements().isEmpty())
+                    return;
+                com.github.javaparser.ast.stmt.Statement last = body.getStatements().get(body.getStatements().size() - 1);
+                if (!(last instanceof com.github.javaparser.ast.stmt.ReturnStmt rs))
+                    return;
+                if (rs.getExpression().isEmpty())
+                    return;
+                String candidateClass = extractNewClassNameFromExpr(rs.getExpression().get());
+                if (candidateClass == null)
+                    return;
+                if (!generatedSet.contains(candidateClass))
+                    return;
+                try {
+                    method.setType(com.github.javaparser.StaticJavaParser.parseType(candidateClass));
+                } catch (Exception ignored) {
+                }
+            });
+        });
+    }
+
+    /**
+     * Extracts the simple class name from {@code new X<>()} or {@code cast(new X<>())}
+     * expressions. Returns {@code null} for anything else.
+     */
+    private static String extractNewClassNameFromExpr(com.github.javaparser.ast.expr.Expression expr) {
+        if (expr instanceof com.github.javaparser.ast.expr.MethodCallExpr mc
+                && mc.getNameAsString().equals("cast")
+                && mc.getArguments().size() == 1) {
+            expr = mc.getArguments().get(0);
+        }
+        if (expr instanceof com.github.javaparser.ast.expr.ObjectCreationExpr oce) {
+            return oce.getType().getNameAsString();
+        }
+        return null;
     }
 
     /**

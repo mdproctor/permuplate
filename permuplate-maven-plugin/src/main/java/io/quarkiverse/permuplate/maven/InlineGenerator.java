@@ -258,6 +258,9 @@ public class InlineGenerator {
                 // @PermuteBody — replace entire method or constructor body per permutation
                 PermuteBodyTransformer.transform(generated, ctx);
 
+                // Infer return type from last 'return new X<>()' in body when X is in generated set
+                inferReturnFromBody(coid, allGeneratedNames);
+
                 // @PermuteAnnotation — add Java annotations to generated elements (runs last)
                 io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
                         generated, ctx, null, null);
@@ -2403,6 +2406,67 @@ public class InlineGenerator {
                 return;
             method.setType(returnType.clone());
         });
+    }
+
+    /**
+     * Post-pass inference: when a method has {@code Object} return, no explicit
+     * {@code @PermuteReturn} remaining, and its last statement is
+     * {@code return new X<>()} or {@code return cast(new X<>())} where X is in
+     * {@code allGeneratedNames} — infer the return type as X.
+     *
+     * <p>
+     * Runs AFTER {@link PermuteBodyTransformer} so the final body is in place, and
+     * after {@link #applyInlineDefaultReturn} so explicit defaults are already applied.
+     * Explicit {@code @PermuteReturn} annotations are already consumed and removed
+     * by this point.
+     */
+    private static void inferReturnFromBody(ClassOrInterfaceDeclaration classDecl,
+            Set<String> allGeneratedNames) {
+        classDecl.getMethods().forEach(method -> {
+            if (!method.getType().asString().equals("Object"))
+                return;
+            boolean hasReturn = method.getAnnotations().stream().anyMatch(a -> {
+                String n = a.getNameAsString();
+                return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn")
+                        || n.equals("PermuteReturns") || n.equals("io.quarkiverse.permuplate.PermuteReturns");
+            });
+            if (hasReturn)
+                return;
+            method.getBody().ifPresent(body -> {
+                if (body.getStatements().isEmpty())
+                    return;
+                com.github.javaparser.ast.stmt.Statement last = body.getStatements().get(body.getStatements().size() - 1);
+                if (!(last instanceof com.github.javaparser.ast.stmt.ReturnStmt rs))
+                    return;
+                if (rs.getExpression().isEmpty())
+                    return;
+                String candidateClass = extractNewClassName(rs.getExpression().get());
+                if (candidateClass == null)
+                    return;
+                if (!allGeneratedNames.contains(candidateClass))
+                    return;
+                try {
+                    method.setType(StaticJavaParser.parseType(candidateClass));
+                } catch (Exception ignored) {
+                }
+            });
+        });
+    }
+
+    /**
+     * Extracts the simple class name from {@code new X<>()} or {@code cast(new X<>())}
+     * expressions. Returns {@code null} for anything else.
+     */
+    private static String extractNewClassName(com.github.javaparser.ast.expr.Expression expr) {
+        if (expr instanceof com.github.javaparser.ast.expr.MethodCallExpr mc
+                && mc.getNameAsString().equals("cast")
+                && mc.getArguments().size() == 1) {
+            expr = mc.getArguments().get(0);
+        }
+        if (expr instanceof com.github.javaparser.ast.expr.ObjectCreationExpr oce) {
+            return oce.getType().getNameAsString();
+        }
+        return null;
     }
 
     /**
