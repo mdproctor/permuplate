@@ -1,6 +1,6 @@
 # Permuplate Roadmap
 
-Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batches 6–8).
+Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batches 6–9).
 
 ---
 
@@ -44,6 +44,17 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 | `@PermuteMixin` | New annotation: inject annotated methods from a mixin class before the transform pipeline. Solves ADR-0006 — `ExtendsRuleMixin` is shared by `RuleBuilderTemplate` and `ParametersFirstTemplate`. |
 | Constructor super-call inference | Auto-insert `super(p1..p_{N-1})` when template extends-previous and constructor has no existing super-call and no `@PermuteStatements`. Explicit `@PermuteStatements` always wins. Removes explicit annotation from `Tuple1`. |
 | `@PermuteExtendsChain` | New annotation: extends-previous-in-family shorthand. Generates `extends ${className}${i-1}<typeArgList(1,i-1,'alpha')>`. Explicit `@PermuteExtends` always wins. Applied to `BaseTuple.Tuple1`. |
+| Batch 9 bug fix — delete NegationScope.java | Batch 8 git rm did not persist; orphan ExistenceScope generated. Deleted. |
+| Batch 9 item 1 — Scope macro | macros={"Scope=capitalize(scope)"} eliminates 3× capitalize(scope) in not/exists. |
+| Batch 9 item 2 — @PermuteFilter on filterLatest | @PermuteFilter("i > 1") replaces max(2,i) trick; suppression at arity 1 now explicit. |
+| Batch 9 item 7 — @PermuteBodyFragment | Named body fragments substituted into @PermuteBody strings before JEXL evaluation. |
+| Batch 9 item 8 — @PermuteParam inside @PermuteMethod | PermuteParamTransformer now runs on @PermuteMethod clones with inner context. filterVar drops @PermuteBody. |
+| Batch 9 item 9 — @PermuteReturn from body inference | Infers return type from last 'return new X<>()' in @PermuteBody when X in generated set. |
+| Batch 9 item 10 — @PermuteDefaultReturn("self") | className="self" → current class + all type params. Eliminates verbose typeArgs expression. |
+| Batch 9 item 3 — @PermuteDefaultReturn replaces @PermuteSelf | 5× @PermuteSelf on Join0First → single @PermuteDefaultReturn(className="self"). |
+| Batch 9 item 4 — Consumer/Predicate cross-product | FunctionalTemplate1.java generates both families via @PermuteVar. Consumer1/Predicate1 hand-written. |
+| Batch 9 item 5 — @FunctionalInterface annotation | @PermuteAnnotation on FunctionalTemplate1. Fixed PermuteAnnotationTransformer gap in non-inline pipeline. |
+| Batch 9 item 6 — @PermuteMacros on RuleExtendsPoint | prev=${i-1} macro names the previous-arity concept. Bug fix: evaluateRaw() preserves Integer type for single-interpolation macros. |
 
 ---
 
