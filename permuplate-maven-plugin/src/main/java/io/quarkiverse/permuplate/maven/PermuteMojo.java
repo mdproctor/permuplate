@@ -169,6 +169,9 @@ public class PermuteMojo extends AbstractMojo {
                     List<SourceScanner.AnnotatedType> sorted = sortBySourceDependency(fileGroup.getValue());
                     generateInlineGroup(fileGroup.getKey(), sorted, allTemplateCus);
                 }
+
+                // Non-template @PermuteMixin processing — classes with @PermuteMixin but no @Permute
+                processNonTemplateMixins(allTemplateCus);
             }
         } catch (MojoExecutionException e) {
             throw e;
@@ -525,6 +528,75 @@ public class PermuteMojo extends AbstractMojo {
         String qualifiedName = packageName.isEmpty() ? outputClassName
                 : packageName + "." + outputClassName;
         writeGeneratedFile(qualifiedName, generatedCu.toString());
+    }
+
+    /**
+     * Processes non-template classes in the template directory that have {@code @PermuteMixin}
+     * but no {@code @Permute}. Injects mixin-generated methods and writes the augmented class
+     * to the generated sources directory — eliminating the need for a dummy
+     * {@code @Permute(varName="i", from="1", to="1")} annotation.
+     *
+     * <p>
+     * <b>Scope:</b> Only top-level types are examined ({@code cu.getTypes()});
+     * nested classes with {@code @PermuteMixin} and no {@code @Permute} are silently ignored.
+     * Only classes from the template directory ({@code src/main/permuplate/}) are considered;
+     * classes in {@code src/main/java/} are not processed here.
+     *
+     * <p>
+     * Only concrete classes are processed — interfaces are excluded because
+     * {@code ClassOrInterfaceDeclaration} in JavaParser covers both.
+     */
+    private void processNonTemplateMixins(List<CompilationUnit> allTemplateCus) throws Exception {
+        for (CompilationUnit cu : allTemplateCus) {
+            for (TypeDeclaration<?> typeDecl : cu.getTypes()) {
+                // Only process ClassOrInterfaceDeclaration (not records, enums, interfaces)
+                if (!(typeDecl instanceof ClassOrInterfaceDeclaration coid) || coid.isInterface())
+                    continue;
+                // Must have @PermuteMixin
+                boolean hasMixin = typeDecl.getAnnotations().stream()
+                        .anyMatch(a -> {
+                            String n = a.getNameAsString();
+                            return n.equals("PermuteMixin") || n.equals("io.quarkiverse.permuplate.PermuteMixin");
+                        });
+                if (!hasMixin)
+                    continue;
+                // Must NOT have @Permute (those are handled by the regular inline pipeline)
+                boolean hasPermute = typeDecl.getAnnotations().stream()
+                        .anyMatch(a -> {
+                            String n = a.getNameAsString();
+                            return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute");
+                        });
+                if (hasPermute)
+                    continue;
+
+                String className = typeDecl.getNameAsString();
+                getLog().info("Permuplate: processing non-template @PermuteMixin on " + className);
+
+                // Clone the CU and work on the clone to avoid mutating the shared allTemplateCus
+                CompilationUnit workCu = cu.clone();
+                TypeDeclaration<?> workTd = workCu.findFirst(ClassOrInterfaceDeclaration.class,
+                        c -> c.getNameAsString().equals(className))
+                        .orElseThrow(() -> new MojoExecutionException(
+                                "Cannot find class '" + className + "' in cloned CU"));
+
+                // Inject mixin methods before generate()
+                InlineGenerator.injectMixinMethods(workTd, allTemplateCus);
+
+                // Synthesize a single-iteration config — no actual permutation loop, just mixin expansion.
+                PermuteConfig syntheticConfig = new PermuteConfig(
+                        "i", "1", "1", className,
+                        new String[0], new PermuteVarConfig[0],
+                        true, false);
+
+                List<Map<String, Object>> combos = PermuteConfig.buildAllCombinations(syntheticConfig);
+                CompilationUnit outputCu = InlineGenerator.generate(workCu, workTd, syntheticConfig, combos);
+
+                String packageName = cu.getPackageDeclaration()
+                        .map(p -> p.getNameAsString()).orElse("");
+                String qualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+                writeGeneratedFile(qualifiedName, outputCu.toString());
+            }
+        }
     }
 
     private void writeGeneratedFile(String qualifiedName, String source) throws IOException {

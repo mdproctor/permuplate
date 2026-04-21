@@ -2,21 +2,19 @@ package io.quarkiverse.permuplate.example.drools;
 
 import java.util.function.Function;
 
-import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteMixin;
 
 /**
  * Entry point returned by RuleBuilder.rule("name"). Supports four param styles
  * plus from() to skip params entirely, matching vol2's ParametersFirst API.
- * Template class ({@code ParametersFirstTemplate}) generates {@code ParametersFirst}.
+ * {@code @PermuteMixin} expands the six {@code extendsRule()} overloads from
+ * a single template method in {@code ExtendsRuleMixin}.
  */
-@Permute(varName = "i", from = "1", to = "1", className = "ParametersFirst",
-         inline = true, keepTemplate = false)
 @PermuteMixin(ExtendsRuleMixin.class)
-public class ParametersFirstTemplate<DS> extends AbstractRuleEntry<DS> {
+public class ParametersFirst<DS> extends AbstractRuleEntry<DS> {
     private final String name;
 
-    public ParametersFirstTemplate(String name) {
+    public ParametersFirst(String name) {
         this.name = name;
     }
 

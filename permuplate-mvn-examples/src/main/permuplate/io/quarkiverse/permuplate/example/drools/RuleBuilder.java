@@ -2,14 +2,12 @@ package io.quarkiverse.permuplate.example.drools;
 
 import java.util.function.Function;
 
-import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteMixin;
 
 /**
  * Entry point for the Drools RuleBuilder DSL approximation.
- * Template class ({@code RuleBuilderTemplate}) generates {@code RuleBuilder} via
- * {@code @Permute(from="1",to="1")} so that {@code @PermuteMethod} can expand the
- * six {@code extendsRule()} overloads from a single template method.
+ * {@code @PermuteMixin} expands the six {@code extendsRule()} overloads from
+ * a single template method in {@code ExtendsRuleMixin}.
  *
  * <pre>{@code
  * RuleBuilder<Ctx> builder = new RuleBuilder<>();
@@ -19,10 +17,8 @@ import io.quarkiverse.permuplate.PermuteMixin;
  * rule.run(ctx);
  * }</pre>
  */
-@Permute(varName = "i", from = "1", to = "1", className = "RuleBuilder",
-         inline = true, keepTemplate = false)
 @PermuteMixin(ExtendsRuleMixin.class)
-public class RuleBuilderTemplate<DS> extends AbstractRuleEntry<DS> {
+public class RuleBuilder<DS> extends AbstractRuleEntry<DS> {
 
     @Override
     protected String ruleName() {

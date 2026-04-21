@@ -1402,6 +1402,8 @@ public class InlineGenerator {
                     method.setType(StaticJavaParser.parseType(typeSrc));
                 } catch (Exception ignored) {
                 }
+                // Constructor-coherence inference: rename new SeedClass<>() to match resolved return type.
+                renameConstructorsToMatchReturn(method, evaluatedClass);
                 return;
             }
 
@@ -1421,6 +1423,8 @@ public class InlineGenerator {
                 method.setType(StaticJavaParser.parseType(returnTypeStr));
             } catch (Exception ignored) {
             }
+            // Constructor-coherence inference: rename new SeedClass<>() to match resolved return type.
+            renameConstructorsToMatchReturn(method, evaluatedClass);
         });
 
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
@@ -2498,6 +2502,64 @@ public class InlineGenerator {
             return oce.getType().getNameAsString();
         }
         return null;
+    }
+
+    /**
+     * Coherence inference: after @PermuteReturn resolves a method's return type to
+     * {@code resolvedClass}, finds any ObjectCreationExpr in the method body whose type
+     * simple name belongs to the same generated-class family (same name prefix after
+     * stripping all digit sequences) and renames it to match.
+     *
+     * <p>
+     * The digit-presence check ({@code typeName.matches(".*\\d.*")}) is intentionally loose;
+     * the family equality check is the real safety filter — both the constructor type and the
+     * resolved return type must strip to the same letter-only string before a rename fires.
+     *
+     * <p>
+     * Note: {@code allGeneratedNames} is not used as a guard here because cross-file
+     * generated families (e.g., {@code RuleExtendsPoint2..7} from {@code RuleExtendsPoint.java})
+     * are absent from the per-CU set when processing a different file (e.g., JoinBuilder.java).
+     * Family matching is sufficient and cross-file safe.
+     *
+     * <p>
+     * Skipped when the method has @PermuteBody (body is a string template, not real Java).
+     */
+    private static void renameConstructorsToMatchReturn(
+            MethodDeclaration method, String resolvedClass) {
+        // Skip string-template methods
+        boolean hasPermuteBody = method.getAnnotations().stream().anyMatch(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteBody") || n.equals("io.quarkiverse.permuplate.PermuteBody")
+                    || n.equals("PermuteBodies") || n.equals("io.quarkiverse.permuplate.PermuteBodies");
+        });
+        if (hasPermuteBody)
+            return;
+        if (method.getBody().isEmpty())
+            return;
+
+        String resolvedSimple = resolvedClass.contains(".")
+                ? resolvedClass.substring(resolvedClass.lastIndexOf('.') + 1)
+                : resolvedClass;
+        // Strip ALL digit sequences to get the structural family — handles embedded digits
+        // like Join2First → JoinFirst, RuleExtendsPoint3 → RuleExtendsPoint.
+        String resolvedFamily = resolvedSimple.replaceAll("\\d+", "");
+
+        method.findAll(com.github.javaparser.ast.expr.ObjectCreationExpr.class).forEach(oce -> {
+            com.github.javaparser.ast.type.ClassOrInterfaceType type = oce.getType();
+            String typeName = type.getNameAsString(); // simple name only
+            // Only consider types that contain at least one digit (arity-numbered classes)
+            // and share the same structural family as the resolved return type.
+            // Cross-file families (e.g. RuleExtendsPoint) are not in allGeneratedNames for
+            // this CU, so we use family matching rather than the set membership check.
+            if (!typeName.matches(".*\\d.*"))
+                return;
+            String typeFamily = typeName.replaceAll("\\d+", "");
+            if (!typeFamily.equals(resolvedFamily))
+                return;
+            if (!typeName.equals(resolvedSimple)) {
+                type.setName(resolvedSimple);
+            }
+        });
     }
 
     /**

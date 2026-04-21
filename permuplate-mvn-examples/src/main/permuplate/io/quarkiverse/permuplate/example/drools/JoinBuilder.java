@@ -113,14 +113,14 @@ public class JoinBuilder {
          * <p>Boundary omission removes this from Join6Second — Join7First is not in the
          * generated set, so {@code @PermuteReturn} silently omits it at i=6.
          *
-         * <p>Uses {@code @PermuteDeclr TYPE_USE} on the constructor to rename
-         * {@code Join1First} to {@code Join${i+1}First} per permutation — no reflection needed.
+         * <p>Constructor-coherence inference renames {@code new Join1First<>()} to
+         * {@code new Join${i+1}First<>()} automatically — no explicit {@code @PermuteDeclr} needed.
          */
         @PermuteTypeParam(varName = "m", from = "${i+1}", to = "${i+1}", name = "${alpha(m)}")
         @PermuteReturn(className = "Join${i+1}First")
         public <B> Object join(java.util.function.Function<DS, DataSource<B>> source) {
             rd.addSource(source);
-            return cast(new @PermuteDeclr(type = "Join${i+1}First") Join1First<>(end(), rd));
+            return cast(new Join1First<>(end(), rd));
         }
 
         /**
@@ -156,7 +156,7 @@ public class JoinBuilder {
             @SuppressWarnings("unchecked")
             JoinSecond<DS> second = (JoinSecond<DS>) secondChain;
             rd.addBilinearSource(second.getRuleDefinition());
-            return cast(new JoinBuilder.@PermuteDeclr(type = "Join${i+j}First") Join1First<>(end(), rd));
+            return cast(new JoinBuilder.Join1First<>(end(), rd));
         }
 
         /**
@@ -237,16 +237,15 @@ public class JoinBuilder {
          * Pass the result to RuleBuilder.extendsRule() to start a child rule that
          * inherits all sources, filters, and constraint scopes up to this point.
          *
-         * <p>Uses {@code @PermuteDeclr TYPE_USE} on the constructor to rename
-         * {@code RuleExtendsPoint2} to {@code RuleExtendsPoint${i+1}} per permutation —
-         * no reflection needed.
+         * <p>Constructor-coherence inference renames {@code new RuleExtendsPoint.RuleExtendsPoint2<>()}
+         * to {@code new RuleExtendsPoint.RuleExtendsPoint${i+1}<>()} automatically.
          */
         @SuppressWarnings("unchecked")
         @PermuteReturn(className = "RuleExtendsPoint.RuleExtendsPoint${i+1}",
                        typeArgs = "'DS, ' + alphaList",
                        alwaysEmit = true)
         public Object extensionPoint() {
-            return cast(new RuleExtendsPoint.@PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${i+1}") RuleExtendsPoint2<>(rd));
+            return cast(new RuleExtendsPoint.RuleExtendsPoint2<>(rd));
         }
 
         /**

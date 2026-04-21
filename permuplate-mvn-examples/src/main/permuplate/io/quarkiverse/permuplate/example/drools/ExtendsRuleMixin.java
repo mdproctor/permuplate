@@ -27,7 +27,6 @@ class ExtendsRuleMixin<DS> extends AbstractRuleEntry<DS> {
             ExtendsPoint<DS> ep) {
         RuleDefinition<DS> child = new RuleDefinition<>(ruleName());
         ep.baseRd().copyInto(child);
-        return cast(new JoinBuilder.@PermuteDeclr(type = "JoinBuilder.Join${j-1}First")
-                Join1First<>(null, child));
+        return cast(new JoinBuilder.Join1First<>(null, child));
     }
 }
