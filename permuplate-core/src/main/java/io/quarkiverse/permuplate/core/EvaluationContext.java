@@ -291,6 +291,29 @@ public class EvaluationContext {
     }
 
     /**
+     * Evaluates a template that is a single interpolation (e.g. {@code "${i-1}"})
+     * and returns the raw JEXL result, preserving the Java type (e.g. {@code Integer}).
+     * Falls back to the String form of {@link #evaluate} when the template is not a
+     * single-interpolation expression.
+     *
+     * <p>
+     * Used by macro evaluation in {@link PermuteConfig#buildAllCombinations} so that
+     * macros like {@code prev=${i-1}} store an {@code Integer} rather than a {@code String},
+     * enabling them to be used in integer contexts such as {@code @PermuteTypeParam to="${prev}"}.
+     */
+    public Object evaluateRaw(String template) {
+        String expr = template.trim();
+        // If the whole template is a single ${...} block, evaluate and return the raw object.
+        if (expr.startsWith("${") && expr.endsWith("}") && expr.indexOf("${", 2) < 0) {
+            String inner = expr.substring(2, expr.length() - 1).trim();
+            MapContext jexlCtx = buildJexlContext();
+            return JEXL.createExpression(inner).evaluate(jexlCtx);
+        }
+        // Multi-segment or plain string — fall back to string interpolation.
+        return evaluate(template);
+    }
+
+    /**
      * Evaluates a JEXL boolean expression and returns its boolean value.
      *
      * <p>

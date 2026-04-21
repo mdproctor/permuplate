@@ -248,8 +248,11 @@ public final class PermuteConfig {
                     try {
                         // Wrap bare expressions in ${} so EvaluationContext handles them;
                         // if already contains ${}, evaluate as-is (it's an interpolated string).
+                        // Use evaluateRaw so that single-interpolation expressions (e.g. ${i-1})
+                        // preserve the raw type (Integer), enabling use in integer contexts such as
+                        // @PermuteTypeParam to="${prev}".
                         String template = expr.contains("${") ? expr : "${" + expr + "}";
-                        Object value = new EvaluationContext(vars).evaluate(template);
+                        Object value = new EvaluationContext(vars).evaluateRaw(template);
                         vars.put(name, value);
                     } catch (Exception ignored) {
                         // Malformed or unevaluatable macro — skip silently
