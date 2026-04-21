@@ -3,7 +3,7 @@ package io.quarkiverse.permuplate.example.drools;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteBody;
 import io.quarkiverse.permuplate.PermuteDeclr;
-import io.quarkiverse.permuplate.PermuteExtends;
+import io.quarkiverse.permuplate.PermuteExtendsChain;
 import io.quarkiverse.permuplate.PermuteParam;
 import io.quarkiverse.permuplate.PermuteTypeParam;
 import io.quarkiverse.permuplate.PermuteValue;
@@ -80,7 +80,7 @@ public abstract class BaseTuple {
 
     @Permute(varName = "i", from = "2", to = "6", className = "Tuple${i}",
              inline = true, keepTemplate = true)
-    @PermuteExtends(className = "Tuple${i-1}", typeArgs = "typeArgList(1, i-1, 'alpha')")
+    @PermuteExtendsChain
     public static class Tuple1<
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
             extends BaseTuple {

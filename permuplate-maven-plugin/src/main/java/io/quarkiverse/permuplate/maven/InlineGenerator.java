@@ -134,9 +134,9 @@ public class InlineGenerator {
 
         boolean isRecord = templateClassDecl instanceof RecordDeclaration;
 
-        // Pre-compute whether the template has @PermuteExtends — used by super-call inference
+        // Pre-compute whether the template has @PermuteExtends or @PermuteExtendsChain — used by super-call inference
         boolean templateHasExtendsAnnotation = templateClassDecl instanceof ClassOrInterfaceDeclaration tcoid
-                && hasPermuteExtendsAnnotation(tcoid);
+                && (hasPermuteExtendsAnnotation(tcoid) || hasPermuteExtendsChainAnnotation(tcoid));
 
         // Build complete generated class set for boundary omission
         Set<String> allGeneratedNames = scanAllGeneratedClassNames(parentCu, config);
@@ -269,8 +269,14 @@ public class InlineGenerator {
                             || n.equals("PermuteImports") || n.equals("io.quarkiverse.permuplate.PermuteImports");
                 });
 
+                // @PermuteExtendsChain — shorthand (only fires when explicit @PermuteExtends absent)
+                boolean hasExplicitPermuteExtends = hasPermuteExtendsAnnotation(coid);
+                boolean hasChain = !hasExplicitPermuteExtends && hasPermuteExtendsChainAnnotation(coid);
+                if (hasChain) {
+                    applyPermuteExtendsChain(coid, config, ctx);
+                }
                 // @PermuteExtends — explicit override of extends/implements clause.
-                boolean permuteExtendsApplied = hasPermuteExtendsAnnotation(coid);
+                boolean permuteExtendsApplied = hasExplicitPermuteExtends || hasChain;
                 applyPermuteExtendsAnnotation(coid, ctx);
 
                 // Extends/implements clause expansion (same-N formula) — only when no explicit override
@@ -791,6 +797,76 @@ public class InlineGenerator {
                     String n = a.getNameAsString();
                     return n.equals("PermuteExtends") || n.equals("io.quarkiverse.permuplate.PermuteExtends");
                 });
+    }
+
+    /** Returns {@code true} if the class has a {@code @PermuteExtendsChain} annotation. */
+    private static boolean hasPermuteExtendsChainAnnotation(ClassOrInterfaceDeclaration classDecl) {
+        return classDecl.getAnnotations().stream()
+                .anyMatch(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteExtendsChain")
+                            || n.equals("io.quarkiverse.permuplate.PermuteExtendsChain");
+                });
+    }
+
+    /**
+     * Applies {@code @PermuteExtendsChain}: sets extends clause to
+     * {@code ${familyBase}${i-1}} with alpha type args {@code typeArgList(1, i-1, 'alpha')}.
+     * Family base is inferred from the config {@code className} pattern (prefix before the
+     * first {@code ${}).
+     * Strips the {@code @PermuteExtendsChain} annotation from the generated class.
+     */
+    private static void applyPermuteExtendsChain(
+            ClassOrInterfaceDeclaration classDecl,
+            PermuteConfig config,
+            EvaluationContext ctx) {
+
+        // Extract family base from className pattern (everything before first "${")
+        String classNamePattern = config.className;
+        int dollarIdx = classNamePattern.indexOf("${");
+        if (dollarIdx <= 0)
+            return; // cannot infer family base
+        String familyBase = classNamePattern.substring(0, dollarIdx);
+
+        // Evaluate parent class name
+        String evaluatedClass;
+        try {
+            evaluatedClass = ctx.evaluate(familyBase + "${i-1}");
+        } catch (Exception ignored) {
+            classDecl.getAnnotations().removeIf(a -> {
+                String n = a.getNameAsString();
+                return n.equals("PermuteExtendsChain")
+                        || n.equals("io.quarkiverse.permuplate.PermuteExtendsChain");
+            });
+            return;
+        }
+
+        // Evaluate alpha type arg list (empty string when i-1 == 0)
+        String typeArgStr;
+        try {
+            typeArgStr = ctx.evaluate("${typeArgList(1, i-1, 'alpha')}");
+        } catch (Exception ignored) {
+            typeArgStr = "";
+        }
+
+        String newTypeStr = (typeArgStr == null || typeArgStr.isEmpty())
+                ? evaluatedClass
+                : evaluatedClass + "<" + typeArgStr + ">";
+
+        try {
+            com.github.javaparser.ast.type.ClassOrInterfaceType newType = (com.github.javaparser.ast.type.ClassOrInterfaceType) StaticJavaParser
+                    .parseType(newTypeStr);
+            classDecl.getExtendedTypes().clear();
+            classDecl.addExtendedType(newType);
+        } catch (Exception ignored) {
+        }
+
+        // Strip the @PermuteExtendsChain annotation
+        classDecl.getAnnotations().removeIf(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteExtendsChain")
+                    || n.equals("io.quarkiverse.permuplate.PermuteExtendsChain");
+        });
     }
 
     /**
@@ -2335,6 +2411,7 @@ public class InlineGenerator {
                 "PermuteReturns", "io.quarkiverse.permuplate.PermuteReturns",
                 "PermuteMethod", "io.quarkiverse.permuplate.PermuteMethod",
                 "PermuteExtends", "io.quarkiverse.permuplate.PermuteExtends",
+                "PermuteExtendsChain", "io.quarkiverse.permuplate.PermuteExtendsChain",
                 "PermuteConst", "io.quarkiverse.permuplate.PermuteConst",
                 "PermuteCase", "io.quarkiverse.permuplate.PermuteCase",
                 "PermuteValue", "io.quarkiverse.permuplate.PermuteValue",
