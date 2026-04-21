@@ -4,7 +4,7 @@
 
 **Type:** java
 
-This file gives future Claude sessions everything needed to contribute to Permuplate without re-deriving the architecture from scratch. Read this first, then consult [OVERVIEW.md](OVERVIEW.md) for per-annotation API detail, transformer internals, the transformation pipeline, and the test coverage map. See [README.md](README.md) for the user-facing picture. For the current state of the DSL sandbox architecture, consult the [design snapshots](docs/design-snapshots/) — the 2026-04-06 snapshot is the current reference.
+This file gives future Claude sessions everything needed to contribute to Permuplate without re-deriving the architecture from scratch. Read this first, then consult [OVERVIEW.md](OVERVIEW.md) for per-annotation API detail, transformer internals, the transformation pipeline, and the test coverage map. See [README.md](README.md) for the user-facing picture.
 
 ---
 
@@ -271,8 +271,7 @@ work to date against the full vol2 test suite to identify gaps.
 ## What to read next
 
 - [README.md](README.md) — user-facing overview with examples and quick start
-- [OVERVIEW.md](OVERVIEW.md) — architecture deep-dive, market comparison, full roadmap (annotation processor core)
-- [Design snapshots](docs/design-snapshots/) — frozen architecture state records; the 2026-04-06 snapshot is the current reference for sandbox architecture
+- [OVERVIEW.md](OVERVIEW.md) — architecture deep-dive, market comparison, full roadmap (annotation processor core). **Serves as `DESIGN.md` for this project** — `java-git-commit` references to `docs/DESIGN.md` should read `OVERVIEW.md` instead.
 - [ADRs](docs/adr/) — formal records of key architectural decisions (ADR-0001..0006 cover DSL sandbox)
 - `permuplate-processor/src/main/java/io/quarkiverse/permuplate/processor/` — the processor source files
 - `permuplate-tests/src/test/java/io/quarkiverse/permuplate/` — test classes

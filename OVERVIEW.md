@@ -137,18 +137,6 @@ The expanded parameter list is rebuilt as: params before sentinel + generated pa
 
 Works on **record components** (via `RecordDeclaration.getParameters()`) as well as method and constructor parameters.
 
-### `@PermuteConst`
-
-```java
-@Retention(RetentionPolicy.SOURCE)
-@Target({ ElementType.FIELD, ElementType.LOCAL_VARIABLE })
-public @interface PermuteConst {
-    String value(); // JEXL expression, e.g. "${i}", "${i * 2}"
-}
-```
-
-Replaces the initializer of a field or local variable. A backward-compatible alias for `@PermuteValue` on fields and local variables. Both are supported; prefer `@PermuteValue` in new code.
-
 ### `@PermuteValue`
 
 ```java
@@ -160,7 +148,7 @@ public @interface PermuteValue {
 }
 ```
 
-Superset of `@PermuteConst`. On a field or local variable: replaces the initializer. On a method or constructor: replaces the RHS of the assignment statement at position `index` in the original template body (0-based, evaluated BEFORE `@PermuteStatements` insertions). Integer expressions produce `IntegerLiteralExpr`; all others produce `StringLiteralExpr`.
+On a field or local variable: replaces the initializer. On a method or constructor: replaces the RHS of the assignment statement at position `index` in the original template body (0-based, evaluated BEFORE `@PermuteStatements` insertions). Integer expressions produce `IntegerLiteralExpr`; all others produce `StringLiteralExpr`.
 
 ### `@PermuteStatements`
 
@@ -361,10 +349,9 @@ Inside `PermuteProcessor.generatePermutation()`:
 3. **Rename** the type using `ctx.evaluate(permute.className())`; rename all constructors to match (JavaParser does not propagate class renames to constructors automatically)
 4. **`@PermuteExtends`** — explicit extends/implements override (inline mode only, before other transforms)
 5. **`PermuteDeclrTransformer.transform()`**:
-   - 5a. `transformFields()` — class-wide scope; also handles `@PermuteConst` initializer substitution on fields
+   - 5a. `transformFields()` — class-wide scope
    - 5b. `transformConstructorParams()` — constructor-body scope
    - 5c. `transformForEachVars()` — loop-body scope
-   - 5d. `transformConstFields()` / `transformConstLocals()` — `@PermuteConst` on remaining fields/locals
 6. **`PermuteParamTransformer.transform()`** — expand parameter list + anchor expansion at call sites (methods and constructors)
 7. **`PermuteTypeParamTransformer.transform()`** — type parameter expansion
 8. **`PermuteReturnTransformer.transform()`** — return type control + boundary omission
@@ -444,7 +431,6 @@ permuplate-parent/
 │   ├── PermuteVar.java        — nested annotation for one extra integer loop axis
 │   ├── PermuteDeclr.java      — field, constructor parameter, for-each, method param renaming
 │   ├── PermuteParam.java      — sentinel parameter expansion + anchor call-site rewriting (methods + constructors)
-│   ├── PermuteConst.java      — field/local initializer replacement (backward-compat alias for PermuteValue)
 │   ├── PermuteValue.java      — field/local initializer or method/constructor statement RHS replacement
 │   ├── PermuteStatements.java — statement insertion into method/constructor bodies
 │   ├── PermuteCase.java       — switch case expansion per inner-loop value
@@ -460,7 +446,7 @@ permuplate-parent/
 │   └── PermuteDelegate.java   — synthesise delegating method bodies from a source interface
 ├── permuplate-core/
 │   ├── EvaluationContext.java          — JEXL3 wrapper; Map<String,Object> for int + string vars; built-in functions
-│   ├── PermuteDeclrTransformer.java    — fields, constructor params, for-each vars, method params; @PermuteConst
+│   ├── PermuteDeclrTransformer.java    — fields, constructor params, for-each vars, method params
 │   ├── PermuteParamTransformer.java    — parameter expansion + anchor mechanism (methods + constructors)
 │   ├── PermuteValueTransformer.java    — @PermuteValue on fields, locals, methods, constructors
 │   ├── PermuteStatementsTransformer.java — @PermuteStatements insertion (methods + constructors)
@@ -499,7 +485,7 @@ Tests are organised into focused test classes:
 | `PermuteTest` | Type permutation range, nested class/interface promotion to top-level, double-digit arities, string variable in `className`, cross-product via `extraVars`, (inline generation tested via InlineGenerationTest) |
 | `PermuteDeclrTest` | Field rename across all methods, constructor parameter rename, for-each variable rename, two annotated fields, dual for-each loops |
 | `PermuteParamTest` | Fixed params before/after sentinel, multiple methods in same class, anchor expansion, lambda param expansion, pure-variable name templates |
-| `PermuteConstTest` | `@PermuteConst` on interface fields and local variables; combined with `@PermuteDeclr` on the same field |
+| `PermuteValueFieldTest` | `@PermuteValue` on fields and local variables; combined with `@PermuteDeclr` on the same field |
 | `ExampleTest` | Real-world domain templates: `ProductFilter2`, `AuditRecord2`, `ValidationSuite.FieldValidator2`, `BiCallable1x1` |
 | `DogFoodingTest` | `Callable1` generates `Callable2`–`Callable10` — Permuplate describes its own foundational types |
 | `DegenerateInputTest` | All error paths with message content and source-position assertions |
