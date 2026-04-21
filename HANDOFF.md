@@ -1,63 +1,45 @@
-# Handover — 2026-04-21 (batches 8–9, DSL deep polish, 305 tests)
+# Handover — 2026-04-21 (batch 10, inference pass, 6 DSL improvements)
 
-**Head commit:** `09d0de0` — blog entry written, everything pushed to origin  
-**Status:** Clean — everything committed and pushed.
+**Head commit:** `2f2ea5c` — everything committed and clean.
+**Status:** Clean — nothing uncommitted.
 
 ---
 
 ## What Changed This Session
 
-### Batch 8 — DSL deep polish, 10 items (issues #92–#101, epic #91)
+### Batch 10 — 6 Permuplate improvements (inference-focused)
 
 | Feature | What it does |
 |---|---|
-| `not()`/`exists()` rename + `@PermuteMethod(values=)` | NegationScope→NotScope, ExistenceScope→ExistsScope; 3 ternaries eliminated via `Scope` macro |
-| `max()/min()` JEXL built-ins | `max(2,i)` replaces `${i > 1 ? i : i+1}` ternary in filterLatest |
-| `typeArgList` custom prefix | `'V'→V1,V2,V3`; enables variable filter templating |
-| Variable filter overloads templated | `@PermuteMethod(m=2..3)` + G4 typeParam replaces 2 hand-coded methods |
-| Method macros on bilinear/extendsRule/OOPath | `joinAll`, `joinRight`, `prevAlpha`, `outerJoin`, `prevTuple` |
-| `@PermuteReturn(typeParam=)` | Return type = named type param; `@PermuteReturn` now `@Repeatable`; Path2 unified |
-| `@PermuteMacros` | Shared macros on outer class; `alphaList` in JoinBuilder defined once |
-| `@PermuteMixin` | Inject mixin methods; `ExtendsRuleMixin`; ADR-0006 resolved |
-| Constructor super-call inference | Auto-inserts `super(p1..p_{N-1})`; removes `@PermuteStatements` from Tuple1 |
-| `@PermuteExtendsChain` | Extends-previous-in-family shorthand; applied to BaseTuple |
+| Constructor-coherence inference | After `@PermuteReturn` resolves to class X, auto-renames `new SeedClass<>()` in method body to match. Removed 4 TYPE_USE `@PermuteDeclr` from `JoinBuilder`/`ExtendsRuleMixin`. |
+| `@PermuteMixin` on non-template | Classes in `src/main/permuplate/` with `@PermuteMixin` but no `@Permute` now processed by `PermuteMojo.processNonTemplateMixins()`. `RuleBuilder`/`ParametersFirst` lost their dummy `@Permute(from=1,to=1)`. |
+| `@PermuteNew(className=...)` | TYPE_USE annotation for explicit constructor renaming; fallback for cases where coherence inference can't resolve. Not currently used in DSL (inference covers it). |
+| `addVariableFilter` m=2..6 | `RuleDefinition` moved to `src/main/permuplate/` + `@PermuteMixin(VariableFilterMixin.class)`. `filterVar` in `JoinBuilder` extended to `to="6"`. |
+| `createEmptyTuple` reflection | Switch (case 1..6) replaced with `Class.forName(BaseTuple.class.getName() + "$Tuple" + size)`. |
+| `@PermuteSealedFamily` | Auto-generates sealed marker interface + adds `implements` to each generated class. `JoinBuilder` manual sealed interface declarations removed. |
 
-### Batch 9 — DSL second-pass, 10 items + bug fix (issues #103–#113, epic #102)
-
-| Feature | What it does |
-|---|---|
-| Bug fix: delete NegationScope.java | Orphan from batch 8's `git rm` that didn't persist |
-| `Scope` macro | `capitalize(scope)` → `${Scope}` macro; 3 calls → 1 |
-| `@PermuteFilter("i > 1")` on filterLatest | More expressive than `max(2,i)` approach |
-| `@PermuteBodyFragment` | Named body fragments substituted into `@PermuteBody` strings before JEXL |
-| `@PermuteParam` inside `@PermuteMethod` | Runs PermuteParamTransformer on clones with inner context; `filterVar` drops `@PermuteBody` |
-| `@PermuteReturn` from body inference | Infers return type from `return new X<>()` when X in generated set |
-| `@PermuteDefaultReturn(className="self")` | Returns current class + all type params; `typeArgs` ignored |
-| `@PermuteDefaultReturn` replaces 5× `@PermuteSelf` | One class annotation on Join0First |
-| Consumer/Predicate cross-product merge | `FunctionalTemplate1` + `@PermuteVar`; Consumer1/Predicate1 hand-written in `src/main/java/` |
-| `@FunctionalInterface` via `@PermuteAnnotation` | Fixed `PermuteAnnotationTransformer` gap in non-inline pipeline |
-| `@PermuteMacros prev=${i-1}` on RuleExtendsPoint | Readability; found+fixed `evaluateRaw()` macro type bug |
+All changes applied to the DSL and documented in CLAUDE.md. 305 tests stable throughout.
 
 ---
 
-## Known non-obvious decisions added this session
+## Key non-obvious decisions (batch 10)
 
-- **`evaluateRaw()`** in `EvaluationContext` — preserves native JEXL type (Integer) for single `${expr}` templates; needed for numeric macros used in `@PermuteTypeParam` bounds. `evaluate()` always returns String.
-- **`PermuteAnnotationTransformer` gap** — was never called in `PermuteMojo.generateTopLevel` (non-inline pipeline); `@PermuteAnnotation` silently had no effect on non-inline templates. Fixed batch 9.
-- **Consumer1/Predicate1** now in `src/main/java/` (hand-written arity-1 interfaces), not `src/main/permuplate/`
-- **`@PermuteParam` inside `@PermuteMethod`**: outer transformer skips these methods; each clone processed with inner context before `@PermuteBody`
-- **`max`/`min` are now reserved JEXL built-in names** — `strings={"max=3"}` patterns silently fail (overwritten). Use `maxN` etc. (bit two APT tests in batch 9 cleanup)
-- **ADR-0006 resolved** — `@PermuteMixin` + `ExtendsRuleMixin` eliminates `extendsRule()` duplication
+- **Constructor-coherence**: uses `replaceAll("\\d+","")` not `replaceAll("\\d+$","")` — strips ALL digit sequences; embedded-arity names like `Join2First` have digits mid-name, not at the end.
+- **`@PermuteMixin` on non-template**: `ClassOrInterfaceDeclaration` in JavaParser covers interfaces too — guard requires `|| coid.isInterface()`.
+- **`allGeneratedNames` not used in coherence**: cross-file families absent from per-CU set; family-matching double guard (digit presence + same stripped family) is sufficient.
+- **`RuleDefinition` is now in `src/main/permuplate/`**, not `src/main/java/`.
+
+*Previous session decisions: `git show HEAD~7:HANDOFF.md`*
 
 ---
 
 ## Immediate Next Step
 
-Maven Central release. Group ID decision still open:
+Maven Central release. Group ID still undecided:
 - `io.github.mdproctor` — instant namespace approval
 - `io.quarkiverse` — slower Quarkiverse review
 
-**305 tests green. All issues #92–#113 closed. Everything pushed.**
+**305 tests green. Everything pushed.**
 
 ---
 
@@ -65,8 +47,8 @@ Maven Central release. Group ID decision still open:
 
 | What | Where |
 |---|---|
-| Batch 8 spec | `docs/superpowers/specs/2026-04-20-dsl-batch8-design.md` |
-| Batch 9 spec | `docs/superpowers/specs/2026-04-21-dsl-batch9-design.md` |
-| Garden PR (4 entries batch 9) | `GE-20260421-c37188`, `GE-20260421-e86212`, `GE-20260421-bbc3a9`, `GE-20260421-876557` |
-| Blog entry | `site/_posts/2026-04-21-mdp01-twenty-features-two-passes.md` |
-| ROADMAP | `docs/ROADMAP.md` — batches 6–9 in Completed |
+| Batch 10 plan | `docs/superpowers/plans/2026-04-21-dsl-deepdive-batch10.md` |
+| Blog entry | `site/_posts/2026-04-21-mdp02-inference-pass-six-more.md` |
+| Garden entries (batch 10) | `GE-20260421-2df2ba`, `GE-20260421-dbc509`, `GE-20260421-5886e0` |
+| Previous handover | `git show HEAD~7:HANDOFF.md` |
+| ROADMAP | `docs/ROADMAP.md` |
