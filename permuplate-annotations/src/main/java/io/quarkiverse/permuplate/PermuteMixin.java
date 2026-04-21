@@ -10,6 +10,10 @@ import java.lang.annotation.Target;
  * the Permuplate transform pipeline runs. Injected methods participate fully in
  * {@code @PermuteMethod}, {@code @PermuteReturn}, and all other transformers.
  *
+ * <p><b>Maven plugin only.</b> The APT processor ({@code permuplate-processor}) does not
+ * process this annotation — it is silently ignored in APT mode. Templates using
+ * {@code @PermuteMixin} must be processed by the Maven plugin ({@code inline = true}).
+ *
  * <p>
  * The mixin class itself is not added to generated output — it is a source-only
  * helper. It must be in the same Maven source root as the template class.

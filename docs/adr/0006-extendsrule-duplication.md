@@ -1,7 +1,7 @@
 # 0006 — extendsRule() duplication in RuleBuilder and ParametersFirst
 
 Date: 2026-04-20
-Status: Accepted
+Status: Superseded
 
 ## Context and Problem Statement
 
@@ -53,6 +53,20 @@ Accept the duplication. The shared infrastructure (`AbstractRuleEntry<DS>`, `rul
 the meaningful behavioural difference to a single abstract method override. The `extendsRule()`
 template body is byte-for-byte identical in both files; only the `ruleName()` implementation
 differs — and that is expressed once per concrete class, not once per overload.
+
+## Resolution (2026-04-21)
+
+**Status: Superseded by `@PermuteMixin` (batch 8, issue #99).**
+
+The `@PermuteMixin` annotation was introduced to inject methods from a source-only mixin class
+into a template class before the transform pipeline runs. `ExtendsRuleMixin` holds the single
+authoritative `extendsRule()` template; both `RuleBuilderTemplate` and `ParametersFirstTemplate`
+now reference it via `@PermuteMixin(ExtendsRuleMixin.class)`. The duplication documented above
+has been eliminated.
+
+The structural constraint identified in this ADR ("`@PermuteMethod` on non-template base class
+methods is invisible to the inline generation pipeline") remains true — `@PermuteMixin` is the
+mechanism that works around it without requiring a pipeline redesign.
 
 ## Consequences for real Drools integration
 
