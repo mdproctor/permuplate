@@ -527,7 +527,8 @@ public class InlineGenerator {
                                                     StaticJavaParser.parseClassOrInterfaceType(implementsType));
                                         } catch (Exception e) {
                                             System.err.println("[Permuplate] @PermuteSealedFamily: failed to add implements '"
-                                                    + implementsType + "' to '" + genClass.getNameAsString() + "': " + e.getMessage());
+                                                    + implementsType + "' to '" + genClass.getNameAsString() + "': "
+                                                    + e.getMessage());
                                         }
                                     });
                         }
