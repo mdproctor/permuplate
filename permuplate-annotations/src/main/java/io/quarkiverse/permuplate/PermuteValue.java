@@ -11,8 +11,7 @@ import java.lang.annotation.Target;
  *
  * <p>
  * On a <b>field or local variable declaration</b>: replaces the initializer.
- * No {@code index} needed — the declaration itself is the target. This is a
- * superset of {@link PermuteConst}.
+ * No {@code index} needed — the declaration itself is the target.
  *
  * <p>
  * On a <b>method</b>: replaces the RHS of the assignment statement at position

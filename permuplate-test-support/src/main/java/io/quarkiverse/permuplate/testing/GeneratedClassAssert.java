@@ -80,7 +80,7 @@ public final class GeneratedClassAssert {
      */
     public GeneratedClassAssert hasNoPermuplateAnnotations() {
         for (String ann : new String[] {
-                "@Permute", "@PermuteAnnotation", "@PermuteCase", "@PermuteConst",
+                "@Permute", "@PermuteAnnotation", "@PermuteCase",
                 "@PermuteDeclr", "@PermuteDelegate", "@PermuteExtends", "@PermuteFilter",
                 "@PermuteImport", "@PermuteMethod", "@PermuteParam", "@PermuteReturn",
                 "@PermuteSource", "@PermuteStatements", "@PermuteThrows",

@@ -24,7 +24,6 @@ import com.github.javaparser.ast.expr.IntegerLiteralExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
-import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.ForEachStmt;
@@ -58,18 +57,11 @@ public class PermuteDeclrTransformer {
     private static final String ANNOTATION_SIMPLE = "PermuteDeclr";
     private static final String ANNOTATION_FQ = "io.quarkiverse.permuplate.PermuteDeclr";
 
-    private static final String CONST_ANNOTATION_SIMPLE = "PermuteConst";
-    private static final String CONST_ANNOTATION_FQ = "io.quarkiverse.permuplate.PermuteConst";
-
     public static void transform(TypeDeclaration<?> classDecl,
             EvaluationContext ctx,
             Messager messager) {
         // Fields first (broadest scope — entire class body)
         transformFields(classDecl, ctx, messager);
-        // Field initializer substitution via @PermuteConst
-        transformConstFields(classDecl, ctx);
-        // Local variable initializer substitution via @PermuteConst (Task 3)
-        transformConstLocals(classDecl, ctx);
         // Object creation expressions — update constructor class name via @PermuteDeclr TYPE_USE
         transformNewExpressions(classDecl, ctx);
         // Record components — @PermuteDeclr on record parameters (RecordDeclaration only)
@@ -172,49 +164,6 @@ public class PermuteDeclrTransformer {
     }
 
     // -------------------------------------------------------------------------
-    // @PermuteConst — field initializer substitution
-    // -------------------------------------------------------------------------
-
-    private static void transformConstFields(TypeDeclaration<?> classDecl,
-            EvaluationContext ctx) {
-        classDecl.getFields().forEach(field -> {
-            field.getAnnotations().stream()
-                    .filter(PermuteDeclrTransformer::isPermuteConst)
-                    .findFirst()
-                    .ifPresent(ann -> {
-                        String expr = extractConstExpr(ann);
-                        String evaluated = ctx.evaluate(expr);
-                        Expression newInit = toExpression(evaluated);
-                        field.getVariable(0).setInitializer(newInit);
-                        field.getAnnotations().remove(ann);
-                    });
-        });
-    }
-
-    private static void transformConstLocals(TypeDeclaration<?> classDecl,
-            EvaluationContext ctx) {
-        // Walk all method and constructor bodies looking for annotated local variable declarations.
-        // VariableDeclarationExpr covers local vars in method bodies; skip for-each variables
-        // (those are handled by transformForEachVars via ForEachStmt.getVariable()).
-        classDecl.walk(VariableDeclarationExpr.class, varDeclExpr -> {
-            // Skip for-each variables — their parent is a ForEachStmt
-            if (varDeclExpr.getParentNode().map(p -> p instanceof ForEachStmt).orElse(false))
-                return;
-
-            varDeclExpr.getAnnotations().stream()
-                    .filter(PermuteDeclrTransformer::isPermuteConst)
-                    .findFirst()
-                    .ifPresent(ann -> {
-                        String expr = extractConstExpr(ann);
-                        String evaluated = ctx.evaluate(expr);
-                        Expression newInit = toExpression(evaluated);
-                        varDeclExpr.getVariables().get(0).setInitializer(newInit);
-                        varDeclExpr.getAnnotations().remove(ann);
-                    });
-        });
-    }
-
-    // -------------------------------------------------------------------------
     // @PermuteDeclr on ObjectCreationExpr — TYPE_USE target
     // -------------------------------------------------------------------------
 
@@ -265,25 +214,6 @@ public class PermuteDeclrTransformer {
             // Replace the type; @PermuteDeclr is removed since we replaced the whole node
             newExpr.setType(newType);
         });
-    }
-
-    private static boolean isPermuteConst(AnnotationExpr ann) {
-        String name = ann.getNameAsString();
-        return name.equals(CONST_ANNOTATION_SIMPLE) || name.equals(CONST_ANNOTATION_FQ);
-    }
-
-    private static String extractConstExpr(AnnotationExpr ann) {
-        if (ann instanceof SingleMemberAnnotationExpr single) {
-            return stripQuotes(single.getMemberValue().toString());
-        }
-        if (ann instanceof NormalAnnotationExpr normal) {
-            for (MemberValuePair pair : normal.getPairs()) {
-                if (pair.getNameAsString().equals("value")) {
-                    return stripQuotes(pair.getValue().toString());
-                }
-            }
-        }
-        throw new IllegalStateException("@PermuteConst missing value");
     }
 
     /**

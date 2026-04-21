@@ -1,7 +1,7 @@
 package io.quarkiverse.permuplate.example;
 
 import io.quarkiverse.permuplate.Permute;
-import io.quarkiverse.permuplate.PermuteConst;
+import io.quarkiverse.permuplate.PermuteValue;
 
 /**
  * Demonstrates {@code @Permute(values={...})} for string-set iteration.
@@ -16,7 +16,7 @@ import io.quarkiverse.permuplate.PermuteConst;
  * </ul>
  *
  * <p>
- * The string variable {@code F} takes each value in turn. {@code @PermuteConst}
+ * The string variable {@code F} takes each value in turn. {@code @PermuteValue}
  * replaces the {@code FORMAT} field initializer with the current string value.
  * The class name is formed by {@code className="${F}Serializer"}.
  */
@@ -27,7 +27,7 @@ public class FormatSerializer {
      * Format identifier for this serializer.
      * Evaluates to "Json" in JsonSerializer, "Xml" in XmlSerializer, and so on.
      */
-    @PermuteConst("${F}")
+    @PermuteValue("${F}")
     public static final String FORMAT = "Json";
 
     /**

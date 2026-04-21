@@ -165,15 +165,15 @@ public class RecordExpansionTest {
     }
 
     /**
-     * @PermuteConst on a record static field replaces the initializer per permutation.
+     * @PermuteValue on a record static field replaces the initializer per permutation.
      *               Generated Tuple3 has ARITY=3, Tuple4 has ARITY=4.
      */
     @Test
-    public void testRecordWithPermuteConstOnStaticField() {
+    public void testRecordWithPermuteValueOnStaticField() {
         Compilation compilation = compile("io.example.Tuple2",
                 "package io.example;\n" +
                         "import io.quarkiverse.permuplate.Permute;\n" +
-                        "import io.quarkiverse.permuplate.PermuteConst;\n" +
+                        "import io.quarkiverse.permuplate.PermuteValue;\n" +
                         "import io.quarkiverse.permuplate.PermuteParam;\n" +
                         "import io.quarkiverse.permuplate.PermuteTypeParam;\n" +
                         "@Permute(varName=\"i\", from=\"3\", to=\"4\", className=\"Tuple${i}\")\n" +
@@ -185,7 +185,7 @@ public class RecordExpansionTest {
                         "                  type=\"${alpha(j)}\", name=\"${lower(j)}\")\n" +
                         "    A a\n" +
                         ") {\n" +
-                        "    @PermuteConst(\"${i}\")\n" +
+                        "    @PermuteValue(\"${i}\")\n" +
                         "    public static final int ARITY = 2;\n" +
                         "}");
 
