@@ -95,7 +95,7 @@ See [`permuplate-mvn-examples/DROOLS-DSL.md`](permuplate-mvn-examples/DROOLS-DSL
                     <path>
                         <groupId>com.github.javaparser</groupId>
                         <artifactId>javaparser-core</artifactId>
-                        <version>3.25.9</version>
+                        <version>3.28.0</version>
                     </path>
                     <path>
                         <groupId>org.apache.commons</groupId>
@@ -174,7 +174,7 @@ The simplest setup. Add `permuplate-processor` to `annotationProcessorPaths` and
                     <path>
                         <groupId>com.github.javaparser</groupId>
                         <artifactId>javaparser-core</artifactId>
-                        <version>3.25.9</version>
+                        <version>3.28.0</version>
                     </path>
                     <path>
                         <groupId>org.apache.commons</groupId>
