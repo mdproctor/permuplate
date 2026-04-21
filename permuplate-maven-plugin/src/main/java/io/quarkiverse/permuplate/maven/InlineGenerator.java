@@ -226,9 +226,6 @@ public class InlineGenerator {
                 PermuteDeclrTransformer.transform(generated, ctx, null);
                 PermuteParamTransformer.transform(generated, ctx, null);
 
-                // @PermuteNew — explicit constructor type rename (complements coherence inference)
-                applyPermuteNew(coid, ctx);
-
                 // Apply @PermuteReturn — explicit override; boundary omission
                 Set<String> explicitReturnMethods = collectExplicitReturnMethodNames(coid);
                 applyPermuteReturn(coid, ctx, allGeneratedNames, alphaInference);
@@ -2662,47 +2659,6 @@ public class InlineGenerator {
     }
 
     /**
-     * Applies {@code @PermuteNew(className="...")} TYPE_USE annotations on
-     * {@code ObjectCreationExpr} nodes: evaluates the JEXL {@code className} expression
-     * and renames the constructed type. This is the explicit alternative to
-     * constructor-coherence inference for edge cases where inference cannot determine
-     * the correct target.
-     */
-    private static void applyPermuteNew(ClassOrInterfaceDeclaration classDecl, EvaluationContext ctx) {
-        classDecl.findAll(com.github.javaparser.ast.expr.ObjectCreationExpr.class).forEach(oce -> {
-            com.github.javaparser.ast.type.ClassOrInterfaceType type = oce.getType();
-            type.getAnnotations().stream()
-                    .filter(a -> a.getNameAsString().equals("PermuteNew")
-                            || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteNew"))
-                    .findFirst()
-                    .ifPresent(ann -> {
-                        String classNameExpr = null;
-                        if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normal) {
-                            classNameExpr = normal.getPairs().stream()
-                                    .filter(p -> p.getNameAsString().equals("className"))
-                                    .findFirst()
-                                    .map(p -> p.getValue().asStringLiteralExpr().asString())
-                                    .orElse(null);
-                        }
-                        if (classNameExpr == null)
-                            return;
-                        try {
-                            String resolved = ctx.evaluate(classNameExpr);
-                            // Resolved may be fully qualified (e.g. "JoinBuilder.Join3First") —
-                            // set only the simple name; the scope qualifier is preserved by JavaParser.
-                            String simple = resolved.contains(".")
-                                    ? resolved.substring(resolved.lastIndexOf('.') + 1)
-                                    : resolved;
-                            type.setName(simple);
-                        } catch (Exception e) {
-                            System.err.println("[Permuplate] @PermuteNew className evaluation failed: '"
-                                    + classNameExpr + "' — " + e.getMessage());
-                        }
-                    });
-        });
-    }
-
-    /**
      * Injects methods from classes listed in {@code @PermuteMixin} into the template class.
      * Must be called before {@link #generate} so injected methods are processed by the pipeline.
      *
@@ -2802,7 +2758,6 @@ public class InlineGenerator {
                 "PermuteMixin", "io.quarkiverse.permuplate.PermuteMixin",
                 "PermuteBodyFragment", "io.quarkiverse.permuplate.PermuteBodyFragment",
                 "PermuteBodyFragments", "io.quarkiverse.permuplate.PermuteBodyFragments",
-                "PermuteNew", "io.quarkiverse.permuplate.PermuteNew",
                 "PermuteSealedFamily", "io.quarkiverse.permuplate.PermuteSealedFamily");
 
         // Strip from the class itself
