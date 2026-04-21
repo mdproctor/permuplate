@@ -337,15 +337,15 @@ public class RuleDefinition<DS> {
     }
 
     private BaseTuple createEmptyTuple(int size) {
-        return switch (size) {
-            case 1 -> new BaseTuple.Tuple1<>();
-            case 2 -> new BaseTuple.Tuple2<>();
-            case 3 -> new BaseTuple.Tuple3<>();
-            case 4 -> new BaseTuple.Tuple4<>();
-            case 5 -> new BaseTuple.Tuple5<>();
-            case 6 -> new BaseTuple.Tuple6<>();
-            default -> throw new IllegalArgumentException("OOPath depth " + size + " exceeds maximum of 6");
-        };
+        // Reflection-based: scales automatically as the BaseTuple.TupleN family grows.
+        // Inner class bytecode name: BaseTuple$Tuple1, BaseTuple$Tuple2, etc.
+        String name = BaseTuple.class.getName() + "$Tuple" + size;
+        try {
+            return (BaseTuple) Class.forName(name).getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalArgumentException(
+                    "OOPath depth " + size + " exceeds the maximum supported tuple size", e);
+        }
     }
 
     // -------------------------------------------------------------------------
