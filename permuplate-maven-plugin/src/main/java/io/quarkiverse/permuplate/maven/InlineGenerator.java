@@ -317,6 +317,10 @@ public class InlineGenerator {
                 // @PermuteStatements — insert accumulated statements into method bodies
                 PermuteStatementsTransformer.transform(generated, ctx);
 
+                // @PermuteBodyFragment — substitute ${name} refs in @PermuteBody body strings (enum path)
+                java.util.Map<String, String> enumBodyFragments = collectBodyFragments(templateClassDecl, ctx);
+                applyBodyFragments(generated, enumBodyFragments);
+
                 // @PermuteBody — replace entire method or constructor body per permutation
                 PermuteBodyTransformer.transform(generated, ctx);
 
@@ -2702,7 +2706,11 @@ public class InlineGenerator {
             return;
         try {
             out.put(name, ctx.evaluate(value));
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "@PermuteBodyFragment(name=\"" + name + "\"): JEXL evaluation failed for value: " + value + " — "
+                            + e.getMessage(),
+                    e);
         }
     }
 

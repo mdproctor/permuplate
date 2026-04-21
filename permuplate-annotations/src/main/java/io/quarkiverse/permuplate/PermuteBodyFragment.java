@@ -26,7 +26,13 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Repeatable(PermuteBodyFragments.class)
 public @interface PermuteBodyFragment {
-    /** Reference key used as {@code ${name}} in {@link PermuteBody#body()}. */
+    /**
+     * Reference key used as {@code ${name}} in {@link PermuteBody#body()}.
+     * Must not clash with JEXL built-in function names ({@code alpha}, {@code lower},
+     * {@code typeArgList}, {@code capitalize}, {@code decapitalize}, {@code max},
+     * {@code min}) or loop variable names — such names are silently overwritten by
+     * the JEXL context after fragment substitution.
+     */
     String name();
 
     /** Java code fragment. JEXL expressions (e.g. {@code ${i}}) are evaluated first. */
