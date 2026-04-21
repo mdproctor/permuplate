@@ -297,10 +297,12 @@ public class PermuteMojo extends AbstractMojo {
             PermuteDeclrTransformer.transform(typeDecl, ctx, null);
             PermuteParamTransformer.transform(typeDecl, ctx, null);
 
-            typeDecl.getAnnotations().removeIf(a -> {
-                String n = a.getNameAsString();
-                return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute");
-            });
+            // @PermuteAnnotation — add Java annotations to generated elements
+            io.quarkiverse.permuplate.core.PermuteAnnotationTransformer.transform(
+                    typeDecl, ctx, null, null);
+
+            // Strip all Permuplate annotations (including @Permute, @PermuteAnnotation, etc.)
+            InlineGenerator.stripPermuteAnnotations(typeDecl);
 
             CompilationUnit generatedCu = new CompilationUnit();
             entry.cu().getPackageDeclaration().ifPresent(p -> generatedCu.setPackageDeclaration(p.clone()));

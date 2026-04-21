@@ -1,6 +1,7 @@
 package io.quarkiverse.permuplate.example.drools;
 
 import io.quarkiverse.permuplate.Permute;
+import io.quarkiverse.permuplate.PermuteAnnotation;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteParam;
 import io.quarkiverse.permuplate.PermuteTypeParam;
@@ -21,6 +22,7 @@ import io.quarkiverse.permuplate.PermuteVar;
          extraVars = {@PermuteVar(varName = "F", values = {"Consumer", "Predicate"})},
          macros = {"method=${F == 'Consumer' ? 'accept' : 'test'}",
                    "ret=${F == 'Consumer' ? 'void' : 'boolean'}"})
+@PermuteAnnotation("@FunctionalInterface")
 public interface FunctionalTemplate1<DS,
         @PermuteTypeParam(varName = "j", from = "1", to = "${i-1}", name = "${alpha(j)}") A> {
 

@@ -48,4 +48,26 @@ public class FunctionalFamilyTest {
         Method m = Arrays.stream(cls.getMethods()).filter(x -> x.getName().equals("test")).findFirst().orElseThrow();
         assertThat(m.getParameterCount()).isEqualTo(4); // DS ctx + A + B + C
     }
+
+    @Test
+    public void testConsumer4IsFunctionalInterface() throws Exception {
+        Class<?> cls = Class.forName("io.quarkiverse.permuplate.example.drools.Consumer4");
+        assertThat(cls.isAnnotationPresent(FunctionalInterface.class)).isTrue();
+    }
+
+    @Test
+    public void testPredicate5IsFunctionalInterface() throws Exception {
+        Class<?> cls = Class.forName("io.quarkiverse.permuplate.example.drools.Predicate5");
+        assertThat(cls.isAnnotationPresent(FunctionalInterface.class)).isTrue();
+    }
+
+    @Test
+    public void testConsumer1IsFunctionalInterface() {
+        assertThat(Consumer1.class.isAnnotationPresent(FunctionalInterface.class)).isTrue();
+    }
+
+    @Test
+    public void testPredicate1IsFunctionalInterface() {
+        assertThat(Predicate1.class.isAnnotationPresent(FunctionalInterface.class)).isTrue();
+    }
 }
