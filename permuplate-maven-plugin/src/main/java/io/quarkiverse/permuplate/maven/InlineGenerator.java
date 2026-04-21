@@ -361,16 +361,8 @@ public class InlineGenerator {
             // Synthesise @PermuteDelegate method bodies
             applyPermuteDelegate(generated, parentCu);
 
-            // Strip @Permute, @PermuteFilter, @PermuteFilters, @PermuteSource, @PermuteSources, @PermuteMixin
-            generated.getAnnotations().removeIf(a -> {
-                String n = a.getNameAsString();
-                return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute")
-                        || n.equals("PermuteFilter") || n.equals("io.quarkiverse.permuplate.PermuteFilter")
-                        || n.equals("PermuteFilters") || n.equals("io.quarkiverse.permuplate.PermuteFilters")
-                        || n.equals("PermuteSource") || n.equals("io.quarkiverse.permuplate.PermuteSource")
-                        || n.equals("PermuteSources") || n.equals("io.quarkiverse.permuplate.PermuteSources")
-                        || n.equals("PermuteMixin") || n.equals("io.quarkiverse.permuplate.PermuteMixin");
-            });
+            // Strip all Permuplate annotations from the generated type and its members
+            stripPermuteAnnotations(generated);
 
             if (isTopLevel) {
                 outputCu.addType(generated);
@@ -496,6 +488,9 @@ public class InlineGenerator {
 
             toRemove.add(method);
 
+            // Read @PermuteFilter expressions from the method (if any)
+            List<String> methodFilterExprs = readFilterExpressions(method);
+
             // Collect declared class type parameter names for undeclared-var detection
             Set<String> declaredTypeParams = new java.util.LinkedHashSet<>();
             classDecl.getTypeParameters().forEach(tp -> declaredTypeParams.add(tp.getNameAsString()));
@@ -507,6 +502,12 @@ public class InlineGenerator {
                 for (String value : pmCfg.values()) {
                     EvaluationContext innerCtx = ctx.withVariable(pmCfg.varName(), value);
                     innerCtx = applyMethodMacros(pmCfg, innerCtx);
+
+                    // Apply method-level @PermuteFilter
+                    if (!evaluateMethodFilters(methodFilterExprs, innerCtx)) {
+                        continue;
+                    }
+
                     applyPermuteMethodClone(method, clone -> toAdd.add(clone),
                             innerCtx, classDecl, declaredTypeParams, pmCfg, allGeneratedNames,
                             /* j for implicit expansion */ -1);
@@ -540,6 +541,12 @@ public class InlineGenerator {
                 for (int j = fromVal; j <= toVal; j++) {
                     EvaluationContext innerCtx = ctx.withVariable(pmCfg.varName(), j);
                     innerCtx = applyMethodMacros(pmCfg, innerCtx);
+
+                    // Apply method-level @PermuteFilter
+                    if (!evaluateMethodFilters(methodFilterExprs, innerCtx)) {
+                        continue;
+                    }
+
                     applyPermuteMethodClone(method, clone -> toAdd.add(clone),
                             innerCtx, classDecl, declaredTypeParams, pmCfg, allGeneratedNames, j);
                 }
@@ -1849,6 +1856,54 @@ public class InlineGenerator {
         return result;
     }
 
+    /**
+     * Reads all {@code @PermuteFilter} expression strings from a method's annotations.
+     * Handles both the single {@code @PermuteFilter} and the {@code @PermuteFilters} container.
+     * Returns an empty list if no filter annotations are present.
+     */
+    private static List<String> readFilterExpressions(MethodDeclaration method) {
+        List<String> result = new ArrayList<>();
+        for (com.github.javaparser.ast.expr.AnnotationExpr ann : method.getAnnotations()) {
+            String name = ann.getNameAsString();
+            if ("PermuteFilter".equals(name) || "io.quarkiverse.permuplate.PermuteFilter".equals(name)) {
+                extractFilterValue(ann).ifPresent(result::add);
+            } else if ("PermuteFilters".equals(name) || "io.quarkiverse.permuplate.PermuteFilters".equals(name)) {
+                if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normal) {
+                    normal.getPairs().stream()
+                            .filter(p -> "value".equals(p.getNameAsString()))
+                            .findFirst()
+                            .ifPresent(p -> {
+                                com.github.javaparser.ast.expr.Expression val = p.getValue();
+                                List<com.github.javaparser.ast.expr.Expression> elems = val instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr
+                                        ? arr.getValues()
+                                        : List.of(val);
+                                elems.forEach(e -> extractFilterValue(e).ifPresent(result::add));
+                            });
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Evaluates method-level @PermuteFilter expressions. Returns true if all filters
+     * pass (or if no filters are present), false if any filter fails.
+     * Filters are ANDed — all must pass for the method clone to be generated.
+     */
+    private static boolean evaluateMethodFilters(List<String> filterExprs, EvaluationContext ctx) {
+        for (String expr : filterExprs) {
+            try {
+                if (!ctx.evaluateBoolean(expr)) {
+                    return false;
+                }
+            } catch (Exception e) {
+                System.err.println("[Permuplate] @PermuteFilter expression error on method (clone kept): "
+                        + expr + " — " + e.getMessage());
+            }
+        }
+        return true;
+    }
+
     private static java.util.Optional<String> extractFilterValue(
             com.github.javaparser.ast.Node node) {
         if (node instanceof com.github.javaparser.ast.expr.SingleMemberAnnotationExpr single) {
@@ -2418,12 +2473,19 @@ public class InlineGenerator {
                 "PermuteStatements", "io.quarkiverse.permuplate.PermuteStatements",
                 "PermuteBody", "io.quarkiverse.permuplate.PermuteBody",
                 "PermuteBodies", "io.quarkiverse.permuplate.PermuteBodies",
+                "PermuteFilter", "io.quarkiverse.permuplate.PermuteFilter",
+                "PermuteFilters", "io.quarkiverse.permuplate.PermuteFilters",
                 "PermuteEnumConst", "io.quarkiverse.permuplate.PermuteEnumConst",
                 "PermuteSwitchArm", "io.quarkiverse.permuplate.PermuteSwitchArm",
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
                 "PermuteImports", "io.quarkiverse.permuplate.PermuteImports",
                 "PermuteSelf", "io.quarkiverse.permuplate.PermuteSelf",
                 "PermuteDefaultReturn", "io.quarkiverse.permuplate.PermuteDefaultReturn",
+                "PermuteAnnotation", "io.quarkiverse.permuplate.PermuteAnnotation",
+                "PermuteAnnotations", "io.quarkiverse.permuplate.PermuteAnnotations",
+                "PermuteThrows", "io.quarkiverse.permuplate.PermuteThrows",
+                "PermuteSource", "io.quarkiverse.permuplate.PermuteSource",
+                "PermuteSources", "io.quarkiverse.permuplate.PermuteSources",
                 "PermuteMixin", "io.quarkiverse.permuplate.PermuteMixin");
 
         // Strip from the class itself
