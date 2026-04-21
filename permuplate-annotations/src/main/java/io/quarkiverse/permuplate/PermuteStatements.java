@@ -15,6 +15,15 @@ import java.lang.annotation.Target;
  * single statement is inserted using only the outer permutation context.
  *
  * <p>
+ * <b>Status under review:</b> This annotation is additive — it inserts statements
+ * while preserving the existing method body, which distinguishes it from
+ * {@link PermuteBody} (full replacement). However, no current Drools DSL template
+ * uses it; every body-manipulation need has been met by {@link PermuteBody} instead.
+ * It is retained pending a decision on whether additive insertion is needed in
+ * future templates. If {@link PermuteBody} continues to cover all practical cases,
+ * this annotation will be removed.
+ *
+ * <p>
  * Example — accumulate field assignments at the start of a constructor:
  *
  * <pre>{@code
