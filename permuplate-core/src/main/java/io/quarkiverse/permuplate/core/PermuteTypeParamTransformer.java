@@ -396,7 +396,10 @@ public class PermuteTypeParamTransformer {
     private static boolean hasPermuteReturn(MethodDeclaration method) {
         return method.getAnnotations().stream().anyMatch(a -> {
             String n = a.getNameAsString();
-            return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn");
+            return n.equals("PermuteReturn")
+                    || n.equals("io.quarkiverse.permuplate.PermuteReturn")
+                    || n.equals("PermuteReturns")
+                    || n.equals("io.quarkiverse.permuplate.PermuteReturns");
         });
     }
 

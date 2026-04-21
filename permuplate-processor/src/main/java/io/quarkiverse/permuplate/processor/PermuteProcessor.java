@@ -1525,6 +1525,17 @@ public class PermuteProcessor extends AbstractProcessor {
             String alwaysEmitAttr = getAnnAttr(ann, "alwaysEmit");
             String typeArgFrom = getAnnAttr(ann, "typeArgFrom");
             String replaceLastTypeArgWith = getAnnAttr(ann, "replaceLastTypeArgWith");
+            String typeParam = getAnnAttr(ann, "typeParam");
+
+            // typeParam= is a Maven plugin (inline) feature — APT cannot act on it
+            if (typeParam != null && !typeParam.isEmpty()) {
+                processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                        "@PermuteReturn typeParam=\"" + typeParam + "\" is a Maven plugin (inline) feature"
+                                + " and is ignored in APT mode."
+                                + " Use @PermuteDeclr or @PermuteReturn className= instead.",
+                        element);
+                return;
+            }
 
             if (classNameTemplate == null || classNameTemplate.isEmpty())
                 return;
