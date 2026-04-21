@@ -340,14 +340,14 @@ public class JoinBuilder {
          */
         @PermuteMethod(varName = "m", from = "2", to = "3", name = "filter")
         @PermuteSelf
-        @PermuteBody(body = "{ rd.addVariableFilter(${typeArgList(1, m, 'v')}, predicate); return this; }")
         public <@PermuteTypeParam(varName = "k", from = "1", to = "${m}", name = "V${k}") V1>
                 Object filterVar(
                 @PermuteParam(varName = "k", from = "1", to = "${m}",
                               type = "Variable<V${k}>", name = "v${k}") Variable<V1> v1,
                 @PermuteDeclr(type = "Predicate${m+1}<DS, ${typeArgList(1, m, 'V')}>")
                 Object predicate) {
-            return null; // replaced by @PermuteBody
+            rd.addVariableFilter(v1, predicate);
+            return this;
         }
 
     }
