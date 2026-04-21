@@ -1718,6 +1718,41 @@ public class PermuteProcessor extends AbstractProcessor {
         if (classNameTemplate == null || classNameTemplate.isEmpty())
             return;
 
+        // "self" is a reserved literal — return current generated class + all type parameters.
+        // typeArgs is ignored when className="self".
+        if ("self".equals(classNameTemplate)) {
+            String selfName = classDecl.getNameAsString();
+            List<String> typeParamNames = new ArrayList<>();
+            classDecl.getTypeParameters().forEach(tp -> typeParamNames.add(tp.getNameAsString()));
+            final String selfTypeSrc = typeParamNames.isEmpty()
+                    ? selfName
+                    : selfName + "<" + String.join(", ", typeParamNames) + ">";
+
+            classDecl.getMethods().stream()
+                    .filter(m -> m.getType().asString().equals("Object"))
+                    .filter(m -> m.getAnnotations().stream().noneMatch(a -> {
+                        String n = a.getNameAsString();
+                        return n.equals("PermuteReturn") || n.equals("io.quarkiverse.permuplate.PermuteReturn")
+                                || n.equals("PermuteReturns") || n.equals("io.quarkiverse.permuplate.PermuteReturns");
+                    }))
+                    .forEach(m -> {
+                        try {
+                            m.setType(StaticJavaParser.parseType(selfTypeSrc));
+                        } catch (Exception e) {
+                            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                                    "@PermuteDefaultReturn(className=\"self\"): cannot parse return type \""
+                                            + selfTypeSrc + "\": " + e.getMessage(),
+                                    element);
+                        }
+                    });
+
+            classDecl.getAnnotations().removeIf(a -> {
+                String n = a.getNameAsString();
+                return n.equals("PermuteDefaultReturn") || n.equals("io.quarkiverse.permuplate.PermuteDefaultReturn");
+            });
+            return;
+        }
+
         String evaluatedClass;
         try {
             evaluatedClass = ctx.evaluate(classNameTemplate);

@@ -42,7 +42,16 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
 public @interface PermuteDefaultReturn {
-    /** JEXL template for the return class name (e.g. {@code "Builder${i}"}). */
+    /**
+     * Template expression for the default return class name, or the reserved literal
+     * {@code "self"} to use the current generated class with all its type parameters.
+     *
+     * <p>
+     * When {@code className = "self"}, the return type is set to the generated class
+     * name plus all its declared type parameters (e.g. {@code Fluent3<T1, T2, T3>}).
+     * The {@code typeArgs} attribute is ignored in this case. {@code "self"} is a
+     * reserved literal and is NOT evaluated as a JEXL expression.
+     */
     String className();
 
     /**
