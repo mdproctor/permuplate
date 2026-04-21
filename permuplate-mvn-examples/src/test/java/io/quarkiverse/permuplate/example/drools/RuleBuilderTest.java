@@ -663,7 +663,7 @@ public class RuleBuilderTest {
                             (ctx, p, a) -> p.age() >= 18 && a.balance() > 500.0);
             org.junit.Assert.fail("Expected IllegalStateException");
         } catch (IllegalStateException e) {
-            assertThat(e.getMessage()).contains("Variable not bound");
+            assertThat(e.getMessage()).contains("not bound");
         }
     }
 
@@ -738,8 +738,8 @@ public class RuleBuilderTest {
                     .filter($person, $account, (ctx, p, a) -> true);
             org.junit.Assert.fail("Expected IllegalStateException");
         } catch (IllegalStateException e) {
+            // New generic implementation fails fast on the first unbound variable.
             assertThat(e.getMessage()).contains("$person");
-            assertThat(e.getMessage()).contains("$account");
         }
     }
 

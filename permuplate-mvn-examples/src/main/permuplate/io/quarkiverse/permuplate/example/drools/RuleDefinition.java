@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.quarkiverse.permuplate.PermuteMixin;
+
 /**
  * Captures the structure of a rule built via the DSL and executes it.
  *
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
  * registration position for single-fact filters — {@code sources.size()} is no
  * longer correct since a bi-linear source is one entry but contributes N columns.
  */
+@PermuteMixin(VariableFilterMixin.class)
 public class RuleDefinition<DS> {
 
     @FunctionalInterface
@@ -159,32 +162,35 @@ public class RuleDefinition<DS> {
         v.bind(factIndex);
     }
 
-    @SuppressWarnings("unchecked")
-    public <V1, V2> void addVariableFilter(Variable<V1> v1, Variable<V2> v2,
-            Predicate3<DS, V1, V2> predicate) {
-        if (!v1.isBound() || !v2.isBound())
-            throw new IllegalStateException(
-                    "Variable not bound — call var() before using it in filter() "
-                            + "('" + v1.name() + "' index=" + v1.index() + ", '" + v2.name() + "' index=" + v2.index() + ")");
-        // Snapshot indices now — Variable.index() is mutable; reading inside the lambda
-        // would allow post-registration rebinding to silently corrupt the filter.
-        int i1 = v1.index(), i2 = v2.index();
-        filters.add((ctx, facts) -> predicate.test((DS) ctx, (V1) facts[i1], (V2) facts[i2]));
-    }
-
-    @SuppressWarnings("unchecked")
-    public <V1, V2, V3> void addVariableFilter(Variable<V1> v1, Variable<V2> v2,
-            Variable<V3> v3,
-            Predicate4<DS, V1, V2, V3> predicate) {
-        if (!v1.isBound() || !v2.isBound() || !v3.isBound())
-            throw new IllegalStateException(
-                    "Variable not bound — call var() before using it in filter() "
-                            + "('" + v1.name() + "' index=" + v1.index() + ", '" + v2.name() + "' index=" + v2.index()
-                            + ", '" + v3.name() + "' index=" + v3.index() + ")");
-        // Snapshot indices now — Variable.index() is mutable; reading inside the lambda
-        // would allow post-registration rebinding to silently corrupt the filter.
-        int i1 = v1.index(), i2 = v2.index(), i3 = v3.index();
-        filters.add((ctx, facts) -> predicate.test((DS) ctx, (V1) facts[i1], (V2) facts[i2], (V3) facts[i3]));
+    /**
+     * Generic variable filter for m=2..6 variables. Checks all variables are bound,
+     * snapshots indices to prevent rebinding corruption, then uses reflection for
+     * runtime predicate invocation — consistent with wrapPredicate/wrapConsumer.
+     * Called by the generated typed addVariableFilter(v1..vm, predicate) overloads.
+     */
+    void addVariableFilterGeneric(Object predicate, Variable<?>... variables) {
+        for (Variable<?> v : variables) {
+            if (!v.isBound())
+                throw new IllegalStateException(
+                        "Variable '" + v.name() + "' not bound — call var() before filter()");
+        }
+        int[] indices = new int[variables.length];
+        for (int k = 0; k < variables.length; k++) {
+            indices[k] = variables[k].index();
+        }
+        Method m = findMethod(predicate, "test");
+        // Intentionally bypasses wrapPredicate — variable indices are explicit snapshots;
+        // wrapPredicate's positional-trim logic would be wrong here.
+        filters.add((ctx, facts) -> {
+            Object[] args = new Object[indices.length + 1];
+            args[0] = ctx;
+            for (int k = 0; k < indices.length; k++) args[k + 1] = facts[indices[k]];
+            try {
+                return (Boolean) m.invoke(predicate, args);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException("Variable filter invocation failed", e);
+            }
+        });
     }
 
     /**
