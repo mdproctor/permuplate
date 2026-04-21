@@ -33,15 +33,17 @@ import java.lang.annotation.Target;
  * <pre>
  * {@code
  * &#64;Permute(varName="i", from="2", to="6", className="Tuple${i}", ...)
- * @PermuteExtends(className="Tuple${i-1}", typeArgs="typeArgList(1, i-1, 'alpha')")
+ * &#64;PermuteExtends(className="Tuple${i-1}", typeArgs="typeArgList(1, i-1, 'alpha')")
  * public static class Tuple1<A> extends BaseTuple { ... }
  * }
  * </pre>
  *
  * With the shorthand:
- * <pre>{@code
+ *
+ * <pre>
+ * {@code
  * &#64;Permute(varName="i", from="2", to="6", className="Tuple${i}", ...)
- * @PermuteExtendsChain
+ * &#64;PermuteExtendsChain
  * public static class Tuple1<A> extends BaseTuple { ... }
  * }
  * </pre>

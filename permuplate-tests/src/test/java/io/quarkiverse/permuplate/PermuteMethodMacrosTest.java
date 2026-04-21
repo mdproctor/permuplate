@@ -58,9 +58,9 @@ public class PermuteMethodMacrosTest {
                         package io.ex;
                         import io.quarkiverse.permuplate.*;
                         @Permute(varName="i", from="1", to="2", className="Mm${i}",
-                                 strings={"max=2"})
+                                 strings={"maxN=2"})
                         public class Mm0 {
-                            @PermuteMethod(varName="n", from="1", to="${max - i}",
+                            @PermuteMethod(varName="n", from="1", to="${maxN - i}",
                                            name="level${n}",
                                            macros={"tail=typeArgList(1,n,'alpha')"})
                             @PermuteReturn(className="Mm${i+n}", typeArgs="tail",

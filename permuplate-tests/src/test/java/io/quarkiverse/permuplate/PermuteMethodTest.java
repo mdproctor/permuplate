@@ -225,9 +225,9 @@ public class PermuteMethodTest {
                         import io.quarkiverse.permuplate.PermuteMethod;
                         import io.quarkiverse.permuplate.PermuteReturn;
                         @Permute(varName="i", from="1", to="3", className="Apt${i}Second",
-                                 strings={"max=3"})
+                                 strings={"maxN=3"})
                         public class Apt0Second {
-                            @PermuteMethod(varName="j", from="1", to="${max - i}", name="join${j}")
+                            @PermuteMethod(varName="j", from="1", to="${maxN - i}", name="join${j}")
                             @PermuteReturn(className="Apt${i+j}First")
                             public Object join(Object src) { return null; }
                             public void execute() {}

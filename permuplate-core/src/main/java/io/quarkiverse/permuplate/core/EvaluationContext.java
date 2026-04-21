@@ -121,11 +121,6 @@ public class EvaluationContext {
      * </ul>
      */
     public static final class JexlThrowHelper {
-        public void throwFor(String style) {
-            throw new IllegalArgumentException(
-                    "typeArgList: unknown style \"" + style + "\" — use \"T\", \"alpha\", or \"lower\"");
-        }
-
         public void throwOutOfRange(String fn, int n) {
             throw new IllegalArgumentException(
                     fn + "(n): n must be between 1 and 26, got " + n);
@@ -136,7 +131,7 @@ public class EvaluationContext {
 
     /**
      * JEXL engine configured with {@code safe(false)} and {@code UNRESTRICTED} permissions
-     * so that Java exceptions thrown by helper methods (e.g. {@link JexlThrowHelper#throwFor})
+     * so that Java exceptions thrown by helper methods (e.g. {@link JexlThrowHelper#throwOutOfRange})
      * propagate as {@link JexlException} rather than being silently swallowed.
      */
     private static final JexlEngine JEXL = new JexlBuilder()

@@ -1,6 +1,6 @@
 # Permuplate Roadmap
 
-Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batches 6–7).
+Prioritised list of improvements beyond the current feature set. Updated 2026-04-20 (batches 6–8).
 
 ---
 
@@ -34,6 +34,16 @@ Prioritised list of improvements beyond the current feature set. Updated 2026-04
 | Alpha growing-tip inference | When `@PermuteReturn` has `className` but no `typeArgs` + single-value alpha `@PermuteTypeParam`, `typeArgs` is inferred automatically. |
 | Sealed JoinFirst/JoinSecond hierarchy | Generated families are `sealed`; enables Java 21 pattern dispatch over the builder arity. |
 | ADR-0006 | Documents why `extendsRule()` duplication is structurally unavoidable — constraint reference for real Drools integration. |
+| not()/exists() string-set conversion | Renamed `NegationScope→NotScope`, `ExistenceScope→ExistsScope`; `addNegation→addNot`, `addExistence→addExists`. `@PermuteMethod(values={"not","exists"})` + `capitalize()` replaces 3 hand-coded ternaries. |
+| `max()`/`min()` JEXL built-ins | New `max(a,b)` and `min(a,b)` functions in `EvaluationContext`; `max(2,i)` eliminates ternary in `filterLatest`. |
+| `typeArgList` custom prefix | Unknown style = literal prefix+index (`V→V1,V2`); enables variable-prefix type arg lists without special-casing each style. |
+| Variable filter overloads templated | `@PermuteMethod(m=2..3)` + G4 `@PermuteTypeParam` replaces two hand-coded filter overloads; eliminates ~40 lines of duplication. |
+| Method macros (bilinear, extendsRule, OOPath) | `macros=` on `@PermuteMethod` for `joinAll`/`joinRight` (bilinear join), `prevAlpha` (extendsRule), `outerJoin`/`prevTuple` (OOPath). |
+| `@PermuteReturn(typeParam=)` + repeatability | `typeParam=` sets return type to a named type parameter; `@PermuteReturn` is now `@Repeatable` (first matching `when=` wins); `@PermuteBody` gains `when=` + `@Repeatable`. `Path2` unified into single template. |
+| `@PermuteMacros` | New annotation: shared JEXL macros on outer class; all nested `@Permute` templates inherit (innermost wins). Eliminates cross-template macro duplication. |
+| `@PermuteMixin` | New annotation: inject annotated methods from a mixin class before the transform pipeline. Solves ADR-0006 — `ExtendsRuleMixin` is shared by `RuleBuilderTemplate` and `ParametersFirstTemplate`. |
+| Constructor super-call inference | Auto-insert `super(p1..p_{N-1})` when template extends-previous and constructor has no existing super-call and no `@PermuteStatements`. Explicit `@PermuteStatements` always wins. Removes explicit annotation from `Tuple1`. |
+| `@PermuteExtendsChain` | New annotation: extends-previous-in-family shorthand. Generates `extends ${className}${i-1}<typeArgList(1,i-1,'alpha')>`. Explicit `@PermuteExtends` always wins. Applied to `BaseTuple.Tuple1`. |
 
 ---
 
