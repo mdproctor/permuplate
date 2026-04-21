@@ -3,6 +3,7 @@ package io.quarkiverse.permuplate.example.drools;
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteBody;
 import io.quarkiverse.permuplate.PermuteDeclr;
+import io.quarkiverse.permuplate.PermuteFilter;
 import io.quarkiverse.permuplate.PermuteMethod;
 import io.quarkiverse.permuplate.PermuteMacros;
 import io.quarkiverse.permuplate.PermuteParam;
@@ -177,11 +178,12 @@ public class JoinBuilder {
          * outer fact combination (runs against ctx globally). Full Drools tracks the
          * per-tuple connection via beta memory.
          */
-        @PermuteMethod(varName = "scope", values = {"not", "exists"}, name = "${scope}")
-        @PermuteReturn(className = "${capitalize(scope)}Scope",
+        @PermuteMethod(varName = "scope", values = {"not", "exists"}, name = "${scope}",
+                       macros = {"Scope=capitalize(scope)"})
+        @PermuteReturn(className = "${Scope}Scope",
                        typeArgs = "'Join' + i + 'Second<END, DS, ' + alphaList + '>, DS'",
                        alwaysEmit = true)
-        @PermuteBody(body = "{ RuleDefinition<DS> scopeRd = new RuleDefinition<>(\"${scope}-scope\"); rd.add${capitalize(scope)}(scopeRd); return new ${capitalize(scope)}Scope<>(this, scopeRd); }")
+        @PermuteBody(body = "{ RuleDefinition<DS> scopeRd = new RuleDefinition<>(\"${scope}-scope\"); rd.add${Scope}(scopeRd); return new ${Scope}Scope<>(this, scopeRd); }")
         public Object scopeTemplate() {
             return null; // replaced by @PermuteBody
         }
@@ -298,12 +300,12 @@ public class JoinBuilder {
 
         /**
          * Single-fact filter — applies a predicate to the most recently joined fact only.
-         * Suppressed at i=1 via {@code @PermuteMethod} range: at arity 1 both overloads
-         * would have {@code filter(Predicate2<DS, A>)} — a compile error. The JEXL expression
-         * {@code from="${max(2, i)}"} produces {@code from="2", to=1} at i=1 (empty
-         * range), silently omitting this method. At i≥2: from=to=i, one clone per arity.
+         * Suppressed at i=1 via {@code @PermuteFilter}: at arity 1 both overloads
+         * would have {@code filter(Predicate2<DS, A>)} — a compile error. The filter
+         * expression {@code "i > 1"} skips this method when i=1, generating one clone per arity at i≥2.
          */
-        @PermuteMethod(varName = "x", from = "${max(2, i)}", to = "${i}", name = "filter")
+        @PermuteFilter("i > 1")
+        @PermuteMethod(varName = "x", from = "${i}", to = "${i}", name = "filter")
         @PermuteSelf
         public Object filterLatest(
                 @PermuteDeclr(type = "Predicate2<DS, ${alpha(i)}>")
