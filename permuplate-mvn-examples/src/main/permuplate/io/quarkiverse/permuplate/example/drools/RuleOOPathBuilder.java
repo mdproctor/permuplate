@@ -4,6 +4,7 @@ import java.util.List;
 
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteBody;
+import io.quarkiverse.permuplate.PermuteBodyFragment;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteReturn;
 import io.quarkiverse.permuplate.PermuteTypeParam;
@@ -22,6 +23,9 @@ import io.quarkiverse.permuplate.PermuteTypeParam;
  */
 public class RuleOOPathBuilder {
 
+    @PermuteBodyFragment(
+            name = "addStep",
+            value = "steps.add(new OOPathStep((ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact), (ctx, child) -> flt2.test((PathContext<T>) ctx, (B) child)));")
     @Permute(varName = "i", from = "2", to = "6", className = "Path${i}",
              inline = true, keepTemplate = false)
     public static class Path1<END, T extends BaseTuple, A, B,
@@ -44,9 +48,9 @@ public class RuleOOPathBuilder {
                        typeArgs = "'END, T, ' + typeArgList(2, i, 'alpha')",
                        alwaysEmit = true)
         @PermuteBody(when = "i == 2",
-                     body = "{ steps.add(new OOPathStep((ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact), (ctx, child) -> flt2.test((PathContext<T>) ctx, (B) child))); rd.addOOPathPipeline(rootIndex, steps); return end; }")
+                     body = "{ ${addStep} rd.addOOPathPipeline(rootIndex, steps); return end; }")
         @PermuteBody(when = "i > 2",
-                     body = "{ steps.add(new OOPathStep((ctx, fact) -> (Iterable<?>) fn2.apply((PathContext<T>) ctx, (A) fact), (ctx, child) -> flt2.test((PathContext<T>) ctx, (B) child))); return new RuleOOPathBuilder.Path${i-1}<>(end, rd, steps, rootIndex); }")
+                     body = "{ ${addStep} return new RuleOOPathBuilder.Path${i-1}<>(end, rd, steps, rootIndex); }")
         public Object path(Function2<PathContext<T>, A, Iterable<B>> fn2,
                 Predicate2<PathContext<T>, B> flt2) {
             return null; // replaced by @PermuteBody
