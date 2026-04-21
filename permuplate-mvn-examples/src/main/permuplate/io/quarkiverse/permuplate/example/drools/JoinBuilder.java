@@ -9,6 +9,7 @@ import io.quarkiverse.permuplate.PermuteMacros;
 import io.quarkiverse.permuplate.PermuteParam;
 import io.quarkiverse.permuplate.PermuteReturn;
 import io.quarkiverse.permuplate.PermuteDefaultReturn;
+import io.quarkiverse.permuplate.PermuteSealedFamily;
 import io.quarkiverse.permuplate.PermuteTypeParam;
 
 /**
@@ -41,30 +42,6 @@ import io.quarkiverse.permuplate.PermuteTypeParam;
 public class JoinBuilder {
 
     /**
-     * Sealed marker interface for the {@code JoinNSecond} generated family.
-     * Permits clause expanded by Permuplate's {@code expandSealedPermits} to list
-     * all generated {@code Join1Second..Join6Second} classes.
-     *
-     * <p>Enables Java 21+ pattern dispatch:
-     * <pre>{@code
-     * JoinBuilderSecond<?, Ctx> builder = getBuilder();
-     * switch (builder) {
-     *     case Join1Second<?, Ctx> j -> handle1(j);
-     *     case Join2Second<?, Ctx, ?> j -> handle2(j);
-     *     // ...
-     * }
-     * }</pre>
-     */
-    public sealed interface JoinBuilderSecond<END, DS> permits Join0Second {}
-
-    /**
-     * Sealed marker interface for the {@code JoinNFirst} generated family.
-     * Permits clause expanded by Permuplate's {@code expandSealedPermits} to list
-     * all generated {@code Join1First..Join6First} classes.
-     */
-    public sealed interface JoinBuilderFirst<END, DS> permits Join0First {}
-
-    /**
      * Template generating Join1Second through Join6Second.
      *
      * <p>Declared FIRST so PermuteMojo processes it before Join0First, ensuring
@@ -79,12 +56,13 @@ public class JoinBuilder {
      *       chain always uses {@code Void} as END (no outer scope).</li>
      * </ul>
      */
+    @PermuteSealedFamily(interfaceName = "JoinBuilderSecond", typeParams = "END, DS")
     @Permute(varName = "i", from = "1", to = "6", className = "Join${i}Second",
              inline = true, keepTemplate = false)
     public static non-sealed class Join0Second<END, DS,
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
             extends BaseRuleBuilder<END>
-            implements JoinSecond<DS>, JoinBuilderSecond<END, DS> {
+            implements JoinSecond<DS> {
 
         protected final RuleDefinition<DS> rd;
 
@@ -275,13 +253,13 @@ public class JoinBuilder {
      * <p>Holds {@code filter()} (single-fact and all-facts overloads). All inherited from
      * the template; inherited {@code join()} and {@code fn()} come from Second via extends.
      */
+    @PermuteSealedFamily(interfaceName = "JoinBuilderFirst", typeParams = "END, DS")
     @Permute(varName = "i", from = "1", to = "6", className = "Join${i}First",
              inline = true, keepTemplate = false)
     @PermuteDefaultReturn(className = "self")
     public static non-sealed class Join0First<END, DS,
             @PermuteTypeParam(varName = "k", from = "1", to = "${i}", name = "${alpha(k)}") A>
-            extends Join0Second<END, DS, A>
-            implements JoinBuilderFirst<END, DS> {
+            extends Join0Second<END, DS, A> {
 
         public Join0First(END end, RuleDefinition<DS> rd) {
             super(end, rd);

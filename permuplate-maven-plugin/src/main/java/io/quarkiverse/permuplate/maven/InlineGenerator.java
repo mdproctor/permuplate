@@ -399,6 +399,10 @@ public class InlineGenerator {
         // Expand any sealed permits clause that references the template class name
         expandSealedPermits(outputCu, templateClassName, generatedNames, config.keepTemplate);
 
+        // @PermuteSealedFamily — auto-generate sealed interface + implements clause
+        applyPermuteSealedFamily(outputCu, outputParent, templateClassDecl,
+                generatedNames, config.keepTemplate, templateClassName);
+
         return outputCu;
     }
 
@@ -441,6 +445,97 @@ public class InlineGenerator {
                 permitted.add(new com.github.javaparser.ast.type.ClassOrInterfaceType(templateName));
             }
         });
+    }
+
+    /**
+     * Applies {@code @PermuteSealedFamily}: generates a sealed marker interface in the
+     * enclosing type and adds the matching {@code implements} clause to each generated class.
+     *
+     * <p>
+     * The generated interface uses {@code permits} listing all generated class names
+     * (and the template name when {@code keepTemplate=true}). Each generated class found
+     * in the output CU receives the {@code implements InterfaceName<TypeParams>} clause.
+     *
+     * <p>
+     * Distinct from {@code expandSealedPermits}, which expands a manually-declared
+     * sealed interface. This method creates the interface from scratch.
+     */
+    private static void applyPermuteSealedFamily(
+            CompilationUnit outputCu,
+            ClassOrInterfaceDeclaration outputParent,
+            TypeDeclaration<?> templateDecl,
+            List<String> generatedNames,
+            boolean keepTemplate,
+            String templateName) {
+
+        if (generatedNames.isEmpty())
+            return;
+
+        templateDecl.getAnnotations().stream()
+                .filter(a -> a.getNameAsString().equals("PermuteSealedFamily")
+                        || a.getNameAsString().equals("io.quarkiverse.permuplate.PermuteSealedFamily"))
+                .findFirst()
+                .ifPresent(ann -> {
+                    String interfaceName = null;
+                    String typeParams = "";
+
+                    if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normal) {
+                        for (var pair : normal.getPairs()) {
+                            if (pair.getNameAsString().equals("interfaceName"))
+                                interfaceName = pair.getValue().asStringLiteralExpr().asString();
+                            else if (pair.getNameAsString().equals("typeParams"))
+                                typeParams = pair.getValue().asStringLiteralExpr().asString();
+                        }
+                    }
+                    if (interfaceName == null)
+                        return;
+
+                    // Build permits clause: all generated names, plus template if kept
+                    List<String> permittedNames = new java.util.ArrayList<>(generatedNames);
+                    if (keepTemplate)
+                        permittedNames.add(templateName);
+                    String permitsClause = String.join(", ", permittedNames);
+
+                    // Build the sealed interface source string
+                    String typeDeclaration = typeParams.isEmpty()
+                            ? "public sealed interface " + interfaceName + " permits " + permitsClause + " {}"
+                            : "public sealed interface " + interfaceName + "<" + typeParams + "> permits " + permitsClause
+                                    + " {}";
+
+                    try {
+                        ClassOrInterfaceDeclaration sealedIface = StaticJavaParser.parseTypeDeclaration(typeDeclaration)
+                                .asClassOrInterfaceDeclaration();
+
+                        if (outputParent != null) {
+                            outputParent.addMember(sealedIface);
+                        } else {
+                            outputCu.addType(sealedIface);
+                        }
+
+                        // Add implements clause to each generated class in the output
+                        String implementsType = typeParams.isEmpty()
+                                ? interfaceName
+                                : interfaceName + "<" + typeParams + ">";
+
+                        for (String genName : generatedNames) {
+                            // For nested templates, generated classes are nested too
+                            outputCu.findAll(ClassOrInterfaceDeclaration.class,
+                                    c -> c.getNameAsString().equals(genName))
+                                    .forEach(genClass -> {
+                                        try {
+                                            genClass.addImplementedType(
+                                                    StaticJavaParser.parseClassOrInterfaceType(implementsType));
+                                        } catch (Exception e) {
+                                            System.err.println("[Permuplate] @PermuteSealedFamily: failed to add implements '"
+                                                    + implementsType + "' to '" + genClass.getNameAsString() + "': " + e.getMessage());
+                                        }
+                                    });
+                        }
+                    } catch (Exception e) {
+                        System.err.println("[Permuplate] @PermuteSealedFamily failed for '"
+                                + interfaceName + "': " + e.getMessage());
+                    }
+                });
     }
 
     /**
@@ -2706,7 +2801,8 @@ public class InlineGenerator {
                 "PermuteMixin", "io.quarkiverse.permuplate.PermuteMixin",
                 "PermuteBodyFragment", "io.quarkiverse.permuplate.PermuteBodyFragment",
                 "PermuteBodyFragments", "io.quarkiverse.permuplate.PermuteBodyFragments",
-                "PermuteNew", "io.quarkiverse.permuplate.PermuteNew");
+                "PermuteNew", "io.quarkiverse.permuplate.PermuteNew",
+                "PermuteSealedFamily", "io.quarkiverse.permuplate.PermuteSealedFamily");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));
