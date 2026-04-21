@@ -134,6 +134,10 @@ public class InlineGenerator {
 
         boolean isRecord = templateClassDecl instanceof RecordDeclaration;
 
+        // Pre-compute whether the template has @PermuteExtends — used by super-call inference
+        boolean templateHasExtendsAnnotation = templateClassDecl instanceof ClassOrInterfaceDeclaration tcoid
+                && hasPermuteExtendsAnnotation(tcoid);
+
         // Build complete generated class set for boundary omission
         Set<String> allGeneratedNames = scanAllGeneratedClassNames(parentCu, config);
 
@@ -235,6 +239,9 @@ public class InlineGenerator {
 
                 // @PermuteStatements — insert accumulated statements into method bodies
                 PermuteStatementsTransformer.transform(generated, ctx);
+
+                // Constructor super-call inference (after @PermuteStatements so explicit wins)
+                inferSuperCalls(coid, templateHasExtendsAnnotation);
 
                 // @PermuteBody — replace entire method or constructor body per permutation
                 PermuteBodyTransformer.transform(generated, ctx);
@@ -784,6 +791,60 @@ public class InlineGenerator {
                     String n = a.getNameAsString();
                     return n.equals("PermuteExtends") || n.equals("io.quarkiverse.permuplate.PermuteExtends");
                 });
+    }
+
+    /**
+     * Infers and inserts {@code super(p1, ..., p_{N-1})} as the first constructor
+     * statement when all conditions hold:
+     * <ol>
+     * <li>The template has {@code @PermuteExtends} (extends-previous pattern)</li>
+     * <li>The constructor has &ge;2 parameters</li>
+     * <li>The constructor does NOT already have a {@code super()} call as its first statement</li>
+     * <li>The constructor does NOT have {@code @PermuteStatements} (explicit annotation wins)</li>
+     * </ol>
+     * Only the parameters before the last one are passed to super — the last param is the
+     * new field added by this level of the hierarchy.
+     */
+    private static void inferSuperCalls(ClassOrInterfaceDeclaration classDecl,
+            boolean templateHasExtendsAnnotation) {
+        if (!templateHasExtendsAnnotation)
+            return;
+
+        classDecl.getConstructors().forEach(ctor -> {
+            // Skip if @PermuteStatements is present — explicit always wins
+            boolean hasPermuteStatements = ctor.getAnnotations().stream()
+                    .anyMatch(a -> {
+                        String n = a.getNameAsString();
+                        return n.equals("PermuteStatements")
+                                || n.equals("io.quarkiverse.permuplate.PermuteStatements");
+                    });
+            if (hasPermuteStatements)
+                return;
+
+            // Skip single-param constructors — nothing to delegate
+            if (ctor.getParameters().size() < 2)
+                return;
+
+            // Skip if already has super() as first statement
+            if (!ctor.getBody().getStatements().isEmpty()) {
+                com.github.javaparser.ast.stmt.Statement first = ctor.getBody().getStatements().get(0);
+                if (first instanceof com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt e
+                        && !e.isThis()) {
+                    return; // already has super(...)
+                }
+            }
+
+            // Build super(p1, p2, ..., p_{N-1}) — all params except the last
+            com.github.javaparser.ast.NodeList<com.github.javaparser.ast.expr.Expression> args = new com.github.javaparser.ast.NodeList<>();
+            java.util.List<com.github.javaparser.ast.body.Parameter> params = ctor.getParameters();
+            for (int idx = 0; idx < params.size() - 1; idx++) {
+                args.add(new com.github.javaparser.ast.expr.NameExpr(
+                        params.get(idx).getNameAsString()));
+            }
+            com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt superCall = new com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt(
+                    false, null, args);
+            ctor.getBody().getStatements().addFirst(superCall);
+        });
     }
 
     /**

@@ -5,7 +5,6 @@ import io.quarkiverse.permuplate.PermuteBody;
 import io.quarkiverse.permuplate.PermuteDeclr;
 import io.quarkiverse.permuplate.PermuteExtends;
 import io.quarkiverse.permuplate.PermuteParam;
-import io.quarkiverse.permuplate.PermuteStatements;
 import io.quarkiverse.permuplate.PermuteTypeParam;
 import io.quarkiverse.permuplate.PermuteValue;
 
@@ -94,7 +93,6 @@ public abstract class BaseTuple {
             this.size = 1;
         }
 
-        @PermuteStatements(position = "first", body = "super(${typeArgList(1, i-1, 'lower')});")
         @PermuteValue(index = 1, value = "${i}")
         public Tuple1(
                 @PermuteParam(varName = "k", from = "1", to = "${i}", type = "${alpha(k)}", name = "${lower(k)}") A a) {
