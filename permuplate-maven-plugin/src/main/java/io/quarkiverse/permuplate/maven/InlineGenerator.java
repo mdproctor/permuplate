@@ -348,14 +348,15 @@ public class InlineGenerator {
             // Synthesise @PermuteDelegate method bodies
             applyPermuteDelegate(generated, parentCu);
 
-            // Strip @Permute, @PermuteFilter, @PermuteFilters, @PermuteSource, @PermuteSources
+            // Strip @Permute, @PermuteFilter, @PermuteFilters, @PermuteSource, @PermuteSources, @PermuteMixin
             generated.getAnnotations().removeIf(a -> {
                 String n = a.getNameAsString();
                 return n.equals("Permute") || n.equals("io.quarkiverse.permuplate.Permute")
                         || n.equals("PermuteFilter") || n.equals("io.quarkiverse.permuplate.PermuteFilter")
                         || n.equals("PermuteFilters") || n.equals("io.quarkiverse.permuplate.PermuteFilters")
                         || n.equals("PermuteSource") || n.equals("io.quarkiverse.permuplate.PermuteSource")
-                        || n.equals("PermuteSources") || n.equals("io.quarkiverse.permuplate.PermuteSources");
+                        || n.equals("PermuteSources") || n.equals("io.quarkiverse.permuplate.PermuteSources")
+                        || n.equals("PermuteMixin") || n.equals("io.quarkiverse.permuplate.PermuteMixin");
             });
 
             if (isTopLevel) {
@@ -2197,6 +2198,68 @@ public class InlineGenerator {
     }
 
     /**
+     * Injects methods from classes listed in {@code @PermuteMixin} into the template class.
+     * Must be called before {@link #generate} so injected methods are processed by the pipeline.
+     *
+     * @param templateDecl the template class to inject into
+     * @param allSourceCus all parsed CompilationUnits in the template source root
+     */
+    public static void injectMixinMethods(TypeDeclaration<?> templateDecl,
+            List<CompilationUnit> allSourceCus) {
+
+        templateDecl.getAnnotations().stream()
+                .filter(a -> {
+                    String n = a.getNameAsString();
+                    return n.equals("PermuteMixin")
+                            || n.equals("io.quarkiverse.permuplate.PermuteMixin");
+                })
+                .findFirst()
+                .ifPresent(ann -> {
+                    List<String> mixinNames = new ArrayList<>();
+                    if (ann instanceof com.github.javaparser.ast.expr.NormalAnnotationExpr normal) {
+                        normal.getPairs().stream()
+                                .filter(p -> p.getNameAsString().equals("value"))
+                                .findFirst()
+                                .ifPresent(p -> extractMixinClassNames(p.getValue(), mixinNames));
+                    } else if (ann instanceof com.github.javaparser.ast.expr.SingleMemberAnnotationExpr sm) {
+                        extractMixinClassNames(sm.getMemberValue(), mixinNames);
+                    }
+
+                    for (String mixinSimpleName : mixinNames) {
+                        allSourceCus.stream()
+                                .flatMap(cu -> cu.findAll(TypeDeclaration.class).stream())
+                                .filter(td -> ((TypeDeclaration<?>) td).getNameAsString().equals(mixinSimpleName))
+                                .findFirst()
+                                .ifPresent(mixinDecl -> {
+                                    if (templateDecl instanceof ClassOrInterfaceDeclaration coid) {
+                                        // Only inject methods that carry at least one Permuplate
+                                        // annotation — plain override stubs (e.g. ruleName()) are
+                                        // excluded so they don't clash with the template's own methods.
+                                        ((TypeDeclaration<?>) mixinDecl).getMethods().stream()
+                                                .filter(m -> ((MethodDeclaration) m).getAnnotations().stream()
+                                                        .anyMatch(a -> a.getNameAsString().startsWith("Permute")
+                                                                || a.getNameAsString()
+                                                                        .startsWith("io.quarkiverse.permuplate.Permute")))
+                                                .forEach(m -> coid.addMember(((MethodDeclaration) m).clone()));
+                                    }
+                                });
+                    }
+                });
+    }
+
+    private static void extractMixinClassNames(com.github.javaparser.ast.expr.Expression expr,
+            List<String> out) {
+        if (expr instanceof com.github.javaparser.ast.expr.ArrayInitializerExpr arr) {
+            arr.getValues().forEach(v -> {
+                if (v instanceof com.github.javaparser.ast.expr.ClassExpr ce)
+                    out.add(ce.getTypeAsString());
+            });
+        } else if (expr instanceof com.github.javaparser.ast.expr.ClassExpr ce) {
+            out.add(ce.getTypeAsString());
+        }
+    }
+
+    /**
      * Strips all Permuplate annotations ({@code @Permute}, {@code @PermuteDeclr},
      * {@code @PermuteParam}) from a type declaration and all of its members,
      * including field-level and parameter-level annotations.
@@ -2222,7 +2285,8 @@ public class InlineGenerator {
                 "PermuteImport", "io.quarkiverse.permuplate.PermuteImport",
                 "PermuteImports", "io.quarkiverse.permuplate.PermuteImports",
                 "PermuteSelf", "io.quarkiverse.permuplate.PermuteSelf",
-                "PermuteDefaultReturn", "io.quarkiverse.permuplate.PermuteDefaultReturn");
+                "PermuteDefaultReturn", "io.quarkiverse.permuplate.PermuteDefaultReturn",
+                "PermuteMixin", "io.quarkiverse.permuplate.PermuteMixin");
 
         // Strip from the class itself
         classDecl.getAnnotations().removeIf(a -> PERMUPLATE_ANNOTATIONS.contains(a.getNameAsString()));

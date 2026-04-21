@@ -83,6 +83,29 @@ public class SourceScanner {
         return new ScanResult(types, methods);
     }
 
+    /**
+     * Parses all {@code .java} files in {@code directory} and returns the resulting
+     * {@link CompilationUnit} list. Unlike {@link #scan}, this includes every file
+     * regardless of whether it carries {@code @Permute} — used by {@code @PermuteMixin}
+     * lookup to locate mixin classes that are not themselves templates.
+     */
+    public static List<CompilationUnit> parseAll(File directory) throws IOException {
+        List<CompilationUnit> cus = new ArrayList<>();
+        if (!directory.exists() || !directory.isDirectory()) {
+            return cus;
+        }
+        Files.walk(directory.toPath())
+                .filter(p -> p.toString().endsWith(".java"))
+                .forEach(path -> {
+                    try {
+                        cus.add(StaticJavaParser.parse(path));
+                    } catch (Exception e) {
+                        // Skip unparseable files — they will fail at javac time
+                    }
+                });
+        return cus;
+    }
+
     private static Optional<AnnotationExpr> findPermuteAnnotation(NodeList<AnnotationExpr> annotations) {
         return annotations.stream()
                 .filter(a -> {

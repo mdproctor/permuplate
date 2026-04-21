@@ -138,6 +138,11 @@ public class PermuteMojo extends AbstractMojo {
                 getLog().info("Permuplate: scanning " + templateDirectory + " for inline templates");
                 SourceScanner.ScanResult templateScan = SourceScanner.scan(templateDirectory);
 
+                // Collect ALL parsed CUs from the template directory — needed for @PermuteMixin
+                // lookup. Mixin classes are not @Permute-annotated so they don't appear in
+                // templateScan.types(); parseAll() covers the entire directory.
+                List<CompilationUnit> allTemplateCus = SourceScanner.parseAll(templateDirectory);
+
                 // Group inline templates by source file. Multiple inline templates in the same
                 // parent must be chained: output CU of each call becomes input of the next.
                 // Declaration order is preserved by SourceScanner.findAll() (depth-first).
@@ -162,7 +167,7 @@ public class PermuteMojo extends AbstractMojo {
                 for (java.util.Map.Entry<java.nio.file.Path, java.util.List<SourceScanner.AnnotatedType>> fileGroup : inlineByFile
                         .entrySet()) {
                     List<SourceScanner.AnnotatedType> sorted = sortBySourceDependency(fileGroup.getValue());
-                    generateInlineGroup(fileGroup.getKey(), sorted);
+                    generateInlineGroup(fileGroup.getKey(), sorted, allTemplateCus);
                 }
             }
         } catch (MojoExecutionException e) {
@@ -369,9 +374,13 @@ public class PermuteMojo extends AbstractMojo {
      * <p>
      * This is required when a parent file has multiple @Permute(inline=true) templates.
      * Without chaining, each call would write independently, overwriting the previous output.
+     *
+     * @param allTemplateCus all parsed CompilationUnits from the template directory,
+     *        used for {@code @PermuteMixin} mixin class lookup
      */
     private void generateInlineGroup(java.nio.file.Path sourceFile,
-            java.util.List<SourceScanner.AnnotatedType> entries) throws Exception {
+            java.util.List<SourceScanner.AnnotatedType> entries,
+            List<CompilationUnit> allTemplateCus) throws Exception {
         if (entries.isEmpty())
             return;
 
@@ -414,6 +423,8 @@ public class PermuteMojo extends AbstractMojo {
             // template in a chained group.
             config = InlineGenerator.mergeContainerMacros(config, entry.typeDecl());
             java.util.List<java.util.Map<String, Object>> allCombinations = PermuteConfig.buildAllCombinations(config);
+            // Inject mixin methods before generate() so they participate in the full pipeline.
+            InlineGenerator.injectMixinMethods(currentTemplate, allTemplateCus);
             currentCu = InlineGenerator.generate(currentCu, currentTemplate, config, allCombinations);
         }
 

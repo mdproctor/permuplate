@@ -3,10 +3,7 @@ package io.quarkiverse.permuplate.example.drools;
 import java.util.function.Function;
 
 import io.quarkiverse.permuplate.Permute;
-import io.quarkiverse.permuplate.PermuteDeclr;
-import io.quarkiverse.permuplate.PermuteMethod;
-import io.quarkiverse.permuplate.PermuteReturn;
-import io.quarkiverse.permuplate.PermuteTypeParam;
+import io.quarkiverse.permuplate.PermuteMixin;
 
 /**
  * Entry point returned by RuleBuilder.rule("name"). Supports four param styles
@@ -15,6 +12,7 @@ import io.quarkiverse.permuplate.PermuteTypeParam;
  */
 @Permute(varName = "i", from = "1", to = "1", className = "ParametersFirst",
          inline = true, keepTemplate = false)
+@PermuteMixin(ExtendsRuleMixin.class)
 public class ParametersFirstTemplate<DS> extends AbstractRuleEntry<DS> {
     private final String name;
 
@@ -66,17 +64,4 @@ public class ParametersFirstTemplate<DS> extends AbstractRuleEntry<DS> {
         return new RuleResult<>(rd);
     }
 
-    @PermuteMethod(varName = "j", from = "2", to = "7", name = "extendsRule",
-                   macros = {"prevAlpha=typeArgList(1,j-1,'alpha')"})
-    @PermuteReturn(className = "JoinBuilder.Join${j-1}First",
-                   typeArgs = "'Void, DS, ' + prevAlpha",
-                   alwaysEmit = true)
-    public <@PermuteTypeParam(varName = "k", from = "1", to = "${j-1}", name = "${alpha(k)}") A>
-            Object extendsRule(
-            @PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${j}<DS, ${prevAlpha}>")
-            ExtendsPoint<DS> ep) {
-        RuleDefinition<DS> child = new RuleDefinition<>(ruleName());
-        ep.baseRd().copyInto(child);
-        return cast(new JoinBuilder.@PermuteDeclr(type = "JoinBuilder.Join${j-1}First") Join1First<>(null, child));
-    }
 }

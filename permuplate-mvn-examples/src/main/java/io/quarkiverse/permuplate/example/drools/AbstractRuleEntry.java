@@ -5,10 +5,8 @@ package io.quarkiverse.permuplate.example.drools;
  *
  * <p>
  * Provides the shared {@link #cast(Object)} helper and the {@link #ruleName()}
- * contract. The {@code extendsRule()} template method cannot be deduplicated here
- * because {@code @PermuteMethod} on a non-template base class is not processed by
- * the Permuplate inline generation pipeline — it remains in each template file as
- * the only intentional duplication.
+ * contract. The {@code extendsRule()} overloads are shared via {@code ExtendsRuleMixin}
+ * injected with {@code @PermuteMixin} — eliminating the duplication documented in ADR-0006.
  */
 abstract class AbstractRuleEntry<DS> {
 
