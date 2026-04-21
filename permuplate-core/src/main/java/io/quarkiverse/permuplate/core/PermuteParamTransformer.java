@@ -53,6 +53,13 @@ public class PermuteParamTransformer {
             EvaluationContext ctx,
             Messager messager) {
         classDecl.findAll(MethodDeclaration.class).forEach(method -> {
+            // Skip methods carrying @PermuteMethod: their @PermuteParam sentinels must be
+            // evaluated with the inner variable (e.g. "m") in scope. The clone-level handler
+            // in applyPermuteMethodClone / applyPermuteMethodAptClone calls
+            // PermuteParamTransformer.transform on each clone with the inner context.
+            if (hasPermuteMethod(method)) {
+                return;
+            }
             // Process sentinels in order. Each transformMethod call removes one sentinel
             // (replacing it with expanded params that carry no @PermuteParam), so
             // re-scanning naturally finds the next remaining sentinel.
@@ -372,6 +379,13 @@ public class PermuteParamTransformer {
 
     private static boolean hasPermuteParam(NodeList<AnnotationExpr> annotations) {
         return annotations.stream().anyMatch(PermuteParamTransformer::isPermuteParam);
+    }
+
+    private static boolean hasPermuteMethod(MethodDeclaration method) {
+        return method.getAnnotations().stream().anyMatch(a -> {
+            String n = a.getNameAsString();
+            return n.equals("PermuteMethod") || n.equals("io.quarkiverse.permuplate.PermuteMethod");
+        });
     }
 
     private static AnnotationExpr getPermuteParam(NodeList<AnnotationExpr> annotations) {
