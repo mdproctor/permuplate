@@ -30,6 +30,10 @@ dependencies {
     // to validate annotation/type syntax after stubbing JEXL expressions.
     implementation("com.github.javaparser:javaparser-core:3.25.9")
 
+    // Apache Commons JEXL3 — used by JexlAnnotator for expression syntax validation
+    // (validation pattern adapted from jenkinsci/idea-stapler-plugin, BSD-2-Clause)
+    implementation("org.apache.commons:commons-jexl3:3.3")
+
     intellijPlatform {
         intellijIdeaCommunity("2023.2")
         bundledPlugin("com.intellij.java")   // Java PSI APIs

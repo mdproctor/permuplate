@@ -89,6 +89,11 @@
             language="JEXL"
             implementationClass="io.quarkiverse.permuplate.intellij.jexl.completion.JexlCompletionContributor"/>
 
+        <!-- JEXL annotator -->
+        <annotator
+            language="JEXL"
+            implementationClass="io.quarkiverse.permuplate.intellij.jexl.annotate.JexlAnnotator"/>
+
         <!-- JEXL parameter info -->
         <lang.parameterInfoHandler
             language="JEXL"
