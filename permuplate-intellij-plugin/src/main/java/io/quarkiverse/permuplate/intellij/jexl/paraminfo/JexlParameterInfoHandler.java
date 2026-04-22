@@ -49,14 +49,22 @@ public class JexlParameterInfoHandler
                 || lParen.getNode() == null
                 || lParen.getNode().getElementType() != JexlTokenTypes.LPAREN) return;
 
+        // Count commas at depth 0 only — nested calls (e.g. max(i,2) inside typeArgList)
+        // must not affect the outer argument index.
         int commas = 0;
+        int depth = 0;
         int targetOffset = context.getOffset();
         PsiElement cur = PsiTreeUtil.nextVisibleLeaf(lParen);
         while (cur != null && cur.getTextOffset() < targetOffset) {
-            if (cur.getNode() != null
-                    && cur.getNode().getElementType() == JexlTokenTypes.COMMA) commas++;
-            if (cur.getNode() != null
-                    && cur.getNode().getElementType() == JexlTokenTypes.RPAREN) break;
+            if (cur.getNode() != null) {
+                com.intellij.psi.tree.IElementType type = cur.getNode().getElementType();
+                if (type == JexlTokenTypes.COMMA && depth == 0)  commas++;
+                else if (type == JexlTokenTypes.LPAREN)          depth++;
+                else if (type == JexlTokenTypes.RPAREN) {
+                    if (depth == 0) break; // outer closing paren
+                    depth--;
+                }
+            }
             cur = PsiTreeUtil.nextVisibleLeaf(cur);
         }
         context.setCurrentParameter(commas);
