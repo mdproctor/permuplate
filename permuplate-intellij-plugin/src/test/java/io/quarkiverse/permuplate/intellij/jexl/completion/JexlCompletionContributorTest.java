@@ -102,16 +102,12 @@ public class JexlCompletionContributorTest extends BasePlatformTestCase {
                 "    @SuppressWarnings(\"${<caret>}\")\n" +
                 "    public void m() {}\n" +
                 "}");
-        // No Permuplate annotation — JEXL not injected — no JEXL completions
-        try {
-            myFixture.completeBasic();
-            List<String> items = myFixture.getLookupElementStrings();
-            if (items != null) {
-                assertFalse("'alpha' must not appear in non-Permuplate completion",
-                        items.contains("alpha"));
-            }
-        } catch (Exception e) {
-            // completeBasic() may return null or throw for non-injected position — acceptable
+        // No Permuplate annotation — JEXL not injected — no JEXL completions expected
+        myFixture.completeBasic();
+        List<String> items = myFixture.getLookupElementStrings();
+        if (items != null) {
+            assertFalse("'alpha' must not appear in non-Permuplate completion",
+                    items.contains("alpha"));
         }
     }
 }

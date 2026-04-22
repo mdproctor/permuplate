@@ -35,7 +35,7 @@ public class JexlCompletionContributor extends CompletionContributor {
                                    .withTailText("(" + String.join(", ", builtin.paramNames()) + ")")
                                    .withInsertHandler((ctx2, item) -> {
                                        int offset = ctx2.getTailOffset();
-                                       ctx2.getDocument().insertString(offset, "(");
+                                       ctx2.getDocument().insertString(offset, "()");
                                        ctx2.getEditor().getCaretModel().moveToOffset(offset + 1);
                                    }));
                        }

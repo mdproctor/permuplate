@@ -3,14 +3,14 @@ package io.quarkiverse.permuplate.intellij.jexl.context;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.psi.*;
 import com.intellij.psi.util.PsiTreeUtil;
-import io.quarkiverse.permuplate.intellij.jexl.lang.JexlSyntaxHighlighter;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
 public class JexlContextResolver {
 
-    public static final Set<String> BUILTIN_NAMES = JexlSyntaxHighlighter.BUILTIN_NAMES;
+    /** Canonical source: derived from JexlBuiltin.ALL to avoid divergence. */
+    public static final Set<String> BUILTIN_NAMES = JexlBuiltin.ALL.keySet();
 
     @Nullable
     public static JexlContext resolve(@Nullable PsiElement elementInJexl) {
