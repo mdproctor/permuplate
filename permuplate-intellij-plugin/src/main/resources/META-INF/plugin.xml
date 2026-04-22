@@ -88,6 +88,11 @@
         <completion.contributor
             language="JEXL"
             implementationClass="io.quarkiverse.permuplate.intellij.jexl.completion.JexlCompletionContributor"/>
+
+        <!-- JEXL parameter info -->
+        <lang.parameterInfoHandler
+            language="JEXL"
+            implementationClass="io.quarkiverse.permuplate.intellij.jexl.paraminfo.JexlParameterInfoHandler"/>
     </extensions>
 
     <actions>
