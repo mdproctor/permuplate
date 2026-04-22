@@ -83,6 +83,11 @@
         <!-- JEXL language injection -->
         <multiHostInjector
             implementationClass="io.quarkiverse.permuplate.intellij.jexl.inject.JexlLanguageInjector"/>
+
+        <!-- JEXL completion -->
+        <completion.contributor
+            language="JEXL"
+            implementationClass="io.quarkiverse.permuplate.intellij.jexl.completion.JexlCompletionContributor"/>
     </extensions>
 
     <actions>
