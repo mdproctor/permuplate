@@ -42,13 +42,17 @@ public class JexlLanguageInjector implements MultiHostInjector {
         List<TextRange> ranges = findJexlRanges(value);
         if (ranges.isEmpty()) return;
 
-        registrar.startInjecting(JexlLanguage.INSTANCE);
+        // Each ${...} range gets its own injection session so the annotator sees one
+        // JexlFile per expression. A single session with multiple addPlace() calls
+        // concatenates the range contents into one expression, causing false positives
+        // when multiple ${...} blocks appear in the same attribute (e.g. "Combo${i}x${i}").
         for (TextRange range : ranges) {
+            registrar.startInjecting(JexlLanguage.INSTANCE);
             // +1 to skip the opening double-quote in the literal's PSI text range
             registrar.addPlace("", "", host,
                     new TextRange(range.getStartOffset() + 1, range.getEndOffset() + 1));
+            registrar.doneInjecting();
         }
-        registrar.doneInjecting();
     }
 
     /**
