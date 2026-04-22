@@ -5,9 +5,11 @@ import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Set;
+
 public class JexlLexer extends LexerBase {
 
-    private static final String TWO_CHAR_OPS = "==!=<=>=&&||";
+    private static final Set<String> TWO_CHAR_OPS = Set.of("==", "!=", "<=", ">=", "&&", "||");
 
     private CharSequence buffer;
     private int tokenStart;

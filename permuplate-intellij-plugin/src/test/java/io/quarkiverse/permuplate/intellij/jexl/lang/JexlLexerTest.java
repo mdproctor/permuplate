@@ -126,10 +126,21 @@ public class JexlLexerTest extends TestCase {
     }
 
     public void testUnterminatedString() {
-        // Lexer must not throw; unclosed quote consumes to end of input
+        // Lexer must not throw; unclosed quote consumes entire remaining input
         List<String[]> tokens = tokenise("'unclosed");
-        assertFalse(tokens.isEmpty());
+        assertEquals("Expected exactly one token for unterminated string", 1, tokens.size());
         assertEquals("JEXL_STRING", tokens.get(0)[0]);
+        assertEquals("'unclosed", tokens.get(0)[1]); // entire input consumed into token
+    }
+
+    public void testBitwiseAndOrAreDistinctTokens() {
+        // '&' followed immediately by '|' must produce two separate OPERATOR tokens,
+        // not a single combined token (guards against false positive in two-char op detection)
+        List<String[]> tokens = tokenise("a & b | c");
+        // IDENT WS OP WS IDENT WS OP WS IDENT = 9 tokens
+        assertEquals(9, tokens.size());
+        assertEquals("&", tokens.get(2)[1]);
+        assertEquals("|", tokens.get(6)[1]);
     }
 
     public void testOnlyWhitespace() {
