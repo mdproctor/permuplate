@@ -23,7 +23,7 @@ This is genuinely novel. Every comparable tool (Vavr generators, Freemarker temp
 ```
 permuplate-parent/
 ├── permuplate-annotations/     All 14 annotations (no runtime deps)
-├── permuplate-core/            shared transformation engine: EvaluationContext, transformers, PermuteConfig
+├── permuplate-core/            shared transformation engine: EvaluationContext, transformers, PermuteConfig, AstUtils (shared AST name/type-string utilities — add new utilities here, not as private methods in InlineGenerator or PermuteProcessor)
 ├── permuplate-ide-support/     annotation string algorithm (matching, rename, validation); no IDE deps
 ├── permuplate-processor/       APT entry point only (thin shell depending on permuplate-core)
 ├── permuplate-maven-plugin/    Maven Mojo for pre-compilation generation including inline mode
@@ -250,6 +250,8 @@ For the full test coverage map (which test class covers which annotation), see [
 The sandbox (`permuplate-mvn-examples`) has its own test suite in
 `src/test/java/io/quarkiverse/permuplate/example/drools/`. Tests are
 organized one class per DSL feature, mirroring the Drools vol2 reference.
+Tests that use the standard two-person/two-account Ctx fixture should extend
+`DroolsDslTestBase` rather than duplicating the @Before setUp.
 
 **Before beginning any DSL work, read all test files in the vol2 reference
 suite — not just the one directly related to the feature.** The full suite
