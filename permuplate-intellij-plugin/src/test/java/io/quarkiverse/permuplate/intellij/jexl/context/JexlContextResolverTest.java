@@ -62,11 +62,12 @@ public class JexlContextResolverTest extends BasePlatformTestCase {
     }
 
     public void testPermuteVarAddsExtraVariable() {
+        // @PermuteVar has @Target({}) — must be nested inside @Permute(extraVars={...})
         JexlContext ctx = resolveAt(
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${<caret>i}\")\n" +
-                "@PermuteVar(varName=\"k\", from=\"1\", to=\"3\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${<caret>i}\",\n" +
+                "         extraVars={@PermuteVar(varName=\"k\", from=\"1\", to=\"3\")})\n" +
                 "public class Join2 {}");
         assertNotNull(ctx);
         assertTrue("Expected 'k' from @PermuteVar", ctx.allVariables().contains("k"));
@@ -129,9 +130,9 @@ public class JexlContextResolverTest extends BasePlatformTestCase {
         JexlContext ctx = resolveAt(
                 "package io.example;\n" +
                 "import io.quarkiverse.permuplate.*;\n" +
-                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${<caret>i}\")\n" +
-                "@PermuteVar(varName=\"j\", from=\"1\", to=\"3\")\n" +
-                "@PermuteVar(varName=\"k\", from=\"1\", to=\"3\")\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${<caret>i}\",\n" +
+                "         extraVars={@PermuteVar(varName=\"j\", from=\"1\", to=\"3\"),\n" +
+                "                    @PermuteVar(varName=\"k\", from=\"1\", to=\"3\")})\n" +
                 "public class Join2 {}");
         assertNotNull(ctx);
         assertTrue(ctx.allVariables().contains("j"));

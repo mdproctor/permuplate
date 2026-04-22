@@ -29,7 +29,7 @@ public class JexlContextResolver {
         PsiElement paramListEl = pair.getParent();
         if (!(paramListEl instanceof PsiAnnotationParameterList)) return null;
 
-        PsiAnnotation hostAnnotation = (PsiAnnotation) paramListEl.getParent();
+        if (!(paramListEl.getParent() instanceof PsiAnnotation hostAnnotation)) return null;
 
         PsiClass enclosingClass = PsiTreeUtil.getParentOfType(host, PsiClass.class);
         if (enclosingClass == null) return null;
@@ -43,9 +43,9 @@ public class JexlContextResolver {
                 variables.add(varName != null ? varName : "i");
                 collectNameParts(ann, "strings", variables);
                 collectNameParts(ann, "macros", variables);
-            } else if (isPermuteVar(fqn)) {
-                String varName = stringAttr(ann, "varName");
-                if (varName != null) variables.add(varName);
+                // @PermuteVar has @Target({}) — it only appears nested inside
+                // @Permute(extraVars={@PermuteVar(...)}) and never as a class annotation.
+                collectExtraVarNames(ann, variables);
             } else if (isPermuteMacros(fqn)) {
                 collectNameParts(ann, "macros", variables);
             }
@@ -70,6 +70,24 @@ public class JexlContextResolver {
         return new JexlContext(variables, innerVariable);
     }
 
+    /** Reads @Permute(extraVars={@PermuteVar(varName="k",...), ...}) and adds each varName. */
+    private static void collectExtraVarNames(PsiAnnotation permute, Set<String> out) {
+        PsiAnnotationMemberValue extraVars = permute.findAttributeValue("extraVars");
+        if (extraVars == null) return;
+        // extraVars may be a single @PermuteVar or an array { @PermuteVar, ... }
+        PsiAnnotationMemberValue[] items;
+        if (extraVars instanceof PsiArrayInitializerMemberValue arr) {
+            items = arr.getInitializers();
+        } else {
+            items = new PsiAnnotationMemberValue[]{extraVars};
+        }
+        for (PsiAnnotationMemberValue item : items) {
+            if (!(item instanceof PsiAnnotation permuteVar)) continue;
+            String varName = stringAttr(permuteVar, "varName");
+            if (varName != null) out.add(varName);
+        }
+    }
+
     private static void collectNameParts(PsiAnnotation ann, String attr, Set<String> out) {
         PsiAnnotationMemberValue val = ann.findAttributeValue(attr);
         if (!(val instanceof PsiArrayInitializerMemberValue arr)) return;
@@ -89,11 +107,10 @@ public class JexlContextResolver {
     }
 
     private static boolean isPermute(String fqn) {
-        return match(fqn, "Permute") && !isPermuteVar(fqn)
-                && !isPermuteMacros(fqn) && !isPermuteMethod(fqn)
-                && !isPermuteSwitchArm(fqn);
+        // Exact match avoids false positives from annotations that start with "Permute"
+        if (fqn == null) return false;
+        return fqn.equals("io.quarkiverse.permuplate.Permute") || fqn.equals("Permute");
     }
-    private static boolean isPermuteVar(String fqn)       { return match(fqn, "PermuteVar"); }
     private static boolean isPermuteMacros(String fqn)    { return match(fqn, "PermuteMacros"); }
     private static boolean isPermuteMethod(String fqn)    { return match(fqn, "PermuteMethod"); }
     private static boolean isPermuteSwitchArm(String fqn) { return match(fqn, "PermuteSwitchArm"); }
