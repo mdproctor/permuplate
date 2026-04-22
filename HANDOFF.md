@@ -1,35 +1,45 @@
-# Handover — 2026-04-21 (batch 10, inference pass, 6 DSL improvements)
+# Handover — 2026-04-22 (annotation audit + codebase refine)
 
-**Head commit:** `2f2ea5c` — everything committed and clean.
+**Head commit:** `394fe8e` — everything committed and clean.
 **Status:** Clean — nothing uncommitted.
 
 ---
 
 ## What Changed This Session
 
-### Batch 10 — 6 Permuplate improvements (inference-focused)
+### Annotation removals
 
-| Feature | What it does |
+| Removed | Why |
 |---|---|
-| Constructor-coherence inference | After `@PermuteReturn` resolves to class X, auto-renames `new SeedClass<>()` in method body to match. Removed 4 TYPE_USE `@PermuteDeclr` from `JoinBuilder`/`ExtendsRuleMixin`. |
-| `@PermuteMixin` on non-template | Classes in `src/main/permuplate/` with `@PermuteMixin` but no `@Permute` now processed by `PermuteMojo.processNonTemplateMixins()`. `RuleBuilder`/`ParametersFirst` lost their dummy `@Permute(from=1,to=1)`. |
-| `@PermuteNew(className=...)` | TYPE_USE annotation for explicit constructor renaming; fallback for cases where coherence inference can't resolve. Not currently used in DSL (inference covers it). |
-| `addVariableFilter` m=2..6 | `RuleDefinition` moved to `src/main/permuplate/` + `@PermuteMixin(VariableFilterMixin.class)`. `filterVar` in `JoinBuilder` extended to `to="6"`. |
-| `createEmptyTuple` reflection | Switch (case 1..6) replaced with `Class.forName(BaseTuple.class.getName() + "$Tuple" + size)`. |
-| `@PermuteSealedFamily` | Auto-generates sealed marker interface + adds `implements` to each generated class. `JoinBuilder` manual sealed interface declarations removed. |
+| `@PermuteConst` | Backward-compat alias for `@PermuteValue`; one usage migrated in `FormatSerializer.java` |
+| `@PermuteNew` | Redundant — coherence inference covers common case; `@PermuteDeclr TYPE_USE` covers edge cases |
 
-All changes applied to the DSL and documented in CLAUDE.md. 305 tests stable throughout.
+Annotation count: 37 → 35. All traces removed from CLAUDE.md, OVERVIEW.md, tests.
+
+### Codebase refine (4 items)
+
+| Item | What |
+|---|---|
+| `AstUtils.java` in permuplate-core | 12 utility methods extracted from InlineGenerator + PermuteProcessor. `expandMethodTypesForJ` had diverged — PermuteProcessor had a bug fix InlineGenerator lacked; extraction surfaced it. |
+| `DroolsDslTestBase` | Shared `@Before setUp()` for 3 sandbox test classes with identical Ctx fixture |
+| InlineGenerator section comments | 6 navigation headers added to 3000-line file |
+| OVERVIEW.md → OVERVIEW + ARCHITECTURE | API reference stays in OVERVIEW; pipeline/modules/testing → ARCHITECTURE.md (now the project's DESIGN.md equivalent) |
+
+### Docs cleanup (from health check)
+
+- CLAUDE.md annotation table: removed `@PermuteConst` + `@PermuteNew` rows; count updated 26→27
+- OVERVIEW.md: removed full `@PermuteConst` section, pipeline refs to deleted methods, stale file tree
+- README.md: JavaParser version `3.25.9` → `3.28.0`
+- `docs/design-snapshots/` broken links removed from CLAUDE.md
 
 ---
 
-## Key non-obvious decisions (batch 10)
+## Key non-obvious decisions
 
-- **Constructor-coherence**: uses `replaceAll("\\d+","")` not `replaceAll("\\d+$","")` — strips ALL digit sequences; embedded-arity names like `Join2First` have digits mid-name, not at the end.
-- **`@PermuteMixin` on non-template**: `ClassOrInterfaceDeclaration` in JavaParser covers interfaces too — guard requires `|| coid.isInterface()`.
-- **`allGeneratedNames` not used in coherence**: cross-file families absent from per-CU set; family-matching double guard (digit presence + same stripped family) is sufficient.
-- **`RuleDefinition` is now in `src/main/permuplate/`**, not `src/main/java/`.
+- **`AstUtils` is the canonical home** for AST name/type-string utilities — add new ones there, not as private methods in InlineGenerator or PermuteProcessor
+- **`@PermuteStatements`** is marked "under review for removal" in its Javadoc — no current template uses it; `@PermuteBody` covers everything
 
-*Previous session decisions: `git show HEAD~7:HANDOFF.md`*
+*Previous session decisions: `git show HEAD~8:HANDOFF.md`*
 
 ---
 
@@ -47,8 +57,7 @@ Maven Central release. Group ID still undecided:
 
 | What | Where |
 |---|---|
-| Batch 10 plan | `docs/superpowers/plans/2026-04-21-dsl-deepdive-batch10.md` |
-| Blog entry | `site/_posts/2026-04-21-mdp02-inference-pass-six-more.md` |
-| Garden entries (batch 10) | `GE-20260421-2df2ba`, `GE-20260421-dbc509`, `GE-20260421-5886e0` |
-| Previous handover | `git show HEAD~7:HANDOFF.md` |
+| Blog entry | `site/_posts/2026-04-22-mdp01-cleaning-house-before-shipping.md` |
+| Garden entries | `GE-20260422-b3423e` (diverged-extraction gotcha), `GE-20260422-9d2c28` (grep-l technique) |
+| Previous handover | `git show HEAD~8:HANDOFF.md` |
 | ROADMAP | `docs/ROADMAP.md` |
