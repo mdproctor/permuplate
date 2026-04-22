@@ -4,7 +4,7 @@
 
 **Type:** java
 
-This file gives future Claude sessions everything needed to contribute to Permuplate without re-deriving the architecture from scratch. Read this first, then consult [OVERVIEW.md](OVERVIEW.md) for per-annotation API detail, transformer internals, the transformation pipeline, and the test coverage map. See [README.md](README.md) for the user-facing picture.
+This file gives future Claude sessions everything needed to contribute to Permuplate without re-deriving the architecture from scratch. Read this first, then consult [OVERVIEW.md](OVERVIEW.md) for the annotation API reference, and [ARCHITECTURE.md](ARCHITECTURE.md) for the transformation pipeline, module structure, and test coverage map. See [README.md](README.md) for the user-facing picture.
 
 ---
 
@@ -243,7 +243,7 @@ String src = sourceOf(compilation.generatedSourceFile("io.permuplate.example.Joi
 assertThat(src).contains("c3.call(o1, o2, o3)");
 ```
 
-For the full test coverage map (which test class covers which annotation), see [OVERVIEW.md § Testing Strategy](OVERVIEW.md#testing-strategy).
+For the full test coverage map (which test class covers which annotation), see [ARCHITECTURE.md § Testing Strategy](ARCHITECTURE.md#testing-strategy).
 
 ### Drools DSL Sandbox Tests
 
@@ -271,7 +271,8 @@ work to date against the full vol2 test suite to identify gaps.
 ## What to read next
 
 - [README.md](README.md) — user-facing overview with examples and quick start
-- [OVERVIEW.md](OVERVIEW.md) — architecture deep-dive, market comparison, full roadmap (annotation processor core). **Serves as `DESIGN.md` for this project** — `java-git-commit` references to `docs/DESIGN.md` should read `OVERVIEW.md` instead.
+- [OVERVIEW.md](OVERVIEW.md) — annotation API reference, market comparison, roadmap (user-facing)
+- [ARCHITECTURE.md](ARCHITECTURE.md) — transformation pipeline, module structure, testing strategy (contributor-facing). **Serves as `DESIGN.md` for this project** — `java-git-commit` references to `docs/DESIGN.md` should read `ARCHITECTURE.md` instead.
 - [ADRs](docs/adr/) — formal records of key architectural decisions (ADR-0001..0006 cover DSL sandbox)
 - `permuplate-processor/src/main/java/io/quarkiverse/permuplate/processor/` — the processor source files
 - `permuplate-tests/src/test/java/io/quarkiverse/permuplate/` — test classes
