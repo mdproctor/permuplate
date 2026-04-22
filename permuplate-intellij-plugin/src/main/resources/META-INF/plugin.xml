@@ -66,6 +66,19 @@
                          enabledByDefault="true"
                          level="WARNING"
                          implementationClass="io.quarkiverse.permuplate.intellij.inspection.PermuteThrowsTypeInspection"/>
+
+        <!-- JEXL language infrastructure -->
+        <fileType name="JEXL"
+                  implementationClass="io.quarkiverse.permuplate.intellij.jexl.lang.JexlFileType"
+                  fieldName="INSTANCE"
+                  language="JEXL"
+                  extensions="jexl"/>
+        <lang.parserDefinition
+            language="JEXL"
+            implementationClass="io.quarkiverse.permuplate.intellij.jexl.lang.JexlParserDefinition"/>
+        <lang.syntaxHighlighterFactory
+            language="JEXL"
+            implementationClass="io.quarkiverse.permuplate.intellij.jexl.lang.JexlSyntaxHighlighterFactory"/>
     </extensions>
 
     <actions>
