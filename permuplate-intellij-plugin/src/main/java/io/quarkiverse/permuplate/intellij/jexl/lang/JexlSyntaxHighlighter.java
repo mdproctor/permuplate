@@ -7,7 +7,13 @@ import com.intellij.openapi.fileTypes.SyntaxHighlighterBase;
 import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Set;
+
 public class JexlSyntaxHighlighter extends SyntaxHighlighterBase {
+
+    /** Built-in function names — shared with completion and annotator to avoid duplication. */
+    public static final Set<String> BUILTIN_NAMES = Set.of(
+            "alpha", "lower", "typeArgList", "capitalize", "decapitalize", "max", "min");
 
     public static final TextAttributesKey IDENTIFIER =
             TextAttributesKey.createTextAttributesKey("JEXL_IDENTIFIER",

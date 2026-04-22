@@ -112,6 +112,13 @@ public class JexlLexerTest extends TestCase {
         assertEquals("JEXL_NUMBER",   tokens.get(1)[0]);
     }
 
+    public void testModuloOperator() {
+        List<String[]> tokens = tokenise("i % 2");
+        assertEquals(5, tokens.size()); // IDENT WS OP WS NUMBER
+        assertEquals("JEXL_OPERATOR", tokens.get(2)[0]);
+        assertEquals("%", tokens.get(2)[1]);
+    }
+
     // --- Robustness ---
 
     public void testEmptyInput() {

@@ -78,7 +78,7 @@ public class JexlLexer extends LexerBase {
         } else if (c == ',') { tokenType = JexlTokenTypes.COMMA;   tokenEnd = tokenStart + 1;
         } else if (c == '.') { tokenType = JexlTokenTypes.DOT;     tokenEnd = tokenStart + 1;
 
-        } else if ("+-*/><!=&|".indexOf(c) >= 0) {
+        } else if ("+-*/><!=&|%".indexOf(c) >= 0) {
             tokenType = JexlTokenTypes.OPERATOR;
             tokenEnd = tokenStart + 1;
             if (tokenEnd < bufferEnd) {
