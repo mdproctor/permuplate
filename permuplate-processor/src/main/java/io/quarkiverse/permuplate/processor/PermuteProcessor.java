@@ -38,6 +38,7 @@ import com.sun.source.util.Trees;
 
 import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteVar;
+import io.quarkiverse.permuplate.core.AstUtils;
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteConfig;
 import io.quarkiverse.permuplate.core.PermuteDeclrTransformer;
@@ -481,8 +482,8 @@ public class PermuteProcessor extends AbstractProcessor {
             java.util.List<String> postG1TypeParams = coid.getTypeParameters().stream()
                     .map(tp -> tp.getNameAsString())
                     .collect(java.util.stream.Collectors.toList());
-            int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
-            int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
+            int templateEmbeddedNum = AstUtils.firstEmbeddedNumber(templateClassName);
+            int currentEmbeddedNum = AstUtils.firstEmbeddedNumber(newClassName);
             applyExtendsExpansion(coid, templateClassName, templateEmbeddedNum,
                     currentEmbeddedNum, postG1TypeParams);
         }
@@ -1275,7 +1276,7 @@ public class PermuteProcessor extends AbstractProcessor {
         // J-based implicit type expansion: only for integer path (j >= 1).
         // String-set path passes j=-1 to skip this.
         if (j >= 1 && !originalHasExplicitReturn) {
-            expandMethodTypesForJ(clone, declaredTypeParams, j);
+            AstUtils.expandMethodTypesForJ(clone, declaredTypeParams, j);
         }
 
         // Apply @PermuteDeclr on parameters with innerCtx
@@ -1861,121 +1862,6 @@ public class PermuteProcessor extends AbstractProcessor {
     // Extends expansion helpers
     // =========================================================================
 
-    /** Returns the substring of name up to (but not including) its first digit. */
-    private static String prefixBeforeFirstDigit(String name) {
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isDigit(name.charAt(i)))
-                return name.substring(0, i);
-        }
-        return name;
-    }
-
-    /** Returns the first contiguous sequence of digits in name as an int, or -1 if none. */
-    private static int firstEmbeddedNumber(String name) {
-        int start = -1;
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isDigit(name.charAt(i))) {
-                start = i;
-                break;
-            }
-        }
-        if (start < 0)
-            return -1;
-        int end = start;
-        while (end < name.length() && Character.isDigit(name.charAt(end)))
-            end++;
-        try {
-            return Integer.parseInt(name.substring(start, end));
-        } catch (NumberFormatException e) {
-            return -1;
-        }
-    }
-
-    /** Replaces the first contiguous digit sequence in name with newNum. */
-    private static String replaceFirstEmbeddedNumber(String name, int newNum) {
-        int start = -1;
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isDigit(name.charAt(i))) {
-                start = i;
-                break;
-            }
-        }
-        if (start < 0)
-            return name;
-        int end = start;
-        while (end < name.length() && Character.isDigit(name.charAt(end)))
-            end++;
-        return name.substring(0, start) + newNum + name.substring(end);
-    }
-
-    /** Returns true if s matches the T+number pattern (e.g. "T1", "T23"). */
-    private static boolean isTNumberVar(String s) {
-        if (s == null || s.length() < 2 || s.charAt(0) != 'T')
-            return false;
-        for (int i = 1; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i)))
-                return false;
-        }
-        return true;
-    }
-
-    /** Record holding parsed return type info: base class name and type arguments. */
-    private record ReturnTypeInfo(String baseClass, java.util.List<String> typeArgs) {
-    }
-
-    /**
-     * Parses "Step2<T1, T2>" into ReturnTypeInfo("Step2", ["T1","T2"]).
-     * Handles nested generics via depth-aware comma splitting.
-     */
-    private static ReturnTypeInfo parseReturnTypeInfo(String returnType) {
-        int lt = returnType.indexOf('<');
-        if (lt < 0)
-            return new ReturnTypeInfo(returnType.trim(), java.util.List.of());
-        String base = returnType.substring(0, lt).trim();
-        String argsStr = returnType.substring(lt + 1, returnType.lastIndexOf('>')).trim();
-        if (argsStr.isEmpty())
-            return new ReturnTypeInfo(base, java.util.List.of());
-        java.util.List<String> args = new java.util.ArrayList<>();
-        int depth = 0, start = 0;
-        for (int i = 0; i < argsStr.length(); i++) {
-            char c = argsStr.charAt(i);
-            if (c == '<')
-                depth++;
-            else if (c == '>')
-                depth--;
-            else if (c == ',' && depth == 0) {
-                args.add(argsStr.substring(start, i).trim());
-                start = i + 1;
-            }
-        }
-        args.add(argsStr.substring(start).trim());
-        return new ReturnTypeInfo(base, args);
-    }
-
-    /** Extracts numeric suffix from class name (e.g. "Chain3" → 3). Returns -1 if none. */
-    private static int classNameSuffix(String name) {
-        int i = name.length() - 1;
-        if (i < 0 || !Character.isDigit(name.charAt(i)))
-            return -1;
-        while (i > 0 && Character.isDigit(name.charAt(i - 1)))
-            i--;
-        try {
-            return Integer.parseInt(name.substring(i));
-        } catch (Exception ignored) {
-            return -1;
-        }
-    }
-
-    /** Strips numeric suffix from class name (e.g. "Chain3" → "Chain"). */
-    private static String stripNumericSuffix(String name) {
-        int i = name.length() - 1;
-        if (i < 0 || !Character.isDigit(name.charAt(i)))
-            return name;
-        while (i > 0 && Character.isDigit(name.charAt(i - 1)))
-            i--;
-        return name.substring(0, i);
-    }
-
     /** Collects method keys that already have explicit @PermuteReturn (to exclude from inference). */
     private static java.util.Set<String> collectExplicitReturnMethods(
             com.github.javaparser.ast.body.TypeDeclaration<?> classDecl) {
@@ -2021,12 +1907,12 @@ public class PermuteProcessor extends AbstractProcessor {
         java.util.List<String> currentTypeParams = new java.util.ArrayList<>();
         classDecl.getTypeParameters().forEach(tp -> currentTypeParams.add(tp.getNameAsString()));
 
-        int currentSuffix = classNameSuffix(classDecl.getNameAsString());
+        int currentSuffix = AstUtils.classNameSuffix(classDecl.getNameAsString());
         if (currentSuffix < 0)
             return; // Generated class has no numeric suffix — inference does not apply
 
         String currentClassName = classDecl.getNameAsString();
-        String currentFamilyPrefix = stripNumericSuffix(currentClassName);
+        String currentFamilyPrefix = AstUtils.stripNumericSuffix(currentClassName);
 
         java.util.List<com.github.javaparser.ast.body.MethodDeclaration> toRemove = new java.util.ArrayList<>();
 
@@ -2039,14 +1925,14 @@ public class PermuteProcessor extends AbstractProcessor {
             if (returnTypeStr.equals("void") || returnTypeStr.equals("Object"))
                 return;
 
-            ReturnTypeInfo info = parseReturnTypeInfo(returnTypeStr);
+            AstUtils.ReturnTypeInfo info = AstUtils.parseReturnTypeInfo(returnTypeStr);
             if (info == null)
                 return;
 
             // Condition 1: return type base class must be in the same family as the generated
             // classes (same name prefix before trailing digits).
             // E.g. "Chain2" has prefix "Chain"; matches generated "Chain3", "Chain4".
-            String returnBasePrefix = stripNumericSuffix(info.baseClass());
+            String returnBasePrefix = AstUtils.stripNumericSuffix(info.baseClass());
             if (returnBasePrefix.isEmpty() || returnBasePrefix.equals(info.baseClass()))
                 return; // base class has no numeric suffix — not a numbered family
             if (!returnBasePrefix.equals(currentFamilyPrefix))
@@ -2163,7 +2049,7 @@ public class PermuteProcessor extends AbstractProcessor {
 
         if (templateEmbeddedNum < 0 || currentEmbeddedNum < 0)
             return;
-        String templatePrefix = prefixBeforeFirstDigit(templateName);
+        String templatePrefix = AstUtils.prefixBeforeFirstDigit(templateName);
         int newNum = currentEmbeddedNum;
 
         com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> extended = classDecl
@@ -2174,11 +2060,11 @@ public class PermuteProcessor extends AbstractProcessor {
             String baseName = ext.getNameAsString();
 
             // Only expand siblings: same prefix-before-digit as template
-            if (!prefixBeforeFirstDigit(baseName).equals(templatePrefix))
+            if (!AstUtils.prefixBeforeFirstDigit(baseName).equals(templatePrefix))
                 continue;
 
             // Only expand when base class has the same embedded number as template
-            int extNum = firstEmbeddedNumber(baseName);
+            int extNum = AstUtils.firstEmbeddedNumber(baseName);
             if (extNum < 0 || extNum != templateEmbeddedNum)
                 continue;
 
@@ -2193,7 +2079,7 @@ public class PermuteProcessor extends AbstractProcessor {
 
             // Determine new type args
             java.util.List<String> newTypeArgNames;
-            boolean allTNumber = extArgNames.stream().allMatch(PermuteProcessor::isTNumberVar);
+            boolean allTNumber = extArgNames.stream().allMatch(AstUtils::isTNumberVar);
             if (allTNumber) {
                 newTypeArgNames = new java.util.ArrayList<>();
                 for (int t = 1; t <= newNum; t++)
@@ -2208,163 +2094,11 @@ public class PermuteProcessor extends AbstractProcessor {
                 newTypeArgNames = postG1TypeParams;
             }
 
-            String newBaseName = replaceFirstEmbeddedNumber(baseName, newNum);
+            String newBaseName = AstUtils.replaceFirstEmbeddedNumber(baseName, newNum);
             String newExtStr = newBaseName + "<" + String.join(", ", newTypeArgNames) + ">";
             try {
                 extended.set(idx, com.github.javaparser.StaticJavaParser.parseClassOrInterfaceType(newExtStr));
             } catch (Exception ignored) {
-            }
-        }
-    }
-
-    // =========================================================================
-    // J-based @PermuteMethod type expansion helpers
-    // =========================================================================
-
-    /**
-     * Increments the first contiguous digit sequence in name by offset.
-     * E.g. incrementFirstEmbeddedNumber("JExpand2", 1) → "JExpand3".
-     */
-    private static String incrementFirstEmbeddedNumber(String name, int offset) {
-        int start = -1;
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isDigit(name.charAt(i))) {
-                start = i;
-                break;
-            }
-        }
-        if (start < 0)
-            return name;
-        int end = start;
-        while (end < name.length() && Character.isDigit(name.charAt(end)))
-            end++;
-        int num = Integer.parseInt(name.substring(start, end));
-        return name.substring(0, start) + (num + offset) + name.substring(end);
-    }
-
-    /**
-     * Rebuilds the type argument list, expanding the growing tip from T(firstTipNum)
-     * to T(newLastTipNum) while preserving fixed args in their original relative positions.
-     *
-     * <p>
-     * Example: args=[T1, T2], declaredTypeParams={T1}, firstTipNum=2, newLastTipNum=3
-     * → [T1, T2, T3]
-     */
-    private static java.util.List<String> buildExpandedTypeArgs(java.util.List<String> originalArgs,
-            java.util.Set<String> declaredTypeParams,
-            int firstTipNum, int newLastTipNum) {
-        java.util.List<String> result = new java.util.ArrayList<>();
-        boolean tipInserted = false;
-
-        for (String arg : originalArgs) {
-            boolean isTip = !declaredTypeParams.contains(arg) && isTNumberVar(arg);
-            if (isTip && !tipInserted) {
-                // Insert expanded tip: T(firstTipNum)..T(newLastTipNum)
-                for (int t = firstTipNum; t <= newLastTipNum; t++) {
-                    result.add("T" + t);
-                }
-                tipInserted = true;
-            } else if (isTip) {
-                // Additional tip vars from original — skip (already expanded above)
-            } else {
-                // Fixed arg — pass through
-                result.add(arg);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Expands a single type string for the j-based inner loop (offset = j-1).
-     * Finds undeclared T+number vars (growing tip), expands them, and increments
-     * the first embedded integer in the base class name by offset.
-     * Returns typeStr unchanged if no growing tip found.
-     */
-    private static String expandTypeStringForJ(String typeStr,
-            java.util.Set<String> declaredTypeParams, int offset) {
-        ReturnTypeInfo info = parseReturnTypeInfo(typeStr);
-        if (info == null)
-            return typeStr;
-
-        java.util.List<String> growingTip = new java.util.ArrayList<>();
-        for (String arg : info.typeArgs()) {
-            if (!declaredTypeParams.contains(arg) && isTNumberVar(arg))
-                growingTip.add(arg);
-        }
-        if (growingTip.isEmpty())
-            return typeStr;
-
-        int firstTipNum = Integer.parseInt(growingTip.get(0).substring(1));
-        int newLastTipNum = firstTipNum + offset;
-
-        java.util.List<String> newTypeArgs = buildExpandedTypeArgs(
-                info.typeArgs(), declaredTypeParams, firstTipNum, newLastTipNum);
-        String newBase = incrementFirstEmbeddedNumber(info.baseClass(), offset);
-        return newTypeArgs.isEmpty() ? newBase : newBase + "<" + String.join(", ", newTypeArgs) + ">";
-    }
-
-    /**
-     * Applies j-based implicit type expansion to a method's return type, parameter types,
-     * and method-level type parameters.
-     *
-     * <p>
-     * j=1 is always a no-op (offset=0). For j&gt;1, T+number vars that are NOT declared
-     * at CLASS level (growing tip — including method-level type params that serve as sentinels)
-     * are expanded by (j-1), the first embedded class-name number is incremented by (j-1),
-     * and any new T+number vars introduced by the expansion are added to the method's type
-     * parameter list.
-     *
-     * <p>
-     * Only called for clones that did NOT have explicit @PermuteReturn.
-     */
-    private static void expandMethodTypesForJ(
-            MethodDeclaration method,
-            java.util.Set<String> classDeclaredTypeParams, int j) {
-        if (j <= 1)
-            return;
-        int offset = j - 1;
-
-        // Use ONLY class-level declared type params for tip detection.
-        // Method-level type params (e.g. <T2>) are the sentinels / growing tip — they must NOT
-        // be treated as declared, so that T2 in JConn2<T1, T2> is recognized as the growing tip.
-        String rt = method.getTypeAsString();
-        String newRt = expandTypeStringForJ(rt, classDeclaredTypeParams, offset);
-        if (!newRt.equals(rt)) {
-            try {
-                method.setType(StaticJavaParser.parseType(newRt));
-            } catch (Exception ignored) {
-            }
-        }
-
-        method.getParameters().forEach(param -> {
-            String pt = param.getTypeAsString();
-            String newPt = expandTypeStringForJ(pt, classDeclaredTypeParams, offset);
-            if (!newPt.equals(pt)) {
-                try {
-                    param.setType(StaticJavaParser.parseType(newPt));
-                } catch (Exception ignored) {
-                }
-            }
-        });
-
-        // Add new T+number type params introduced by the expansion to the method's type param list.
-        // Collect existing method-level type params (before we start adding) to prevent duplicates.
-        java.util.Set<String> existingMethodTypeParams = new java.util.LinkedHashSet<>();
-        method.getTypeParameters().forEach(tp -> existingMethodTypeParams.add(tp.getNameAsString()));
-
-        ReturnTypeInfo expandedInfo = parseReturnTypeInfo(method.getTypeAsString());
-        if (expandedInfo != null) {
-            for (String arg : expandedInfo.typeArgs()) {
-                if (isTNumberVar(arg)
-                        && !classDeclaredTypeParams.contains(arg)
-                        && !existingMethodTypeParams.contains(arg)) {
-                    try {
-                        method.addTypeParameter(com.github.javaparser.StaticJavaParser
-                                .parseTypeParameter(arg));
-                        existingMethodTypeParams.add(arg); // prevent duplicates
-                    } catch (Exception ignored) {
-                    }
-                }
             }
         }
     }

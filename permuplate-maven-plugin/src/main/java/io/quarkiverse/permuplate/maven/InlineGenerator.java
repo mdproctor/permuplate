@@ -25,6 +25,7 @@ import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.nodeTypes.NodeWithTypeParameters;
 import com.github.javaparser.ast.type.TypeParameter;
 
+import io.quarkiverse.permuplate.core.AstUtils;
 import io.quarkiverse.permuplate.core.EvaluationContext;
 import io.quarkiverse.permuplate.core.PermuteBodyTransformer;
 import io.quarkiverse.permuplate.core.PermuteCaseTransformer;
@@ -296,8 +297,8 @@ public class InlineGenerator {
 
                 // Extends/implements clause expansion (same-N formula) — only when no explicit override
                 if (!permuteExtendsApplied) {
-                    int templateEmbeddedNum = firstEmbeddedNumber(templateClassName);
-                    int currentEmbeddedNum = firstEmbeddedNumber(newClassName);
+                    int templateEmbeddedNum = AstUtils.firstEmbeddedNumber(templateClassName);
+                    int currentEmbeddedNum = AstUtils.firstEmbeddedNumber(newClassName);
                     if (templateEmbeddedNum >= 0 && currentEmbeddedNum >= 0) {
                         applyExtendsExpansion(coid, templateClassName, templateEmbeddedNum, currentEmbeddedNum,
                                 postG1TypeParams);
@@ -412,6 +413,8 @@ public class InlineGenerator {
      * name is appended to the end of the expanded list after the generated names, preserving a valid
      * sealed-type declaration.
      */
+    // ===== Sealed Interface Support =====
+
     private static void expandSealedPermits(
             CompilationUnit cu, String templateName, List<String> generatedNames, boolean keepTemplate) {
         if (generatedNames.isEmpty())
@@ -580,6 +583,8 @@ public class InlineGenerator {
      * parameters is consumed with the inner context — the downstream transform sees
      * no remaining @PermuteDeclr annotations on these methods.
      */
+    // ===== @PermuteMethod — Method Overload Expansion =====
+
     private static void applyPermuteMethod(ClassOrInterfaceDeclaration classDecl,
             EvaluationContext ctx,
             PermuteConfig config,
@@ -760,7 +765,7 @@ public class InlineGenerator {
         // String-set path passes j=-1 to skip this entirely.
         String methodKey = clone.getNameAsString() + clone.getParameters().toString();
         if (j >= 1 && !explicitMethods.contains(methodKey)) {
-            expandMethodTypesForJ(clone, declaredTypeParams, j);
+            AstUtils.expandMethodTypesForJ(clone, declaredTypeParams, j);
         }
 
         // Process @PermuteDeclr on parameters with innerCtx
@@ -802,116 +807,6 @@ public class InlineGenerator {
         addClone.accept(clone);
     }
 
-    /**
-     * Applies j-based implicit type expansion to a method's return type and parameter types.
-     *
-     * <p>
-     * For each type string (return and each param), finds undeclared T+number vars
-     * (the "growing tip"), expands them by adding T(firstTip+1)..T(firstTip+j-1), and
-     * increments the first embedded integer in the base class name by (j-1). When j=1
-     * this is a no-op (offset=0, tip unchanged).
-     *
-     * <p>
-     * Used by {@code applyPermuteMethod} to expand the template method's types for each
-     * inner j value without relying on {@code allGeneratedNames} or class name suffix heuristics.
-     */
-    private static void expandMethodTypesForJ(MethodDeclaration method,
-            Set<String> declaredTypeParams, int j) {
-        if (j <= 1)
-            return; // j=1 is always a no-op
-
-        int offset = j - 1;
-
-        // Expand return type
-        String rt = method.getTypeAsString();
-        String newRt = expandTypeStringForJ(rt, declaredTypeParams, offset);
-        if (!newRt.equals(rt)) {
-            try {
-                method.setType(StaticJavaParser.parseType(newRt));
-            } catch (Exception ignored) {
-            }
-        }
-
-        // Expand each parameter type
-        method.getParameters().forEach(param -> {
-            String pt = param.getTypeAsString();
-            String newPt = expandTypeStringForJ(pt, declaredTypeParams, offset);
-            if (!newPt.equals(pt)) {
-                try {
-                    param.setType(StaticJavaParser.parseType(newPt));
-                } catch (Exception ignored) {
-                }
-            }
-        });
-    }
-
-    /**
-     * Expands a single type string for the j-based inner loop.
-     *
-     * <p>
-     * For a type like {@code "Join2First<T1, T2>"} where T2 is undeclared:
-     * <ul>
-     * <li>Finds the growing tip (undeclared T+number vars), e.g. T2</li>
-     * <li>Expands tip to T2, T3, ..., T(firstTipNum + offset)</li>
-     * <li>Increments the first embedded integer in the base class name by offset</li>
-     * </ul>
-     *
-     * <p>
-     * If no undeclared T+number vars are present, the type string is returned unchanged.
-     */
-    private static String expandTypeStringForJ(String typeStr,
-            Set<String> declaredTypeParams, int offset) {
-        ReturnTypeInfo info = parseReturnTypeInfo(typeStr);
-        if (info == null)
-            return typeStr;
-
-        // Find undeclared T+number vars (growing tip)
-        List<String> growingTip = new ArrayList<>();
-        for (String arg : info.typeArgs()) {
-            if (!declaredTypeParams.contains(arg) && isTNumberVar(arg)) {
-                growingTip.add(arg);
-            }
-        }
-        if (growingTip.isEmpty())
-            return typeStr;
-
-        int firstTipNum = Integer.parseInt(growingTip.get(0).substring(1));
-        int newLastTipNum = firstTipNum + offset;
-
-        // Rebuild type args: preserve fixed args in position, expand tip
-        List<String> newTypeArgs = buildExpandedTypeArgs(info.typeArgs(), declaredTypeParams,
-                firstTipNum, newLastTipNum);
-
-        // Increment the first embedded integer in the base class name by offset
-        String newBase = incrementFirstEmbeddedNumber(info.baseClass(), offset);
-
-        if (newTypeArgs.isEmpty())
-            return newBase;
-        return newBase + "<" + String.join(", ", newTypeArgs) + ">";
-    }
-
-    /**
-     * Finds the first contiguous run of digits in a class name and increments it by offset.
-     * E.g. {@code incrementFirstEmbeddedNumber("Join2First", 1)} → {@code "Join3First"}.
-     * If no digits found, returns the name unchanged.
-     */
-    private static String incrementFirstEmbeddedNumber(String name, int offset) {
-        int start = -1;
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isDigit(name.charAt(i))) {
-                start = i;
-                break;
-            }
-        }
-        if (start < 0)
-            return name;
-        int end = start;
-        while (end < name.length() && Character.isDigit(name.charAt(end)))
-            end++;
-        int num = Integer.parseInt(name.substring(start, end));
-        return name.substring(0, start) + (num + offset) + name.substring(end);
-    }
-
     /** Returns {@code true} if the class has a {@code @PermuteExtends} annotation. */
     private static boolean hasPermuteExtendsAnnotation(ClassOrInterfaceDeclaration classDecl) {
         return classDecl.getAnnotations().stream()
@@ -938,6 +833,8 @@ public class InlineGenerator {
      * first {@code ${}).
      * Strips the {@code @PermuteExtendsChain} annotation from the generated class.
      */
+    // ===== @PermuteExtends / @PermuteExtendsChain — Inheritance Expansion =====
+
     private static void applyPermuteExtendsChain(
             ClassOrInterfaceDeclaration classDecl,
             PermuteConfig config,
@@ -1176,7 +1073,7 @@ public class InlineGenerator {
             int currentEmbeddedNum,
             List<String> postG1TypeParams) {
 
-        String templateNamePrefix = prefixBeforeFirstDigit(templateName);
+        String templateNamePrefix = AstUtils.prefixBeforeFirstDigit(templateName);
         int newNum = currentEmbeddedNum; // same-N: Join2First → extends Join2Second
 
         com.github.javaparser.ast.NodeList<com.github.javaparser.ast.type.ClassOrInterfaceType> extended = classDecl
@@ -1188,11 +1085,11 @@ public class InlineGenerator {
             // Guard: only expand if the base class shares the same prefix-before-digit
             // as the template class. This prevents incorrectly expanding third-party
             // classes (e.g. External1Lib) that happen to share the template's embedded digit.
-            if (!prefixBeforeFirstDigit(baseName).equals(templateNamePrefix))
+            if (!AstUtils.prefixBeforeFirstDigit(baseName).equals(templateNamePrefix))
                 continue;
 
             // Only expand if extends base class has same first embedded number as the template
-            int extNum = firstEmbeddedNumber(baseName);
+            int extNum = AstUtils.firstEmbeddedNumber(baseName);
             if (extNum < 0 || extNum != templateEmbeddedNum)
                 continue;
 
@@ -1207,7 +1104,7 @@ public class InlineGenerator {
 
             // Determine new type args via one of two detection branches.
             List<String> newTypeArgNames;
-            boolean allTNumber = extArgNames.stream().allMatch(InlineGenerator::isTNumberVar);
+            boolean allTNumber = extArgNames.stream().allMatch(AstUtils::isTNumberVar);
             if (allTNumber) {
                 // T+number case: build T1..T(newNum) from scratch
                 newTypeArgNames = new ArrayList<>();
@@ -1226,54 +1123,13 @@ public class InlineGenerator {
             }
 
             // Build new base class name: replace embedded number with newNum
-            String newBaseName = replaceFirstEmbeddedNumber(baseName, newNum);
+            String newBaseName = AstUtils.replaceFirstEmbeddedNumber(baseName, newNum);
             String newExtStr = newBaseName + "<" + String.join(", ", newTypeArgNames) + ">";
             try {
                 extended.set(idx, StaticJavaParser.parseClassOrInterfaceType(newExtStr));
             } catch (Exception ignored) {
             }
         }
-    }
-
-    /**
-     * Returns the substring of {@code name} up to (but not including) its first digit.
-     * E.g. {@code "Join1Second"} → {@code "Join"}, {@code "BaseStep"} → {@code "BaseStep"}.
-     */
-    private static String prefixBeforeFirstDigit(String name) {
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isDigit(name.charAt(i)))
-                return name.substring(0, i);
-        }
-        return name;
-    }
-
-    /** Returns the first contiguous run of digits in a name as an integer, or -1 if none. */
-    private static int firstEmbeddedNumber(String name) {
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isDigit(name.charAt(i))) {
-                int end = i;
-                while (end < name.length() && Character.isDigit(name.charAt(end)))
-                    end++;
-                try {
-                    return Integer.parseInt(name.substring(i, end));
-                } catch (Exception ignored) {
-                }
-            }
-        }
-        return -1;
-    }
-
-    /** Replaces the first contiguous run of digits in {@code name} with {@code newNum}. */
-    private static String replaceFirstEmbeddedNumber(String name, int newNum) {
-        for (int i = 0; i < name.length(); i++) {
-            if (Character.isDigit(name.charAt(i))) {
-                int end = i;
-                while (end < name.length() && Character.isDigit(name.charAt(end)))
-                    end++;
-                return name.substring(0, i) + newNum + name.substring(end);
-            }
-        }
-        return name; // no digits found — return unchanged
     }
 
     /**
@@ -1367,6 +1223,8 @@ public class InlineGenerator {
      * replaces the sentinel return type with the computed type, and removes
      * methods whose boundary check fails.
      */
+    // ===== @PermuteReturn — Return Type Control, Inference, and Boundary Omission =====
+
     private static void applyPermuteReturn(ClassOrInterfaceDeclaration classDecl,
             EvaluationContext ctx,
             Set<String> allGeneratedNames) {
@@ -1722,7 +1580,7 @@ public class InlineGenerator {
                 return;
 
             // Parse base class and type args
-            ReturnTypeInfo info = parseReturnTypeInfo(returnTypeStr);
+            AstUtils.ReturnTypeInfo info = AstUtils.parseReturnTypeInfo(returnTypeStr);
             if (info == null)
                 return;
 
@@ -1736,7 +1594,7 @@ public class InlineGenerator {
             List<String> growingTip = new ArrayList<>();
 
             for (String arg : info.typeArgs()) {
-                if (!declaredTypeParams.contains(arg) && isTNumberVar(arg)) {
+                if (!declaredTypeParams.contains(arg) && AstUtils.isTNumberVar(arg)) {
                     growingTip.add(arg);
                 } else {
                     fixedArgs.add(arg);
@@ -1750,12 +1608,12 @@ public class InlineGenerator {
             int firstTipNum = Integer.parseInt(growingTip.get(0).substring(1));
 
             // Compute currentSuffix from the generated class name (e.g. "Step3" → 3)
-            int currentSuffix = classNameSuffix(classDecl.getNameAsString());
+            int currentSuffix = AstUtils.classNameSuffix(classDecl.getNameAsString());
             if (currentSuffix < 0)
                 return;
 
             int newSuffix = currentSuffix + 1;
-            String baseClassName = stripNumericSuffix(info.baseClass());
+            String baseClassName = AstUtils.stripNumericSuffix(info.baseClass());
             String newBaseClass = baseClassName + newSuffix;
 
             // Boundary omission: if new class not in generated set, omit the method
@@ -1767,7 +1625,7 @@ public class InlineGenerator {
             // Build new type args: reconstruct in original order, expanding the growing tip
             // The growing tip expands from T(firstTipNum) to T(newSuffix)
             // Fixed args stay in their original positions (before tip, between tip, after tip)
-            List<String> newTypeArgs = buildExpandedTypeArgs(info.typeArgs(), declaredTypeParams,
+            List<String> newTypeArgs = AstUtils.buildExpandedTypeArgs(info.typeArgs(), declaredTypeParams,
                     firstTipNum, newSuffix);
 
             String newReturnType = newBaseClass + "<" + String.join(", ", newTypeArgs) + ">";
@@ -1796,109 +1654,6 @@ public class InlineGenerator {
         });
 
         toRemove.forEach(m -> classDecl.getMembers().removeIf(member -> member == m));
-    }
-
-    /**
-     * Rebuilds the type argument list, expanding the growing tip from T(firstTipNum)
-     * to T(newSuffix) while preserving fixed args in their original relative positions.
-     *
-     * <p>
-     * Example: args=[T1, T2, R], declaredTypeParams={T1,R}, firstTipNum=2, newSuffix=4
-     * → [T1, T2, T3, T4, R]
-     */
-    private static List<String> buildExpandedTypeArgs(List<String> originalArgs,
-            Set<String> declaredTypeParams,
-            int firstTipNum, int newSuffix) {
-        List<String> result = new ArrayList<>();
-        boolean tipInserted = false;
-
-        for (String arg : originalArgs) {
-            boolean isTip = !declaredTypeParams.contains(arg) && isTNumberVar(arg);
-            if (isTip && !tipInserted) {
-                // Insert expanded tip: T(firstTipNum)..T(newSuffix)
-                for (int t = firstTipNum; t <= newSuffix; t++) {
-                    result.add("T" + t);
-                }
-                tipInserted = true;
-                // Skip additional tip vars from the original (they are subsumed)
-            } else if (isTip) {
-                // Additional tip vars from original — skip (already expanded above)
-            } else {
-                // Fixed arg — pass through
-                result.add(arg);
-            }
-        }
-        return result;
-    }
-
-    // ---- Helper types and utilities ----
-
-    private record ReturnTypeInfo(String baseClass, List<String> typeArgs) {
-    }
-
-    /**
-     * Parses "Step2<T1, T2>" into ReturnTypeInfo("Step2", ["T1","T2"]).
-     * Returns null if the string cannot be parsed as a class name.
-     */
-    private static ReturnTypeInfo parseReturnTypeInfo(String returnType) {
-        int lt = returnType.indexOf('<');
-        if (lt < 0)
-            return new ReturnTypeInfo(returnType.trim(), List.of());
-        String base = returnType.substring(0, lt).trim();
-        String argsStr = returnType.substring(lt + 1, returnType.lastIndexOf('>')).trim();
-        if (argsStr.isEmpty())
-            return new ReturnTypeInfo(base, List.of());
-        // Split on comma at depth 0 (handles nested generics like Source<T2>)
-        List<String> args = new ArrayList<>();
-        int depth = 0, start = 0;
-        for (int i = 0; i < argsStr.length(); i++) {
-            char c = argsStr.charAt(i);
-            if (c == '<')
-                depth++;
-            else if (c == '>')
-                depth--;
-            else if (c == ',' && depth == 0) {
-                args.add(argsStr.substring(start, i).trim());
-                start = i + 1;
-            }
-        }
-        args.add(argsStr.substring(start).trim());
-        return new ReturnTypeInfo(base, args);
-    }
-
-    /** Returns true if s matches T+number pattern (e.g. "T1", "T23"). */
-    private static boolean isTNumberVar(String s) {
-        if (s == null || s.length() < 2 || s.charAt(0) != 'T')
-            return false;
-        for (int i = 1; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i)))
-                return false;
-        }
-        return true;
-    }
-
-    /** Extracts numeric suffix from class name (e.g. "Step3" → 3). Returns -1 if none. */
-    private static int classNameSuffix(String name) {
-        int i = name.length() - 1;
-        if (i < 0 || !Character.isDigit(name.charAt(i)))
-            return -1;
-        while (i > 0 && Character.isDigit(name.charAt(i - 1)))
-            i--;
-        try {
-            return Integer.parseInt(name.substring(i));
-        } catch (Exception ignored) {
-            return -1;
-        }
-    }
-
-    /** Strips numeric suffix from class name (e.g. "Step3" → "Step"). */
-    private static String stripNumericSuffix(String name) {
-        int i = name.length() - 1;
-        if (i < 0 || !Character.isDigit(name.charAt(i)))
-            return name;
-        while (i > 0 && Character.isDigit(name.charAt(i - 1)))
-            i--;
-        return name.substring(0, i);
     }
 
     /**
@@ -2126,6 +1881,8 @@ public class InlineGenerator {
      * This is what makes "type params are inferred from the source" work.
      * No @PermuteTypeParam needed on the derived template.
      */
+    // ===== @PermuteSource / @PermuteDelegate — Source Dependency and Delegation Synthesis =====
+
     private static void applySourceTypeParams(TypeDeclaration<?> generated,
             TypeDeclaration<?> templateClass,
             CompilationUnit parentCu,
@@ -2196,7 +1953,7 @@ public class InlineGenerator {
 
         // Determine the template's embedded sentinel number from templateClass name
         String templateClassName = templateClass.getNameAsString();
-        int templateEmbedded = firstEmbeddedNumber(templateClassName);
+        int templateEmbedded = AstUtils.firstEmbeddedNumber(templateClassName);
 
         // Current generated source name (e.g. "Callable3" for i=3)
         String currentSourceName = ctx.evaluate(patterns.get(0));
@@ -2236,7 +1993,7 @@ public class InlineGenerator {
         // Determine the template sentinel source name (what the template literally contains,
         // e.g. "Callable2" or "SyncCallable2"). Strategy: find the source name prefix
         // (everything before the number in currentSourceName) and add templateEmbedded.
-        String currentPrefix = prefixBeforeFirstDigit(currentSourceName);
+        String currentPrefix = AstUtils.prefixBeforeFirstDigit(currentSourceName);
         String templateSourceName = templateEmbedded >= 0
                 ? currentPrefix + templateEmbedded
                 : currentSourceName;
@@ -2725,6 +2482,8 @@ public class InlineGenerator {
      * {@code @PermuteParam}) from a type declaration and all of its members,
      * including field-level and parameter-level annotations.
      */
+    // ===== Infrastructure — Stripping, Mixin Injection, Annotation Scanning =====
+
     static void stripPermuteAnnotations(TypeDeclaration<?> classDecl) {
         Set<String> PERMUPLATE_ANNOTATIONS = Set.of(
                 "Permute", "io.quarkiverse.permuplate.Permute",
