@@ -776,6 +776,114 @@ public class AnnotationStringRenameProcessorTest extends BasePlatformTestCase {
                 "}");
     }
 
+    // =========================================================================
+    // @PermuteReturn and @PermuteDefaultReturn rename propagation
+    // =========================================================================
+
+    public void testClassRenameUpdatesPermuteReturnClassName() {
+        myFixture.configureByText("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteReturn(className=\"Join${i}\")\n" +
+                "    public Object joi<caret>n2() { return null; }\n" +
+                "}");
+
+        myFixture.renameElementAtCaret("merge2");
+
+        // method rename — the @PermuteReturn className attribute is unaffected by method rename;
+        // the className literal "Join" is unchanged. Verify no corruption.
+        assertTrue(myFixture.getFile().getText().contains("className=\"Join${i}\""));
+    }
+
+    public void testFamilyRenameUpdatesPermuteReturnClassName() {
+        PsiFile templateFile = myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {\n" +
+                "    @PermuteReturn(className=\"Join${i}\")\n" +
+                "    public Object join() { return null; }\n" +
+                "}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join2);
+        myFixture.renameElement(join2, "Merge2");
+
+        String text = templateFile.getText();
+        assertTrue("@Permute className must be updated", text.contains("className=\"Merge${i}\""));
+        assertTrue("@PermuteReturn className must be updated", text.contains("@PermuteReturn(className=\"Merge${i}\")"));
+        assertFalse("Old @PermuteReturn className must not remain", text.contains("@PermuteReturn(className=\"Join${i}\")"));
+    }
+
+    public void testFamilyRenameUpdatesPermuteDefaultReturnClassName() {
+        PsiFile templateFile = myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "@PermuteDefaultReturn(className=\"Join${i}\")\n" +
+                "public class Join2 {}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join2);
+        myFixture.renameElement(join2, "Merge2");
+
+        String text = templateFile.getText();
+        assertTrue("@PermuteDefaultReturn className must be updated",
+                text.contains("@PermuteDefaultReturn(className=\"Merge${i}\")"));
+        assertFalse("Old @PermuteDefaultReturn className must not remain",
+                text.contains("@PermuteDefaultReturn(className=\"Join${i}\")"));
+    }
+
+    public void testFamilyRenameDoesNotAffectPermuteDefaultReturnSelfLiteral() {
+        PsiFile templateFile = myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "@PermuteDefaultReturn(className=\"self\")\n" +
+                "public class Join2 {}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join2);
+        myFixture.renameElement(join2, "Merge2");
+
+        String text = templateFile.getText();
+        assertTrue("@PermuteDefaultReturn(className=\"self\") must be unchanged",
+                text.contains("@PermuteDefaultReturn(className=\"self\")"));
+    }
+
+    public void testCrossFileRenameUpdatesPermuteReturnInOtherTemplate() {
+        myFixture.addFileToProject("Join2.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.Permute;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i}\")\n" +
+                "public class Join2 {}");
+
+        PsiFile builderFile = myFixture.addFileToProject("JoinBuilder.java",
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"JoinBuilder${i}\")\n" +
+                "public class JoinBuilder2 {\n" +
+                "    @PermuteReturn(className=\"Join${i}\")\n" +
+                "    public Object build() { return null; }\n" +
+                "}");
+
+        PsiClass join2 = JavaPsiFacade.getInstance(getProject())
+                .findClass("io.example.Join2", GlobalSearchScope.allScope(getProject()));
+        assertNotNull(join2);
+        myFixture.renameElement(join2, "Merge2");
+
+        String builderText = builderFile.getText();
+        assertTrue("Cross-file @PermuteReturn className must be updated to Merge${i}",
+                builderText.contains("@PermuteReturn(className=\"Merge${i}\")"));
+        assertFalse("Old cross-file @PermuteReturn className must not remain",
+                builderText.contains("@PermuteReturn(className=\"Join${i}\")"));
+    }
+
     public void testGeneratedFileDetectorIdentifiesTargetPath() throws Exception {
         com.intellij.openapi.vfs.VirtualFile generatedFile =
                 myFixture.getTempDirFixture().createFile(

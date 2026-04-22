@@ -79,6 +79,10 @@
         <lang.syntaxHighlighterFactory
             language="JEXL"
             implementationClass="io.quarkiverse.permuplate.intellij.jexl.lang.JexlSyntaxHighlighterFactory"/>
+
+        <!-- JEXL language injection -->
+        <multiHostInjector
+            implementationClass="io.quarkiverse.permuplate.intellij.jexl.inject.JexlLanguageInjector"/>
     </extensions>
 
     <actions>

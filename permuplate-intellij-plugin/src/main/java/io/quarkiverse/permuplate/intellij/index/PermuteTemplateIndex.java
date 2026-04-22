@@ -152,6 +152,7 @@ public class PermuteTemplateIndex extends FileBasedIndexExtension<String, Permut
                     .map(v -> template.replace(placeholder, v))
                     .collect(java.util.stream.Collectors.toList());
         }
+        if (to < from) return List.of(); // JEXL-expression range (e.g. to="${max}") — skip
         List<String> names = new ArrayList<>(to - from + 1);
         for (int v = from; v <= to; v++) {
             names.add(template.replace(placeholder, String.valueOf(v)));

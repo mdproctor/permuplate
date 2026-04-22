@@ -2,6 +2,7 @@ package io.quarkiverse.permuplate.intellij.jexl.context;
 
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 
 public class JexlContextResolverTest extends BasePlatformTestCase {
@@ -10,12 +11,30 @@ public class JexlContextResolverTest extends BasePlatformTestCase {
      * Configures a Java file with a caret inside a ${...} JEXL expression,
      * then resolves the JEXL context from the injected fragment at the caret.
      * Returns null if no injected JEXL element is found at the caret.
+     *
+     * The <caret> marker is stripped BEFORE calling configureByText to prevent
+     * BasePlatformTestCase.configureInner() (caresAboutInjection=true) from
+     * detecting the caret inside an injection and switching myFile to the
+     * injected JexlFile instead of the Java host file.
+     *
+     * The target offset is the index of <caret> in the original string — after
+     * stripping, this is where the JEXL expression variable sits in the file.
      */
     private JexlContext resolveAt(String javaSource) {
-        myFixture.configureByText("Join2.java", javaSource);
+        String MARKER = "<caret>";
+        int markerPos = javaSource.indexOf(MARKER);
+        int targetOffset = (markerPos >= 0) ? markerPos : 0;
+        // Strip the marker: configureByText must NOT see <caret> inside ${...}
+        // or configureInner() will switch to the injected language file.
+        String src = (markerPos >= 0)
+                ? javaSource.substring(0, markerPos) + javaSource.substring(markerPos + MARKER.length())
+                : javaSource;
+
+        // Use a unique filename per test invocation to bypass the InjectedLanguageManager
+        // cache which associates injected PSI with already-seen virtual file paths.
+        PsiFile hostFile = myFixture.configureByText("Ctx_" + System.nanoTime() + ".java", src);
         InjectedLanguageManager mgr = InjectedLanguageManager.getInstance(getProject());
-        PsiElement injected = mgr.findInjectedElementAt(
-                myFixture.getFile(), myFixture.getCaretOffset());
+        PsiElement injected = mgr.findInjectedElementAt(hostFile, targetOffset);
         if (injected == null) return null;
         return JexlContextResolver.resolve(injected);
     }
