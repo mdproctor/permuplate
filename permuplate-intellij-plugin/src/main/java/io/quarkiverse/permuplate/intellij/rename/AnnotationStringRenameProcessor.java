@@ -23,6 +23,7 @@ import com.intellij.psi.search.GlobalSearchScope;
 import io.quarkiverse.permuplate.intellij.index.PermuteElementResolver;
 import io.quarkiverse.permuplate.intellij.index.PermuteFileDetector;
 import io.quarkiverse.permuplate.intellij.index.PermuteTemplateData;
+import io.quarkiverse.permuplate.intellij.shared.PermuteAnnotations;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,18 +45,6 @@ import java.util.*;
  *   from adding spurious spaces around = in annotation attributes
  */
 public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
-
-    private static final Set<String> ALL_ANNOTATION_FQNS = Set.of(
-            "io.quarkiverse.permuplate.Permute",
-            "io.quarkiverse.permuplate.PermuteDeclr",
-            "io.quarkiverse.permuplate.PermuteParam",
-            "io.quarkiverse.permuplate.PermuteTypeParam",
-            "io.quarkiverse.permuplate.PermuteMethod",
-            "io.quarkiverse.permuplate.PermuteSource",
-            "io.quarkiverse.permuplate.PermuteAnnotation",
-            "io.quarkiverse.permuplate.PermuteThrows",
-            "io.quarkiverse.permuplate.PermuteSwitchArm"
-    );
 
     /**
      * Carries computed text-range updates from prepareRenaming() through renameElement()
@@ -217,8 +206,7 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
                 super.visitAnnotation(annotation);
                 String fqn = annotation.getQualifiedName();
                 if (fqn == null) return;
-                boolean isPermutateAnnotation = ALL_ANNOTATION_FQNS.contains(fqn)
-                        || ALL_ANNOTATION_FQNS.stream().anyMatch(f -> f.endsWith("." + fqn));
+                boolean isPermutateAnnotation = PermuteAnnotations.isPermuteAnnotation(fqn);
                 if (!isPermutateAnnotation) return;
 
                 for (PsiNameValuePair pair : annotation.getParameterList().getAttributes()) {
@@ -300,8 +288,7 @@ public class AnnotationStringRenameProcessor extends RenamePsiElementProcessor {
         for (PsiAnnotation annotation : modifierList.getAnnotations()) {
             String fqn = annotation.getQualifiedName();
             if (fqn == null) continue;
-            boolean isPermuteAnnotation = ALL_ANNOTATION_FQNS.contains(fqn)
-                    || ALL_ANNOTATION_FQNS.stream().anyMatch(f -> f.endsWith("." + fqn));
+            boolean isPermuteAnnotation = PermuteAnnotations.isPermuteAnnotation(fqn);
             if (!isPermuteAnnotation) continue;
 
             for (PsiNameValuePair pair : annotation.getParameterList().getAttributes()) {
