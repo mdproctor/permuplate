@@ -168,3 +168,53 @@ Tests are organised into focused test classes:
 `ProcessorTestSupport` provides shared infrastructure: `templateSource()` reads real template `.java` files from `src/test/java/`; `compileTemplate()` adds generated `Callable{n}` support sources; `classLoaderFor()` loads generated `.class` bytes; `capturingProxy()` creates reflective proxies for behavioural assertions; `assertJoinN()` is a structural + behavioural assertion helper for the Join pattern.
 
 ---
+
+## IntelliJ Plugin
+
+The plugin (`permuplate-intellij-plugin/`, Gradle + Java 17) provides IDE support for Permuplate template authors. It is a separate Gradle build — not aggregated into the Maven parent — and depends on `permuplate-ide-support` and `permuplate-annotations` jars from `target/`.
+
+**Rename propagation** — `AnnotationStringRenameProcessor` hooks into IntelliJ's rename refactoring. When a class is renamed, all Permuplate annotation string attributes referencing that class name are updated atomically. Covered annotations: all in `PermuteAnnotations.ALL_ANNOTATION_FQNS` that carry class-name strings (`@PermuteDeclr`, `@PermuteParam`, `@Permute`, `@PermuteAnnotation`, `@PermuteThrows`, `@PermuteSource`). `@PermuteFilter` is excluded — its value is a JEXL boolean expression with no class references.
+
+**Inspections** — `LocalInspectionTool` subclasses flag common authoring mistakes at edit time:
+- `AnnotationStringInspection` — validates `@PermuteDeclr`/`@PermuteParam` string attributes (R2 substring matching, R3 orphan variable, R4 no-anchor) via `AnnotationStringAlgorithm`
+- `BoundaryOmissionInspection` — warns when a return type references a class outside the generated range
+- `PermuteAnnotationValueInspection` — validates `@PermuteAnnotation.value`
+- `PermuteThrowsTypeInspection` — validates `@PermuteThrows.value`
+- `StaleAnnotationStringInspection` — flags annotation strings that no longer match the current class name after a rename
+
+**Navigation** — `PermuteMethodNavigator` provides go-to-declaration from generated class references back to the template. `PermuteFamilyFindUsagesAction` finds all usages across a generated class family.
+
+**Safe delete** — `PermuteSafeDeleteDelegate` prevents accidental deletion of template classes that have generated dependants.
+
+**Package move** — `PermutePackageMoveHandler` keeps annotation string package prefixes consistent when a template class is moved to a different package.
+
+**Index** — `PermuteTemplateIndex` (file-based index) maps generated class names to their template source files. `PermuteFileDetector` identifies generated files by the permuplate header comment. Used by navigation and rename to resolve cross-file references efficiently without a full project scan.
+
+**Editor decoration** — `GeneratedFileNotification` shows a banner in generated files linking back to the template.
+
+**Shared constants** — `PermuteAnnotations` (`shared/`) provides `ALL_ANNOTATION_FQNS` (all 29 Permuplate annotation FQNs), `JEXL_BEARING_ATTRIBUTES`, and `isPermuteAnnotation()` with O(1) simple-name lookup via a pre-computed `SIMPLE_NAMES` set. Single source of truth used across all plugin services.
+
+### JEXL String Assistance
+
+Full IDE authoring assistance inside `${...}` expressions in Permuplate annotation string attributes, implemented as an IntelliJ language injection stack:
+
+**Language infrastructure** (`jexl/lang/`)
+- `JexlLanguage` — singleton `Language("JEXL")` identifier
+- `JexlLexer` — hand-written `LexerBase`: IDENTIFIER, NUMBER, STRING (single-quoted), OPERATOR (including two-char forms `==`, `!=`, `<=`, `>=`, `&&`, `||`), LPAREN, RPAREN, COMMA, DOT, WHITESPACE, BAD_CHARACTER. `%` (modulo) included. JEXL keywords (`true`, `false`, `null`, etc.) tokenise as IDENTIFIER.
+- `JexlSyntaxHighlighter` — maps token types to `TextAttributesKey`; `BUILTIN_NAMES` is a public constant derived from `JexlBuiltin.ALL.keySet()`
+- `JexlParserDefinition` — flat parse (no grammar tree); all IDE services operate at token level
+
+**Injection** (`jexl/inject/`)
+- `JexlLanguageInjector` (`MultiHostInjector`) — scans `PsiLiteralExpression` nodes in Permuplate annotations for `${...}` subranges; each range gets its own injection session (one `JexlFile` per expression, not one combined file per attribute)
+
+**Context resolution** (`jexl/context/`)
+- `JexlContext` — record: `variables: Set<String>`, `innerVariable: @Nullable String`
+- `JexlBuiltin` — record per built-in function; `ALL` map is the single source of truth for function names, signatures, and parameter info
+- `JexlContextResolver` — walks from injected element → host literal → `PsiNameValuePair` → `PsiAnnotation` → `PsiClass`; collects primary `varName`, `extraVars=@PermuteVar(...)` variables, `strings=` constants, `macros=` names, and `@PermuteMethod`/`@PermuteSwitchArm` inner `varName`; `BUILTIN_NAMES` delegates to `JexlBuiltin.ALL.keySet()`
+
+**IDE services** (`jexl/completion/`, `jexl/paraminfo/`, `jexl/annotate/`)
+- `JexlCompletionContributor` — offers all in-scope variables (bold) and built-in function names; insert handler appends `()` with caret between parens
+- `JexlParameterInfoHandler` — shows parameter signature for built-in calls; walks flat token tree with depth tracking for nested calls (e.g. `typeArgList(1, max(i,2), 'T')`)
+- `JexlAnnotator` — fires once per `JexlFile` root (`instanceof JexlFile` guard); (1) syntax validation via Apache Commons JEXL3 (`createExpression()` → WARNING); (2) undefined variable detection skipping builtins, function call targets, property access, and JEXL keywords
+
+---
