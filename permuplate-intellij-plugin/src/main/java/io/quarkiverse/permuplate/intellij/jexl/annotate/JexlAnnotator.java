@@ -7,24 +7,28 @@ import com.intellij.psi.PsiRecursiveElementVisitor;
 import com.intellij.psi.util.PsiTreeUtil;
 import io.quarkiverse.permuplate.intellij.jexl.context.JexlContext;
 import io.quarkiverse.permuplate.intellij.jexl.context.JexlContextResolver;
+import io.quarkiverse.permuplate.intellij.jexl.lang.JexlFile;
 import io.quarkiverse.permuplate.intellij.jexl.lang.JexlTokenTypes;
 import org.apache.commons.jexl3.*;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Set;
 
 public class JexlAnnotator implements Annotator {
 
     // Validation pattern adapted from jenkinsci/idea-stapler-plugin JexlInspection (BSD-2-Clause)
     private static final JexlEngine JEXL = new JexlBuilder().silent(true).strict(false).create();
 
+    // JEXL keyword literals that tokenise as IDENTIFIER in our lexer — never user-defined variables
+    private static final Set<String> JEXL_KEYWORDS = Set.of(
+            "true", "false", "null", "empty", "size", "not", "div", "mod", "new");
+
     @Override
     public void annotate(@NotNull PsiElement element,
                           @NotNull AnnotationHolder holder) {
-        PsiFile file = element.getContainingFile();
-        if (file == null) return;
-
-        // Only annotate the root element of each injected JexlFile — not individual tokens.
-        // The root's parent is the file itself.
-        if (element.getParent() != file) return;
+        // Annotators are called for every PSI node. In a flat JEXL parse tree every token
+        // is a direct child of JexlFile — fire the full logic only on the file root itself.
+        if (!(element instanceof JexlFile file)) return;
 
         String text = file.getText();
         if (text == null || text.isBlank()) return;
@@ -54,15 +58,18 @@ public class JexlAnnotator implements Annotator {
 
                 String name = el.getText();
 
+                // Skip JEXL keywords (tokenise as IDENTIFIER in our flat lexer)
+                if (JEXL_KEYWORDS.contains(name)) return;
+
                 // Skip known built-in function names
                 if (JexlContextResolver.BUILTIN_NAMES.contains(name)) return;
 
-                // Skip identifiers used as function call targets (IDENTIFIER followed by LPAREN)
+                // Skip function call targets (IDENTIFIER immediately followed by LPAREN)
                 PsiElement next = PsiTreeUtil.nextVisibleLeaf(el);
                 if (next != null && next.getNode() != null
                         && next.getNode().getElementType() == JexlTokenTypes.LPAREN) return;
 
-                // Skip property access (IDENTIFIER preceded by DOT)
+                // Skip property access (IDENTIFIER immediately preceded by DOT)
                 PsiElement prev = PsiTreeUtil.prevVisibleLeaf(el);
                 if (prev != null && prev.getNode() != null
                         && prev.getNode().getElementType() == JexlTokenTypes.DOT) return;

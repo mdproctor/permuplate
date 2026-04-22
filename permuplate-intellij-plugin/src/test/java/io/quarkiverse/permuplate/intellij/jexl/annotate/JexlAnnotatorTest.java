@@ -136,4 +136,44 @@ public class JexlAnnotatorTest extends BasePlatformTestCase {
         assertFalse("No JEXL warnings in non-Permuplate annotations",
                 hasWarningContaining(infos, "Unknown variable"));
     }
+
+    public void testSyntaxErrorProducesWarning() {
+        // "${i +}" — the content inside ${...} is "i +" which is invalid JEXL (trailing operator)
+        List<HighlightInfo> infos = highlight(
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\", className=\"Join${i +}\")\n" +
+                "public class Join2 {}");
+        assertTrue("Expected a JEXL syntax error warning for trailing operator",
+                hasWarningContaining(infos, "JEXL syntax error"));
+    }
+
+    public void testNoFalsePositiveForExtraVarsVariable() {
+        // @PermuteVar must be nested inside @Permute(extraVars={...})
+        List<HighlightInfo> infos = highlight(
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\",\n" +
+                "         className=\"Join${k}\",\n" +
+                "         extraVars={@PermuteVar(varName=\"k\", from=\"1\", to=\"3\")})\n" +
+                "public class Join2 {}");
+        assertFalse("'k' from extraVars must not be flagged as undefined",
+                hasWarningContaining(infos, "Unknown variable 'k'"));
+    }
+
+    public void testJexlKeywordsNotFlaggedAsUndefined() {
+        // 'null' and 'true' are JEXL keywords that tokenise as IDENTIFIER — must not warn
+        List<HighlightInfo> infos = highlight(
+                "package io.example;\n" +
+                "import io.quarkiverse.permuplate.*;\n" +
+                "@Permute(varName=\"i\", from=\"3\", to=\"5\",\n" +
+                "         className=\"Join${i}\",\n" +
+                "         strings={\"max=5\"})\n" +
+                "public class Join2 {\n" +
+                "    @PermuteReturn(className=\"Join${i}\", when=\"i != null\")\n" +
+                "    public Object build() { return null; }\n" +
+                "}");
+        assertFalse("'null' keyword must not be flagged as undefined",
+                hasWarningContaining(infos, "Unknown variable 'null'"));
+    }
 }
