@@ -17,7 +17,7 @@ arity. Permuplate eliminates that boilerplate: write one template, generate N cl
 
 Rather than modifying the Drools codebase directly as the first experiment, this module
 provides a safe sandbox where the API can be broken, rethought, and rebuilt without touching
-production Drools code. The sandbox has a comprehensive test suite (32+ passing tests) and
+production Drools code. The sandbox has a comprehensive test suite (118+ passing tests across 17 test classes) and
 has been extended across six implementation phases.
 
 The key principle of the sandbox is **the template is valid, compilable Java**. The IDE can
@@ -142,15 +142,18 @@ Every `JoinNFirst` at arity N has two `filter()` overloads:
 - **All-facts** — tests all accumulated facts: `filter(Predicate${N+1}<DS, A, B, ...>)`
 - **Single-fact** — tests only the most recently joined fact: `filter(Predicate2<DS, alpha(N)>)`
 
-`Join1First` has only the all-facts overload (which is also the single-fact overload at
-arity 1 — same signature). The single-fact overload at arity 2+ is suppressed at i=1 using
-a `@PermuteMethod` JEXL ternary:
+`Join1First` has only the all-facts overload — at arity 1 both overloads would produce
+`filter(Predicate2<DS, A>)`, a duplicate signature. The single-fact overload is suppressed
+at i=1 using `@PermuteFilter`:
 
 ```java
-@PermuteMethod(varName = "x", from = "${i > 1 ? i : i+1}", to = "${i}", name = "filter")
+@PermuteFilter("i > 1")
+@PermuteMethod(varName = "x", from = "${i}", to = "${i}", name = "filter")
+public Object filterLatest(...) { ... }
 ```
 
-At i=1 this produces `from=2, to=1` — an empty range — silently omitting the method.
+`@PermuteFilter("i > 1")` skips this method entirely at i=1. `@PermuteMethod` with
+`from="${i}", to="${i}"` produces exactly one clone per arity, renamed to `filter`.
 
 ```java
 // All-facts filter — cross-fact comparison
@@ -172,6 +175,9 @@ it when `Join7First` is not in the generated set. `filter()` and `fn()` are stil
 | **G1** `@PermuteTypeParam` (explicit, alpha) | Class type params `A..F` — `name="${alpha(k)}"` |
 | **G2** `@PermuteReturn` (explicit) | All return types — alpha naming disables implicit inference |
 | **G2** Boundary omission | `Join6Second.join()` omitted — `Join7First` not in generated set |
+| **`@PermuteFilter`** | `filterLatest` suppressed at i=1 — `@PermuteFilter("i > 1")` |
+| **`@PermuteDefaultReturn(className="self")`** | All `filter()` / `var()` / `index()` returns on `Join0First` — no per-method `@PermuteSelf` needed |
+| **`@PermuteMacros`** on container | `alphaList=typeArgList(1,i,'alpha')` on `JoinBuilder` — shared by both nested templates |
 | **N4** `typeArgList()` | `filter()`, `fn()`, `join()` — `typeArgList(1, i, 'alpha')` |
 | **N4** `alpha()` | Single-fact filter parameter — `Predicate2<DS, ${alpha(i)}>` |
 
@@ -232,9 +238,11 @@ alpha-named method type params `alpha(i+1)..alpha(i+j)`.
 | Feature | Used by |
 |---|---|
 | **G3** Extends clause auto-expansion (alpha branch) | `Join0First extends Join0Second<END, DS, A>` |
-| **G4** Method-level `@PermuteTypeParam` inside `@PermuteMethod` | `joinBilinear()` |
-| **@PermuteMethod** inferred `to` | Bi-linear join — `to` omitted, inferred as `6 - i` |
-| PermuteMojo multi-template chaining | Two templates in `JoinBuilder.java` |
+| **G4** Method-level `@PermuteTypeParam` inside `@PermuteMethod` | `joinBilinear()` — j new alpha type params |
+| **`@PermuteMethod`** inferred `to` | Bi-linear join — `to` omitted, inferred as `6 - i` |
+| **`@PermuteMethod` `macros=`** | `joinAll` and `joinRight` named type arg lists, reused in `@PermuteReturn` and `@PermuteDeclr` |
+| **`@PermuteSealedFamily`** | `JoinBuilderFirst` and `JoinBuilderSecond` sealed interfaces — enables Java 21 pattern dispatch over the full arity family |
+| PermuteMojo multi-template chaining | Two templates in `JoinBuilder.java` — `Join0Second` declared first so boundary omission sees complete name set |
 
 ---
 
@@ -258,6 +266,11 @@ scope. This is the known type-safety limitation (see Known Limitations).
 
 ### NotScope and ExistsScope
 
+`ExistsScope` is generated from `NotScope` via string-set permutation:
+`@Permute(varName = "T", values = {"Exists"}, className = "${T}Scope", keepTemplate = true)`.
+`@PermuteDeclr` renames the self-returning `join()` and `filter()` return types to the
+generated class name. This eliminates the duplicate class — one template covers both.
+
 Both are independent classes (not subtypes of `JoinNSecond`) — this was the key design
 choice. The inheritance approach was rejected because `Join2Second` has one `rd` field, and
 inheriting it means `join()` inside the not-scope would add to the outer `rd` instead of the
@@ -269,9 +282,23 @@ scope's private `rd`.
 - `filter(Object predicate)` adds to the scope's private `rd`
 - `end()` returns `OUTER` — the typed outer builder, fully restoring arity
 
-The `@PermuteReturn` annotation on `not()` and `exists()` uses `when="true"` to prevent
-boundary omission (these methods should exist on all arities). The return type string
-constructs `NotScope<Join${i}Second<END, DS, ...>, DS>`.
+Both `not()` and `exists()` are generated from a single template method on `Join0Second`
+using `@PermuteMethod(varName = "scope", values = {"not", "exists"}, name = "${scope}")`.
+A `capitalize(scope)` macro (`Scope`) drives the return type construction and the
+`@PermuteBody` body:
+
+```java
+@PermuteMethod(varName = "scope", values = {"not", "exists"}, name = "${scope}",
+               macros = {"Scope=capitalize(scope)"})
+@PermuteReturn(className = "${Scope}Scope",
+               typeArgs = "'Join' + i + 'Second<END, DS, ' + alphaList + '>, DS'",
+               alwaysEmit = true)
+@PermuteBody(body = "{ RuleDefinition<DS> scopeRd = new RuleDefinition<>(\"${scope}-scope\");"
+             + " rd.add${Scope}(scopeRd); return new ${Scope}Scope<>(this, scopeRd); }")
+public Object scopeTemplate() { ... }
+```
+
+`alwaysEmit = true` prevents boundary omission — these methods should exist on all arities.
 
 ### Sandbox Simplification: Global Scope Evaluation
 
@@ -288,6 +315,15 @@ combination — it runs against `ctx` globally:
 
 Full Drools tracks the per-outer-tuple connection via beta memory. The sandbox simplification
 is sufficient for API design validation.
+
+### Permuplate Features Exercised
+
+| Feature | Used by |
+|---|---|
+| **`@PermuteMethod(values={"not","exists"})`** | Both scope methods generated from one template — no duplication |
+| **`@PermuteBody`** | Full method body provided per string-set value |
+| **`@PermuteMacros`** (`Scope` on method) | `capitalize(scope)` drives return type and body — `NotScope` / `ExistsScope` |
+| **String-set `@Permute`** on `NotScope` | `ExistsScope` generated from `NotScope` template — `@PermuteDeclr` renames self-return types |
 
 ---
 
@@ -356,8 +392,17 @@ to the same (last-mutated) tuple.
 
 ### path2()..path6() Suppression
 
-All `pathN()` methods use `when="i < 6"` — suppressed on `Join6Second` since there is no
-`Join7First` to receive the traversal result.
+All `pathN()` methods use `when="i < 6"` on `@PermuteReturn` — suppressed on `Join6Second`
+since there is no `Join7First` to receive the traversal result.
+
+### Permuplate Features Exercised
+
+| Feature | Used by |
+|---|---|
+| **`@PermuteMethod` with `macros=`** | `tail`, `prev`, `outerJoin`, `prevTuple` named type arg expressions — reused in `@PermuteReturn` and `@PermuteBody` |
+| **`@PermuteReturn` `when=`** | `when="i < 6"` suppresses `pathN()` on `Join6Second` |
+| **`@PermuteTypeParam`** (standalone on method) | Expands root traversal type param per OOPath arity |
+| **`@PermuteExtendsChain`** | `Tuple1 extends Tuple0`, `Tuple2 extends Tuple1`, … — `@PermuteExtendsChain` generates the chain without explicit `@PermuteExtends` on every tuple |
 
 ---
 
@@ -398,10 +443,16 @@ Snapshotting is critical: `Variable.index()` is mutable and `var()` can be calle
 on the same variable. Snapshotting prevents post-registration rebinding from silently
 corrupting the filter.
 
-Two variable-filter overloads are available: `filter(v1, v2, Predicate3<DS, V1, V2>)` and
-`filter(v1, v2, v3, Predicate4<DS, V1, V2, V3>)`. Both overloads check that all variables
-are bound before constructing the lambda, throwing `IllegalStateException` with diagnostic
-names if not.
+Variable-filter overloads cover m=2..6 variables: `filter(v1..vm, Predicate{m+1}<DS, V1..Vm>)`.
+Generated by `@PermuteMethod(varName="m", from="2", to="6")` in `filterVar()` on `Join0First`,
+using `@PermuteParam` for the variable parameters and `@PermuteDeclr` for the predicate type.
+
+These overloads delegate to `RuleDefinition.addVariableFilter()`, which is itself generated
+by `VariableFilterMixin` — a `@PermuteMixin` class that injects the matching typed overloads
+into `RuleDefinition` at generation time. Each overload snapshots the variable indices and
+calls `addVariableFilterGeneric(predicate, v1, ..., vm)`. All overloads check that all
+variables are bound before constructing the lambda, throwing `IllegalStateException` with
+diagnostic names if not.
 
 ---
 
@@ -464,9 +515,30 @@ In a real Rete network, node sharing is handled automatically at the network lev
 is authoring-time deduplication only — it gives each child rule its own `RuleDefinition` with
 the same logical structure, without needing a special runtime node-sharing concept in the sandbox.
 
+### ExtendsRuleMixin — Shared extendsRule() Overloads
+
+Both `RuleBuilder` and `ParametersFirst` need the same six `extendsRule()` overloads.
+Rather than duplicating them (the original hand-written approach documented in ADR-0006),
+`ExtendsRuleMixin` provides a single `@PermuteMethod`-driven template that is injected
+into both classes via `@PermuteMixin`:
+
+```java
+@PermuteMethod(varName = "j", from = "2", to = "7", name = "extendsRule",
+               macros = {"prevAlpha=typeArgList(1,j-1,'alpha')"})
+@PermuteReturn(className = "JoinBuilder.Join${j-1}First", ...)
+public <@PermuteTypeParam(...)A> Object extendsRule(
+        @PermuteDeclr(type = "RuleExtendsPoint.RuleExtendsPoint${j}<DS, ${prevAlpha}>")
+        ExtendsPoint<DS> ep) { ... }
+```
+
+`ExtendsRuleMixin` is in `src/main/permuplate/` — a source-only file that Permuplate reads
+but never compiles directly. `ExtendsPoint<DS>` is a hand-written interface exposing
+`baseRd()`, used as a common cast target across all `RuleExtendsPointN` arities.
+
 ### ParametersFirst Integration
 
-`ParametersFirst` also has six `extendsRule()` overloads, so named rules can extend base patterns:
+`ParametersFirst` also has six `extendsRule()` overloads (via `ExtendsRuleMixin`), so named
+rules can extend base patterns:
 
 ```java
 var ep = builder.rule("base")
@@ -479,6 +551,49 @@ var child = builder.rule("child")
         .join(ctx -> ctx.accounts())
         .fn((ctx, p, a) -> { });
 ```
+
+### Permuplate Features Exercised
+
+| Feature | Used by |
+|---|---|
+| **`@PermuteMixin`** (`ExtendsRuleMixin`) | Six `extendsRule()` overloads shared by `RuleBuilder` and `ParametersFirst` — single source eliminates ADR-0006 duplication |
+| **`@PermuteMethod` `macros=`** | `prevAlpha` type arg list, reused in `@PermuteReturn` and `@PermuteDeclr` |
+| **`@PermuteMacros({"prev=${i-1}"})`** on `RuleExtendsPoint` | `prev` macro drives `to="${prev}"` on `@PermuteTypeParam` — `RuleExtendsPoint3..7` generated from `RuleExtendsPoint2` template |
+
+---
+
+## Consumer and Predicate Families
+
+`Consumer2..7` and `Predicate2..7` are functional interfaces generated from a single
+cross-product template, `FunctionalTemplate1`:
+
+```java
+@Permute(varName = "i", from = "2", to = "7", className = "${F}${i}",
+         extraVars = {@PermuteVar(varName = "F", values = {"Consumer", "Predicate"})},
+         macros = {"method=${F == 'Consumer' ? 'accept' : 'test'}",
+                   "ret=${F == 'Consumer' ? 'void' : 'boolean'}"})
+@PermuteAnnotation("@FunctionalInterface")
+public interface FunctionalTemplate1<DS,
+        @PermuteTypeParam(varName = "j", from = "1", to = "${i-1}", name = "${alpha(j)}") A> {
+
+    @PermuteDeclr(type = "${ret}", name = "${method}")
+    void accept(DS ctx,
+            @PermuteParam(varName = "j", from = "1", to = "${i-1}",
+                          type = "${alpha(j)}", name = "${lower(j)}") A a);
+}
+```
+
+`@PermuteVar(varName="F", values={"Consumer","Predicate"})` cross-products with `i=2..7`,
+producing 12 interfaces (6 Consumer + 6 Predicate) from a single template. JEXL ternary
+macros (`method`, `ret`) drive the method name and return type per family. `Consumer1` and
+`Predicate1` are minimal hand-written arity-1 interfaces.
+
+| Feature | Used by |
+|---|---|
+| **`@PermuteVar(values=...)`** cross-product | Two families from one template — Consumer and Predicate |
+| **`@PermuteAnnotation`** | `@FunctionalInterface` added to every generated interface |
+| **`@PermuteMacros`** (ternary) | `method` and `ret` derive method name / return type from the `F` string variable |
+| **`@PermuteParam`** with alpha | `a, b, c, ...` parameter names via `lower(j)` |
 
 ---
 
@@ -645,7 +760,7 @@ not as a source. As a result, `rd.sourceCount()` does not include the params slo
 | OOPath + extends combination not tested | No test exercises a rule with both `path2()` and `extendsRule()` | Structurally supported — `copyInto()` deliberately skips the OOPath pipeline |
 | Maximum arity is 6 | Practical limit for the sandbox | Change `to=6` to `to=10` on all templates; tests scale automatically |
 | `wrapPredicate()` uses reflection at build time | Typed lambdas are erased at runtime; method lookup required | One-time cost at rule construction; negligible in practice |
-| `Variable<T>` does not support `filter(v, pred)` — only `filter(v1, v2, pred)` | Single-variable filter is equivalent to a plain `filter(Predicate2)` | Use the standard `filter()` overload for single-fact predicates |
+| `Variable<T>` does not support single-variable `filter(v, pred)` | Single-variable filter is equivalent to a plain `filter(Predicate2)` | Use the standard `filter()` overload for single-fact predicates |
 | ctx position locked at index 0 of every lambda | Design decision not yet locked; `(ctx, a, b)` vs `(a, b, ctx)` open | Review before Drools migration |
 
 ---
@@ -653,6 +768,7 @@ not as a source. As a result, `rd.sourceCount()` does not include the params slo
 ## Test Classes
 
 All tests are in `permuplate-mvn-examples/src/test/java/io/quarkiverse/permuplate/example/drools/`.
+118+ tests across 17 test classes (base class `DroolsDslTestBase` excluded from count).
 
 | Class | Coverage |
 |---|---|
@@ -660,19 +776,25 @@ All tests are in `permuplate-mvn-examples/src/test/java/io/quarkiverse/permuplat
 | `ExtensionPointTest` | `extensionPoint()`/`extendsRule()` — single filter, add join, two base joins, fan-out (two children), extend-of-extend, inherits `not()` scope, inherits `exists()` scope |
 | `NamedRuleTest` | `builder.rule("name").from()`, `.fn().end()` no-op, all four param styles (typed, list, map, typed-per-param), named rule + extension point |
 | `TupleAsTest` | `BaseTuple.as()` — projects `Tuple2`/`Tuple3` into records and plain classes |
+| `FunctionalFamilyTest` | `Consumer2..7` and `Predicate2..7` — `@FunctionalInterface` presence, lambda assignment, correct arity, type parameter structure |
+| `VariableFilterExtTest` | Variable-filter overloads for m=2..6 — typed lambda correctness, index-snapshot semantics, unbound error path |
+| `PermuteMixinTest` | `@PermuteMixin` injection — `extendsRule()` overloads present on both `RuleBuilder` and `ParametersFirst` |
+| `NonTemplateMixinTest` | `@PermuteMixin` on non-template classes — `VariableFilterMixin` injected into `RuleDefinition` without a `@Permute` on `RuleDefinition` itself |
+| `PermuteMacrosTest` | Container-level `@PermuteMacros` — `alphaList` macro available in nested templates; `prev` macro on `RuleExtendsPoint` |
+| `PermuteExtendsChainTest` | `@PermuteExtendsChain` — `BaseTuple.Tuple2..6` correctly extend the previous tuple in the chain |
+| `SealedFamilyTest` | `@PermuteSealedFamily` — `JoinBuilderFirst`/`JoinBuilderSecond` sealed interfaces; generated classes are `non-sealed`; Java 21 pattern switch dispatch |
+| `SuperCallInferenceTest` | Constructor super-call inference — `Tuple2..6` constructors correctly delegate to parent |
+| `PermuteReturnTypeParamTest` | `@PermuteReturn(typeParam=)` — return type fixed to a named type parameter; `type()` narrowing via `replaceLastTypeArgWith` |
+| `PermuteBodyFragmentTest` | `@PermuteBodyFragment` — named body fragments substituted into `@PermuteBody` strings |
+| `ConstructorCoherenceTest` | Constructor-coherence inference — `join()` and `extensionPoint()` body `new X<>()` renamed without `@PermuteDeclr` |
+| `OOPathReflectionTest` | OOPath reflection — `pathN()` body constructs `new Join${i+1}First<>()` and `new RuleOOPathBuilder.Path${n}<>()` correctly |
 
 ---
 
 ## Real Drools Migration
 
 This sandbox exists to validate that Permuplate can generate the arity-indexed class families
-that make up the real Drools RuleBuilder API. The real Drools code is at:
-
-```
-/Users/mdproctor/dev/droolsoct2025/droolsvol2/src/main/java/org/drools/core/RuleBuilder.java
-```
-
-The hand-written Drools codebase has `Join2First..Join5First`, `Join2Second..Join5Second`,
+that make up the real Drools RuleBuilder API. The hand-written Drools codebase has `Join2First..Join5First`, `Join2Second..Join5Second`,
 `Consumer1..4`, `Predicate1..10`, `Function1..5` — all candidates for Permuplate generation.
 
 **Planned migration order:**
