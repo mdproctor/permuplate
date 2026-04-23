@@ -1,0 +1,68 @@
+title: Permuplate
+description: "Java annotation processor that generates type-safe arity permutations from a single compilable template. No external tools. Full IDE support."
+baseurl: "/permuplate"
+url: "https://mdproctor.github.io"
+author: Mark Proctor
+
+permalink: /blog/:year/:month/:day/:title/
+
+markdown: kramdown
+kramdown:
+  input: GFM
+
+plugins:
+  - jekyll-feed
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - DECISIONS.md
+  - HANDOFF.md
+  - CLAUDE.md
+  - pom.xml
+  - permuplate-annotations
+  - permuplate-core
+  - permuplate-ide-support
+  - permuplate-processor
+  - permuplate-maven-plugin
+  - permuplate-apt-examples
+  - permuplate-mvn-examples
+  - permuplate-tests
+  - permuplate-test-support
+  - permuplate-intellij-plugin
+  - docs
+  - snapshots
+  - target
+  - _site
+  - .github
+
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: post
+
+  - scope:
+      path: "README.md"
+    values:
+      layout: doc
+      title: "Quick Start"
+      permalink: /quick-start/
+      render_with_liquid: false
+
+  - scope:
+      path: "OVERVIEW.md"
+    values:
+      layout: doc
+      title: "Overview"
+      permalink: /overview/
+      render_with_liquid: false
+
+  - scope:
+      path: "ARCHITECTURE.md"
+    values:
+      layout: doc
+      title: "Architecture"
+      permalink: /architecture/
+      render_with_liquid: false
