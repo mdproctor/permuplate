@@ -9,14 +9,14 @@ import org.junit.Test;
 
 /**
  * Verifies that @PermuteMacros on the outer class is accessible inside nested templates.
- * The DSL uses this for alphaList= shared between Join0Second and Join0First.
+ * The DSL uses this for alphaList= shared between Join0Gate and Join0First.
  */
 public class PermuteMacrosTest {
 
     @Test
-    public void testJoin3SecondHasFnMethod() throws Exception {
+    public void testJoin3GateHasFnMethod() throws Exception {
         Class<?> join3Second = Class.forName(
-                "io.quarkiverse.permuplate.example.drools.JoinBuilder$Join3Second");
+                "io.quarkiverse.permuplate.example.drools.JoinBuilder$Join3Gate");
         Method fn = Arrays.stream(join3Second.getMethods())
                 .filter(m -> m.getName().equals("fn"))
                 .findFirst().orElse(null);

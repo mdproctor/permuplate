@@ -362,11 +362,11 @@ public class RuleBuilderTest {
     // =========================================================================
 
     @Test
-    public void testJoin2FirstSatisfiesJoin2SecondAtCompileTime() {
-        // Structural: Join2First<Void,Ctx,Person,Account> IS-A Join2Second<Void,Ctx,Person,Account>.
+    public void testJoin2FirstSatisfiesJoin2GateAtCompileTime() {
+        // Structural: Join2First<Void,Ctx,Person,Account> IS-A Join2Gate<Void,Ctx,Person,Account>.
         // This test only compiles if the extends relation is correct.
-        // If Join2First does not extend Join2Second, this assignment fails at compile time.
-        JoinBuilder.Join2Second<Void, Ctx, Person, Account> asSecond = builder.from(ctx -> ctx.persons())
+        // If Join2First does not extend Join2Gate, this assignment fails at compile time.
+        JoinBuilder.Join2Gate<Void, Ctx, Person, Account> asSecond = builder.from(ctx -> ctx.persons())
                 .join(ctx -> ctx.accounts());
         assertThat(asSecond).isNotNull();
     }

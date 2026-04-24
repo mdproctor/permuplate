@@ -5,7 +5,7 @@ import io.quarkiverse.permuplate.PermuteMacros;
 import io.quarkiverse.permuplate.PermuteTypeParam;
 
 /**
- * Container for typed extension point handles produced by JoinNSecond.extensionPoint().
+ * Container for typed extension point handles produced by JoinNGate.extensionPoint().
  * Each inner class captures the base rule's RuleDefinition and encodes the accumulated
  * fact types in its type parameters.
  *

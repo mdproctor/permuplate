@@ -65,7 +65,7 @@ public class RuleDefinition<DS> {
     }
 
     // -------------------------------------------------------------------------
-    // Builder methods — called by generated JoinFirst/Second classes
+    // Builder methods — called by generated JoinFirst/Gate classes
     // -------------------------------------------------------------------------
 
     /**
@@ -124,7 +124,7 @@ public class RuleDefinition<DS> {
     /**
      * Registers a negation sub-network. During {@link #matchedTuples}, outer tuples
      * are excluded if this sub-network produces ANY matching result (zero-match required).
-     * Called by {@code JoinNSecond.not()} before returning the NotScope.
+     * Called by {@code JoinNGate.not()} before returning the NotScope.
      */
     public void addNot(RuleDefinition<DS> notScope) {
         negations.add(notScope);
@@ -133,7 +133,7 @@ public class RuleDefinition<DS> {
     /**
      * Registers an existence sub-network. During {@link #matchedTuples}, outer tuples
      * are excluded if this sub-network produces ZERO matching results (at-least-one required).
-     * Called by {@code JoinNSecond.exists()} before returning the ExistsScope.
+     * Called by {@code JoinNGate.exists()} before returning the ExistsScope.
      */
     public void addExists(RuleDefinition<DS> existsScope) {
         existences.add(existsScope);

@@ -9,7 +9,7 @@ public class SealedFamilyTest {
     @Test
     public void joinBuilderSecond_is_sealed_with_six_permitted_subclasses() throws Exception {
         Class<?> iface = Class.forName(
-                "io.quarkiverse.permuplate.example.drools.JoinBuilder$JoinBuilderSecond");
+                "io.quarkiverse.permuplate.example.drools.JoinBuilder$JoinBuilderGate");
         assertThat(iface.isInterface()).isTrue();
         assertThat(iface.isSealed()).isTrue();
         assertThat(iface.getPermittedSubclasses()).hasLength(6);
@@ -18,9 +18,9 @@ public class SealedFamilyTest {
     @Test
     public void join1Second_implements_joinBuilderSecond() throws Exception {
         Class<?> iface = Class.forName(
-                "io.quarkiverse.permuplate.example.drools.JoinBuilder$JoinBuilderSecond");
+                "io.quarkiverse.permuplate.example.drools.JoinBuilder$JoinBuilderGate");
         Class<?> cls = Class.forName(
-                "io.quarkiverse.permuplate.example.drools.JoinBuilder$Join1Second");
+                "io.quarkiverse.permuplate.example.drools.JoinBuilder$Join1Gate");
         assertThat(iface.isAssignableFrom(cls)).isTrue();
     }
 

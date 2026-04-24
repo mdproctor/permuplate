@@ -97,7 +97,7 @@ public class ExtensionPointTest extends DroolsDslTestBase {
     public void testExtendsChaining() {
         // Extend-of-extend: ep1 captures 1 join; ep2 extends ep1 and captures 2 joins;
         // rule extends ep2 and adds a third join.
-        // extensionPoint() is available on JoinNFirst because JoinNFirst extends JoinNSecond.
+        // extensionPoint() is available on JoinNFirst because JoinNFirst extends JoinNGate.
         var ep1 = builder.from(ctx -> ctx.persons())
                 .filter((ctx, p) -> p.age() >= 18)
                 .extensionPoint();

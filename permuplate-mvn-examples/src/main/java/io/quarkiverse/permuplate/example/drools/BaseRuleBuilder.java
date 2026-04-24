@@ -1,7 +1,7 @@
 package io.quarkiverse.permuplate.example.drools;
 
 /**
- * Base class for all generated JoinNFirst and JoinNSecond classes.
+ * Base class for all generated JoinNFirst and JoinNGate classes.
  *
  * <p>
  * The {@code END} phantom type parameter enables typed nested scopes. When a
@@ -20,10 +20,10 @@ package io.quarkiverse.permuplate.example.drools;
  * <pre>
  *   .params()           → From1First&lt;Void,DS,Params3&gt;                  arity: 1
  *   .join(persons)      → Join2First&lt;Void,DS,Params3,Person&gt;            arity: 2
- *   .not()              → Not2&lt;Join2Second&lt;Void,...&gt;, DS, Params3, Person&gt;
- *       .join(misc)     → Join3First&lt;Join2Second&lt;Void,...&gt;, ...&gt;         arity: 3 (inside scope)
- *       .join(libs)     → Join4First&lt;Join2Second&lt;Void,...&gt;, ...&gt;         arity: 4 (inside scope)
- *   .end()              → Join2Second&lt;Void,DS,Params3,Person&gt;            arity: 2 (reset!)
+ *   .not()              → Not2&lt;Join2Gate&lt;Void,...&gt;, DS, Params3, Person&gt;
+ *       .join(misc)     → Join3First&lt;Join2Gate&lt;Void,...&gt;, ...&gt;         arity: 3 (inside scope)
+ *       .join(libs)     → Join4First&lt;Join2Gate&lt;Void,...&gt;, ...&gt;         arity: 4 (inside scope)
+ *   .end()              → Join2Gate&lt;Void,DS,Params3,Person&gt;            arity: 2 (reset!)
  *   .fn((a,b,c) -&gt; ...)  Consumer3&lt;Context&lt;DS&gt;,Params3,Person&gt;          arity 2 confirmed
  * </pre>
  *

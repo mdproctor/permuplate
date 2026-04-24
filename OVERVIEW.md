@@ -1,3 +1,5 @@
+---
+---
 # Permuplate — Annotation API Reference
 
 For the contributor architecture guide (transformation pipeline, module structure, testing strategy), see [ARCHITECTURE.md](ARCHITECTURE.md).

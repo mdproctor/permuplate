@@ -12,10 +12,9 @@ description: "Permuplate documentation: quick start, architecture, annotation re
       <div class="section-label">Reference</div>
       <h1 style="font-size:clamp(4rem,12vw,8rem)">Documentation</h1>
       <p style="color:var(--muted);font-size:0.95rem;max-width:520px;margin-top:var(--space-md);line-height:1.7">
-        Full documentation lives in the GitHub repository as versioned Markdown.
-        The links below take you directly to the rendered source. Start with
-        the Quick Start, then reach for the Architecture deep-dive when you need
-        to understand what the processor is doing under the hood.
+        All documentation is versioned Markdown — readable here on the site or
+        directly on GitHub. Start with the Quick Start, then reach for the
+        Overview when you need to understand what the processor is doing under the hood.
       </p>
     </div>
   </section>
@@ -29,7 +28,7 @@ description: "Permuplate documentation: quick start, architecture, annotation re
       <h2>Guides</h2>
 
       <div class="docs-grid mt-xl">
-        <a href="https://github.com/mdproctor/permuplate/blob/main/README.md" target="_blank" class="doc-card">
+        <a href="#quick-start" class="doc-card">
           <span class="doc-card-tag">01 — Quick Start</span>
           <h3>README</h3>
           <p>
@@ -39,8 +38,8 @@ description: "Permuplate documentation: quick start, architecture, annotation re
           </p>
         </a>
 
-        <a href="https://github.com/mdproctor/permuplate/blob/main/OVERVIEW.md" target="_blank" class="doc-card">
-          <span class="doc-card-tag">02 — Architecture</span>
+        <a href="{{ '/overview/' | relative_url }}" class="doc-card">
+          <span class="doc-card-tag">02 — Overview</span>
           <h3>OVERVIEW</h3>
           <p>
             Deep-dive into the annotation processor pipeline, transformation engine,
@@ -79,9 +78,9 @@ description: "Permuplate documentation: quick start, architecture, annotation re
           </p>
         </a>
 
-        <a href="https://github.com/mdproctor/permuplate/blob/main/CLAUDE.md" target="_blank" class="doc-card">
+        <a href="{{ '/architecture/' | relative_url }}" class="doc-card">
           <span class="doc-card-tag">06 — Contributors</span>
-          <h3>CLAUDE.md</h3>
+          <h3>ARCHITECTURE</h3>
           <p>
             Full contributor context: module layout, processor internals, key
             non-obvious decisions, error reporting standards, and test structure.
@@ -95,7 +94,7 @@ description: "Permuplate documentation: quick start, architecture, annotation re
   <!-- ============================================================
        QUICK START CODE
        ============================================================ -->
-  <section class="section" style="background:var(--press)">
+  <section id="quick-start" class="section" style="background:var(--press)">
     <div class="container">
       <div class="section-label">Step by Step</div>
       <h2>Quick Start</h2>

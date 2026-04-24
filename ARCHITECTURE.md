@@ -1,3 +1,5 @@
+---
+---
 # Permuplate — Architecture Reference
 
 Contributor guide to the processor internals. For the annotation API reference, see [OVERVIEW.md](OVERVIEW.md).

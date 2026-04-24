@@ -31,7 +31,7 @@ from hand-written ones.
 | Phase | What it adds | Status | Key classes |
 |---|---|---|---|
 | 1 | Linear join chain: `from()`, `join()`, `filter()`, `fn()` | Complete | `JoinBuilder` (templates), `DataSource`, `RuleDefinition`, `RuleResult` |
-| 2 | First/Second split, END phantom type, bi-linear joins (15 overloads) | Complete | `Join0Second`, `Join0First`, `BaseRuleBuilder`, `JoinSecond` |
+| 2 | First/Second split, END phantom type, bi-linear joins (15 overloads) | Complete | `Join0Gate`, `Join0First`, `BaseRuleBuilder`, `JoinGate` |
 | 3a | `not()`/`exists()` constraint scopes | Complete | `NotScope`, `ExistsScope` |
 | 3b | OOPath traversal: `path2()..path6()` | Complete | `RuleOOPathBuilder`, `BaseTuple`, `PathContext`, `OOPathStep` |
 | 4 | `Variable<T>` cross-fact binding | Complete | `Variable`, `Predicate3`, `Predicate4` |
@@ -42,21 +42,21 @@ from hand-written ones.
 
 ## Architecture: Two Families
 
-The `JoinNFirst` / `JoinNSecond` split mirrors the real Drools design:
+The `JoinNFirst` / `JoinNGate` split mirrors the real Drools design:
 
-- **`JoinNSecond<END, DS, A, B, ...>`** — the "gateway" class. Holds `join()` (both
+- **`JoinNGate<END, DS, A, B, ...>`** — the "gateway" class. Holds `join()` (both
   single-source and bi-linear overloads), `not()`, `exists()`, `path2()..path6()`,
   `extensionPoint()`, and `fn()`. After a `not(...).end()` or `exists(...).end()` scope
-  chain-back, the returned type is `JoinNSecond` — and `fn()` is available because it
+  chain-back, the returned type is `JoinNGate` — and `fn()` is available because it
   lives here.
 
-- **`JoinNFirst<END, DS, A, B, ...> extends JoinNSecond`** — the "full" class. Adds
+- **`JoinNFirst<END, DS, A, B, ...> extends JoinNGate`** — the "full" class. Adds
   `filter()` (two overloads: all-facts and single-fact), `var()`, and variable-based
-  `filter(v1, v2, pred)` overloads. `JoinNFirst extends JoinNSecond` means a pre-built
-  chain can be passed anywhere `JoinNSecond` is expected — enabling bi-linear joins.
+  `filter(v1, v2, pred)` overloads. `JoinNFirst extends JoinNGate` means a pre-built
+  chain can be passed anywhere `JoinNGate` is expected — enabling bi-linear joins.
 
 Both families are generated from templates inside `JoinBuilder.java` using `inline = true`.
-The `Join0Second` template is declared first so that PermuteMojo processes it before
+The `Join0Gate` template is declared first so that PermuteMojo processes it before
 `Join0First` — boundary omission on `join()` (which references `Join${i+1}First`) must see
 the complete generated-class set.
 
@@ -70,7 +70,7 @@ returns to.
 
 - **Top-level rules** (created via `from()` or `rule("name").from()`): `END = Void`.
   `end()` returns null and is never called in practice.
-- **Nested scopes** (`not()`, `exists()`): `END = outer JoinNSecond type`. `end()` returns
+- **Nested scopes** (`not()`, `exists()`): `END = outer JoinNGate type`. `end()` returns
   the outer builder at its original arity.
 
 The arity freezes at scope entry and is restored at scope exit — scope facts do not
@@ -114,7 +114,7 @@ The compiler enforces that lambda signatures match the accumulated fact types ex
 
 ### Template Structure
 
-Both `Join0Second` and `Join0First` live inside `JoinBuilder.java` as nested static classes
+Both `Join0Gate` and `Join0First` live inside `JoinBuilder.java` as nested static classes
 annotated with `@Permute(inline=true)`. Each generates `Join1..Join6`. The `inline=true` mode
 is required because `@PermuteReturn` boundary omission (needed for the leaf-node `join()`)
 only works in the Maven plugin's `InlineGenerator`.
@@ -165,7 +165,7 @@ public Object filterLatest(...) { ... }
 
 ### The Leaf Node
 
-`Join6Second` has no `join()` method — `@PermuteReturn` boundary omission silently removes
+`Join6Gate` has no `join()` method — `@PermuteReturn` boundary omission silently removes
 it when `Join7First` is not in the generated set. `filter()` and `fn()` are still present.
 
 ### Permuplate Features Exercised
@@ -174,7 +174,7 @@ it when `Join7First` is not in the generated set. `filter()` and `fn()` are stil
 |---|---|
 | **G1** `@PermuteTypeParam` (explicit, alpha) | Class type params `A..F` — `name="${alpha(k)}"` |
 | **G2** `@PermuteReturn` (explicit) | All return types — alpha naming disables implicit inference |
-| **G2** Boundary omission | `Join6Second.join()` omitted — `Join7First` not in generated set |
+| **G2** Boundary omission | `Join6Gate.join()` omitted — `Join7First` not in generated set |
 | **`@PermuteFilter`** | `filterLatest` suppressed at i=1 — `@PermuteFilter("i > 1")` |
 | **`@PermuteDefaultReturn(className="self")`** | All `filter()` / `var()` / `index()` returns on `Join0First` — no per-method `@PermuteSelf` needed |
 | **`@PermuteMacros`** on container | `alphaList=typeArgList(1,i,'alpha')` on `JoinBuilder` — shared by both nested templates |
@@ -190,21 +190,21 @@ See [ADR-0003](../docs/adr/0003-end-phantom-type-added-in-phase-2.md).
 
 ### First/Second Split
 
-`fn()` was moved from `Join0First` to `Join0Second` so that after `not(...).end()` or
-`exists(...).end()` — which return `JoinNSecond` — the fluent chain can call `fn()` directly.
+`fn()` was moved from `Join0First` to `Join0Gate` so that after `not(...).end()` or
+`exists(...).end()` — which return `JoinNGate` — the fluent chain can call `fn()` directly.
 
 ```java
 builder.from(ctx -> ctx.persons())
-        .not()                                // returns NotScope<Join1Second<...>, DS>
+        .not()                                // returns NotScope<Join1Gate<...>, DS>
         .join(ctx -> ctx.accounts())
         .filter(...)
-        .end()                                // returns Join1Second<Void, DS, Person>
-        .fn((ctx, p) -> { ... });             // fn() is on JoinNSecond — works here
+        .end()                                // returns Join1Gate<Void, DS, Person>
+        .fn((ctx, p) -> { ... });             // fn() is on JoinNGate — works here
 ```
 
 ### Bi-Linear Joins
 
-`JoinNSecond.join(JoinMSecond<Void, DS, ...>)` joins two independent fact chains:
+`JoinNGate.join(JoinMSecond<Void, DS, ...>)` joins two independent fact chains:
 
 ```java
 // Pre-build a sub-network: adult persons with high-balance accounts
@@ -214,7 +214,7 @@ var personAccounts = builder.from(ctx -> ctx.persons())
 
 // Two rules sharing the same sub-network (Rete node-sharing)
 var rule1 = builder.from(ctx -> ctx.orders())
-        .join(personAccounts)     // Join2First accepted via JoinNFirst extends JoinNSecond
+        .join(personAccounts)     // Join2First accepted via JoinNFirst extends JoinNGate
         .fn((ctx, a, b, c) -> { }); // a: Order, b: Person, c: Account
 
 var rule2 = builder.from(ctx -> ctx.products())
@@ -237,18 +237,18 @@ alpha-named method type params `alpha(i+1)..alpha(i+j)`.
 
 | Feature | Used by |
 |---|---|
-| **G3** Extends clause auto-expansion (alpha branch) | `Join0First extends Join0Second<END, DS, A>` |
+| **G3** Extends clause auto-expansion (alpha branch) | `Join0First extends Join0Gate<END, DS, A>` |
 | **G4** Method-level `@PermuteTypeParam` inside `@PermuteMethod` | `joinBilinear()` — j new alpha type params |
 | **`@PermuteMethod`** inferred `to` | Bi-linear join — `to` omitted, inferred as `6 - i` |
 | **`@PermuteMethod` `macros=`** | `joinAll` and `joinRight` named type arg lists, reused in `@PermuteReturn` and `@PermuteDeclr` |
-| **`@PermuteSealedFamily`** | `JoinBuilderFirst` and `JoinBuilderSecond` sealed interfaces — enables Java 21 pattern dispatch over the full arity family |
-| PermuteMojo multi-template chaining | Two templates in `JoinBuilder.java` — `Join0Second` declared first so boundary omission sees complete name set |
+| **`@PermuteSealedFamily`** | `JoinBuilderFirst` and `JoinBuilderGate` sealed interfaces — enables Java 21 pattern dispatch over the full arity family |
+| PermuteMojo multi-template chaining | Two templates in `JoinBuilder.java` — `Join0Gate` declared first so boundary omission sees complete name set |
 
 ---
 
 ## Phase 3a: Constraint Scopes (not/exists)
 
-`not()` and `exists()` are methods on `Join0Second` that return typed scope builders.
+`not()` and `exists()` are methods on `Join0Gate` that return typed scope builders.
 See [ADR-0004](../docs/adr/0004-negationscope-as-separate-class.md).
 
 ```java
@@ -271,8 +271,8 @@ scope. This is the known type-safety limitation (see Known Limitations).
 `@PermuteDeclr` renames the self-returning `join()` and `filter()` return types to the
 generated class name. This eliminates the duplicate class — one template covers both.
 
-Both are independent classes (not subtypes of `JoinNSecond`) — this was the key design
-choice. The inheritance approach was rejected because `Join2Second` has one `rd` field, and
+Both are independent classes (not subtypes of `JoinNGate`) — this was the key design
+choice. The inheritance approach was rejected because `Join2Gate` has one `rd` field, and
 inheriting it means `join()` inside the not-scope would add to the outer `rd` instead of the
 scope's private `rd`.
 
@@ -282,7 +282,7 @@ scope's private `rd`.
 - `filter(Object predicate)` adds to the scope's private `rd`
 - `end()` returns `OUTER` — the typed outer builder, fully restoring arity
 
-Both `not()` and `exists()` are generated from a single template method on `Join0Second`
+Both `not()` and `exists()` are generated from a single template method on `Join0Gate`
 using `@PermuteMethod(varName = "scope", values = {"not", "exists"}, name = "${scope}")`.
 A `capitalize(scope)` macro (`Scope`) drives the return type construction and the
 `@PermuteBody` body:
@@ -329,7 +329,7 @@ is sufficient for API design validation.
 
 ## Phase 3b: OOPath Traversal
 
-`path2()..path6()` methods on `Join0Second` start typed OOPath traversal chains. Fixed arity
+`path2()..path6()` methods on `Join0Gate` start typed OOPath traversal chains. Fixed arity
 was chosen over an `end()`-terminated chain to avoid the scope-chain complexity of nested
 builders.
 
@@ -392,7 +392,7 @@ to the same (last-mutated) tuple.
 
 ### path2()..path6() Suppression
 
-All `pathN()` methods use `when="i < 6"` on `@PermuteReturn` — suppressed on `Join6Second`
+All `pathN()` methods use `when="i < 6"` on `@PermuteReturn` — suppressed on `Join6Gate`
 since there is no `Join7First` to receive the traversal result.
 
 ### Permuplate Features Exercised
@@ -400,7 +400,7 @@ since there is no `Join7First` to receive the traversal result.
 | Feature | Used by |
 |---|---|
 | **`@PermuteMethod` with `macros=`** | `tail`, `prev`, `outerJoin`, `prevTuple` named type arg expressions — reused in `@PermuteReturn` and `@PermuteBody` |
-| **`@PermuteReturn` `when=`** | `when="i < 6"` suppresses `pathN()` on `Join6Second` |
+| **`@PermuteReturn` `when=`** | `when="i < 6"` suppresses `pathN()` on `Join6Gate` |
 | **`@PermuteTypeParam`** (standalone on method) | Expands root traversal type param per OOPath arity |
 | **`@PermuteExtendsChain`** | `Tuple1 extends Tuple0`, `Tuple2 extends Tuple1`, … — `@PermuteExtendsChain` generates the chain without explicit `@PermuteExtends` on every tuple |
 
@@ -480,7 +480,7 @@ var rule2 = builder.extendsRule(ep)
 ```
 
 Extend-of-extend works naturally — `extensionPoint()` is available on `JoinNFirst` because
-`JoinNFirst extends JoinNSecond`, which holds `extensionPoint()`.
+`JoinNFirst extends JoinNGate`, which holds `extensionPoint()`.
 
 ### RuleExtendsPoint Container
 
@@ -782,7 +782,7 @@ All tests are in `permuplate-mvn-examples/src/test/java/io/quarkiverse/permuplat
 | `NonTemplateMixinTest` | `@PermuteMixin` on non-template classes — `VariableFilterMixin` injected into `RuleDefinition` without a `@Permute` on `RuleDefinition` itself |
 | `PermuteMacrosTest` | Container-level `@PermuteMacros` — `alphaList` macro available in nested templates; `prev` macro on `RuleExtendsPoint` |
 | `PermuteExtendsChainTest` | `@PermuteExtendsChain` — `BaseTuple.Tuple2..6` correctly extend the previous tuple in the chain |
-| `SealedFamilyTest` | `@PermuteSealedFamily` — `JoinBuilderFirst`/`JoinBuilderSecond` sealed interfaces; generated classes are `non-sealed`; Java 21 pattern switch dispatch |
+| `SealedFamilyTest` | `@PermuteSealedFamily` — `JoinBuilderFirst`/`JoinBuilderGate` sealed interfaces; generated classes are `non-sealed`; Java 21 pattern switch dispatch |
 | `SuperCallInferenceTest` | Constructor super-call inference — `Tuple2..6` constructors correctly delegate to parent |
 | `PermuteReturnTypeParamTest` | `@PermuteReturn(typeParam=)` — return type fixed to a named type parameter; `type()` narrowing via `replaceLastTypeArgWith` |
 | `PermuteBodyFragmentTest` | `@PermuteBodyFragment` — named body fragments substituted into `@PermuteBody` strings |
@@ -794,7 +794,7 @@ All tests are in `permuplate-mvn-examples/src/test/java/io/quarkiverse/permuplat
 ## Real Drools Migration
 
 This sandbox exists to validate that Permuplate can generate the arity-indexed class families
-that make up the real Drools RuleBuilder API. The hand-written Drools codebase has `Join2First..Join5First`, `Join2Second..Join5Second`,
+that make up the real Drools RuleBuilder API. The hand-written Drools codebase has `Join2First..Join5First`, `Join2Gate..Join5Gate`,
 `Consumer1..4`, `Predicate1..10`, `Function1..5` — all candidates for Permuplate generation.
 
 **Planned migration order:**
@@ -828,7 +828,7 @@ GitHub epics: main `apache/incubator-kie-drools#6639` → DSL sub-epic #6638 (ch
 | Single-fact `filter(Predicate2<DS, C>)` | Handwritten per arity | Generated; suppressed at i=1 via JEXL ternary |
 | All-facts `filter(PredicateN+1<DS,...>)` | Handwritten per arity | Generated |
 | First extends Second | Handwritten | G3 auto-expands extends clause |
-| `join(JoinNSecond)` bi-linear (15 overloads) | ~3 overloads, 1 commented out | Complete matrix (15) via `@PermuteMethod` |
+| `join(JoinNGate)` bi-linear (15 overloads) | ~3 overloads, 1 commented out | Complete matrix (15) via `@PermuteMethod` |
 | `not()`/`exists()` scopes | Full beta memory | Sandbox: global scope evaluation |
 | Boundary omission (leaf node) | Manually written | Automatic via `@PermuteReturn` |
 | Extend to arity 10 | Requires editing N classes | Change `to=6` on templates |
@@ -842,7 +842,7 @@ GitHub epics: main `apache/incubator-kie-drools#6639` → DSL sub-epic #6638 (ch
 | [ADR-0001](../docs/adr/0001-standalone-method-level-permutetypeparam-with-propagation.md) | Standalone method-level `@PermuteTypeParam` with rename propagation |
 | [ADR-0002](../docs/adr/0002-oopath-runtime-as-pipeline-on-ruledefinition.md) | OOPath runtime as pipeline on `RuleDefinition` |
 | [ADR-0003](../docs/adr/0003-end-phantom-type-added-in-phase-2.md) | END phantom type added alongside First/Second split in Phase 2 |
-| [ADR-0004](../docs/adr/0004-negationscope-as-separate-class.md) | `NotScope`/`ExistsScope` as separate builder classes, not `JoinNSecond` subtypes |
+| [ADR-0004](../docs/adr/0004-negationscope-as-separate-class.md) | `NotScope`/`ExistsScope` as separate builder classes, not `JoinNGate` subtypes |
 | [ADR-0005](../docs/adr/0005-sandbox-scope-boundary.md) | Sandbox scope boundary: DSL API design only; Rete engine out of scope |
 
 **Blog series:** `site/_posts/` — entries from 2026-04-04 through 2026-04-18 cover the Permuplate implementation journey including typed joins, First/Second split, not()/exists(), OOPath traversal, and the sandbox template consolidation.

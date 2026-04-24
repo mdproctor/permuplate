@@ -4,7 +4,7 @@ import io.quarkiverse.permuplate.Permute;
 import io.quarkiverse.permuplate.PermuteDeclr;
 
 /**
- * Scope builder returned by {@code JoinNSecond.not()}.
+ * Scope builder returned by {@code JoinNGate.not()}.
  * Template (keepTemplate=true) generates {@link ExistsScope} via string-set permutation.
  *
  * <p>
