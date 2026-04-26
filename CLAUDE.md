@@ -134,9 +134,9 @@ work to date against the full vol2 test suite to identify gaps.
 
 ## Blog
 
-**Blog directory:** `site/_posts/`
+**Blog directory:** `_posts/`
 
-Blog posts are Jekyll posts — they must have YAML frontmatter (layout, title, date, phase, phase_label). The site is built with Jekyll from `site/` and deployed to `mdproctor.github.io/permuplate/`.
+Blog posts are Jekyll posts — they must have YAML frontmatter (layout, title, date, phase, phase_label). The site is built with Jekyll from the repo root and deployed to `mdproctor.github.io/permuplate/`.
 
 **The writing style guide at `~/claude-workspace/writing-styles/blog-technical.md` is mandatory for all blog and diary entries.** Load it in full before drafting any entry. Complete the pre-draft voice classification (I / we / Claude-named) before generating any prose. Do not show a draft without first verifying it against the style guide's "What to Avoid" section.
 
